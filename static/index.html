@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTsys - 量化交易回测系统</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/lib/codemirror.css">
+    <link rel="stylesheet" href="/static/lib/dracula.css">
+    <style>
+/* ===== 全局样式 ===== */
+:root {
+    --bg-900: #0f1117; --bg-800: #1a1d29; --bg-700: #1e2235;
+    --bg-600: #252a3a; --bg-500: #2d3348; --bg-400: #3b4261;
+    --text-100: #f1f5f9; --text-200: #e2e8f0; --text-300: #cbd5e1;
+    --text-400: #94a3b8; --text-500: #64748b;
+    --accent: #6366f1; --accent-light: #818cf8;
+    --profit: #22c55e; --loss: #ef4444;
+    --border: #2d3348;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-800); color: var(--text-200); min-height: 100vh; }
+a { color: var(--accent-light); text-decoration: none; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-800); }
+::-webkit-scrollbar-thumb { background: var(--bg-400); border-radius: 3px; }
+
+/* ===== 布局 ===== */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.header { background: var(--bg-700); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-brand h1 { font-size: 20px; font-weight: 700; color: var(--accent-light); }
+.header-brand span { font-size: 12px; color: var(--text-500); }
+.nav { display: flex; gap: 4px; }
+.nav-btn { padding: 8px 16px; border-radius: 8px; border: none; background: transparent; color: var(--text-400); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.nav-btn:hover { color: var(--text-200); background: var(--bg-600); }
+.nav-btn.active { background: var(--accent); color: white; }
+.main { flex: 1; padding: 24px; max-width: 1280px; margin: 0 auto; width: 100%; }
+
+/* ===== 通用组件 ===== */
+.card { background: var(--bg-700); border-radius: 12px; padding: 20px; }
+.card-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: var(--text-100); }
+.input { width: 100%; background: var(--bg-700); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-200); font-size: 14px; outline: none; transition: border-color 0.2s; }
+.input:focus { border-color: var(--accent); }
+select.input { cursor: pointer; }
+.label { font-size: 12px; color: var(--text-400); margin-bottom: 4px; display: block; }
+.btn { padding: 8px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-light); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: var(--bg-600); color: var(--text-300); }
+.btn-secondary:hover { background: var(--bg-500); }
+.btn-danger { color: var(--loss); background: none; border: none; font-size: 12px; cursor: pointer; padding: 2px 0; }
+.btn-danger:hover { text-decoration: underline; }
+.btn-link { color: var(--accent-light); background: none; border: none; font-size: 13px; cursor: pointer; padding: 0; }
+.btn-link:hover { text-decoration: underline; }
+
+/* ===== Grid ===== */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+@media (max-width: 900px) { .grid-6 { grid-template-columns: repeat(3, 1fr); } .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.gap-sm { gap: 8px; } .gap-md { gap: 16px; } .gap-lg { gap: 24px; }
+.flex { display: flex; } .flex-col { flex-direction: column; }
+.items-center { align-items: center; } .justify-between { justify-content: space-between; }
+.flex-1 { flex: 1; } .flex-shrink-0 { flex-shrink: 0; }
+.space-y > * + * { margin-top: 16px; }
+.space-y-sm > * + * { margin-top: 8px; }
+.text-center { text-align: center; } .text-right { text-align: right; }
+.text-sm { font-size: 13px; } .text-xs { font-size: 12px; }
+.text-muted { color: var(--text-500); } .text-profit { color: var(--profit); } .text-loss { color: var(--loss); }
+.mt-2 { margin-top: 8px; } .mt-4 { margin-top: 16px; } .py-10 { padding: 40px 0; }
+
+/* ===== 指标卡片 ===== */
+.metric-card { background: var(--bg-700); border-radius: 12px; padding: 16px; transition: all 0.2s; }
+.metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+.metric-label { font-size: 12px; color: var(--text-400); margin-bottom: 4px; }
+.metric-value { font-size: 24px; font-weight: 700; }
+
+/* ===== Tabs ===== */
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab-btn { padding: 12px 20px; border: none; background: none; color: var(--text-400); font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-btn:hover { color: var(--text-200); }
+.tab-btn.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+.tab-content { padding: 20px; }
+
+/* ===== 表格 ===== */
+.table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 8px 12px; color: var(--text-400); border-bottom: 1px solid var(--border); font-weight: 500; position: sticky; top: 0; background: var(--bg-700); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--bg-600); }
+tr:hover td { background: var(--bg-600); }
+
+/* ===== 策略页面 ===== */
+.strategy-layout { display: flex; gap: 16px; }
+.strategy-sidebar { width: 240px; flex-shrink: 0; }
+.strategy-list { max-height: 420px; overflow-y: auto; }
+.strategy-item { padding: 12px; border-radius: 8px; cursor: pointer; transition: all 0.15s; background: var(--bg-700); margin-bottom: 6px; }
+.strategy-item:hover { background: var(--bg-600); }
+.strategy-item.selected { background: var(--bg-500); border: 1px solid var(--accent); }
+.strategy-item-name { font-size: 14px; font-weight: 500; }
+.strategy-item-desc { font-size: 12px; color: var(--text-500); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== 历史记录 ===== */
+.history-item { background: var(--bg-700); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
+.history-item:hover { background: var(--bg-600); }
+.history-return { font-size: 18px; font-weight: 700; }
+
+/* ===== 日志 ===== */
+.log-panel { background: var(--bg-900); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.6; }
+
+/* ===== Toast ===== */
+.toast { position: fixed; top: 16px; right: 16px; padding: 10px 20px; border-radius: 8px; color: white; font-size: 14px; z-index: 999; animation: fadeIn 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.toast-success { background: #16a34a; }
+.toast-error { background: #dc2626; }
+.toast-info { background: var(--accent); }
+
+/* ===== Spinner ===== */
+.spinner { border: 3px solid var(--bg-600); border-top: 3px solid var(--accent); border-radius: 50%; width: 18px; height: 18px; animation: spin 0.8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease; }
+
+/* ===== CodeMirror 覆盖 ===== */
+.CodeMirror { height: 400px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border); }
+
+/* ===== 帮助页面 ===== */
+.help-page { max-width: 860px; margin: 0 auto; }
+.help-section { background: var(--bg-700); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+.help-section h3 { font-size: 16px; font-weight: 600; color: var(--accent-light); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.help-section h4 { font-size: 14px; font-weight: 600; color: var(--text-100); margin: 12px 0 6px; }
+.help-section p, .help-section li { font-size: 13px; color: var(--text-300); line-height: 1.7; }
+.help-section ul { padding-left: 20px; margin: 6px 0; }
+.help-section code { background: var(--bg-900); color: #f59e0b; padding: 1px 6px; border-radius: 4px; font-size: 12px; font-family: 'Consolas', 'Monaco', monospace; }
+.help-code-block { background: var(--bg-900); border-radius: 8px; padding: 16px; margin: 8px 0; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.6; color: var(--text-200); white-space: pre; }
+.help-api-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+.help-api-table th { text-align: left; padding: 6px 10px; color: var(--text-400); border-bottom: 1px solid var(--border); font-weight: 500; }
+.help-api-table td { padding: 6px 10px; border-bottom: 1px solid var(--bg-600); color: var(--text-300); }
+
+/* ===== 因子页面 ===== */
+.factor-layout { display: flex; gap: 16px; }
+.factor-sidebar { width: 260px; flex-shrink: 0; }
+.factor-list { max-height: 500px; overflow-y: auto; }
+.factor-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: all 0.15s; background: var(--bg-700); margin-bottom: 6px; }
+.factor-item:hover { background: var(--bg-600); }
+.factor-item.selected { background: var(--bg-500); border: 1px solid var(--accent); }
+.factor-item-name { font-size: 13px; font-weight: 500; }
+.factor-item-cat { font-size: 11px; color: var(--text-500); margin-top: 2px; }
+.factor-item-expr { font-size: 11px; color: var(--text-400); margin-top: 2px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.factor-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+.factor-badge-builtin { background: #1e3a5f; color: #60a5fa; }
+.factor-badge-gp { background: #1a3a2a; color: #4ade80; }
+.factor-badge-llm { background: #3a2a1a; color: #fbbf24; }
+.factor-badge-user { background: #2a1a3a; color: #c084fc; }
+.factor-metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.factor-metric-box { background: var(--bg-600); border-radius: 8px; padding: 10px; text-align: center; }
+.factor-metric-label { font-size: 11px; color: var(--text-400); }
+.factor-metric-val { font-size: 18px; font-weight: 700; margin-top: 2px; }
+.mine-panel { background: var(--bg-700); border-radius: 12px; padding: 16px; margin-top: 12px; }
+
+/* ===== 新闻页面 ===== */
+.news-layout { display: flex; gap: 16px; }
+.news-main { flex: 1; }
+.news-sidebar { width: 300px; flex-shrink: 0; }
+.news-item { background: var(--bg-700); border-radius: 10px; padding: 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+.news-item:hover { background: var(--bg-600); }
+.news-item.sentiment-bullish { border-left-color: var(--profit); }
+.news-item.sentiment-bearish { border-left-color: var(--loss); }
+.news-item.sentiment-neutral { border-left-color: var(--text-500); }
+.news-title { font-size: 14px; font-weight: 500; line-height: 1.5; }
+.news-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; color: var(--text-500); }
+.news-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.news-badge-bullish { background: #14532d; color: #4ade80; }
+.news-badge-bearish { background: #450a0a; color: #f87171; }
+.news-badge-neutral { background: #1e293b; color: #94a3b8; }
+.news-badge-high { background: #7c2d12; color: #fb923c; }
+.news-badge-mid { background: #1e3a5f; color: #60a5fa; }
+.news-sector-tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; background: var(--bg-500); color: var(--text-300); margin-right: 4px; }
+.news-detail { background: var(--bg-700); border-radius: 12px; padding: 20px; }
+.news-detail-content { font-size: 14px; line-height: 1.8; color: var(--text-300); white-space: pre-wrap; max-height: 500px; overflow-y: auto; }
+.news-filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.news-filter-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-400); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.news-filter-btn:hover { background: var(--bg-600); color: var(--text-200); }
+.news-filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.sentiment-dashboard { background: var(--bg-700); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.sentiment-bar { height: 8px; border-radius: 4px; display: flex; overflow: hidden; margin: 8px 0; }
+.sentiment-bar-bull { background: var(--profit); }
+.sentiment-bar-bear { background: var(--loss); }
+.sentiment-bar-neut { background: var(--text-500); }
+.sector-heat-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--bg-600); font-size: 12px; }
+
+/* ===== 看盘页面 ===== */
+.market-page { display: flex; flex-direction: column; gap: 12px; }
+.market-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--bg-700); border-radius: 10px; padding: 12px 16px; }
+.market-toolbar .input { width: 140px; }
+.market-toolbar select.input { width: 100px; }
+.market-workspace { position: relative; min-height: 600px; background: var(--bg-900); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }
+.stock-window { position: absolute; background: var(--bg-700); border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; flex-direction: column; overflow: hidden; transition: box-shadow 0.15s; min-width: 320px; min-height: 240px; }
+.stock-window.active { border-color: var(--accent); box-shadow: 0 8px 30px rgba(99,102,241,0.25); z-index: 10; }
+.stock-window-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg-600); cursor: grab; user-select: none; flex-shrink: 0; }
+.stock-window-bar:active { cursor: grabbing; }
+.stock-window-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.stock-window-btns { display: flex; gap: 2px; }
+.stock-window-btn { width: 22px; height: 22px; border-radius: 50%; border: none; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-500); color: var(--text-400); transition: all 0.15s; }
+.stock-window-btn:hover { background: var(--bg-400); color: var(--text-100); }
+.stock-window-btn.close-btn:hover { background: var(--loss); color: white; }
+.stock-window-body { flex: 1; padding: 8px; overflow: hidden; }
+.stock-window-resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.stock-window-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px; border-right: 2px solid var(--text-500); border-bottom: 2px solid var(--text-500); }
+.stock-window-info { display: flex; align-items: center; gap: 8px; padding: 0 2px 4px; }
+.stock-window-price { font-size: 16px; font-weight: 700; }
+.stock-window-chg { font-size: 12px; }
+.kline-container { position: relative; width: 100%; }
+.kline-canvas { display: block; border-radius: 4px; }
+.kline-info { display: flex; gap: 10px; font-size: 10px; color: var(--text-400); margin-top: 2px; flex-wrap: wrap; }
+.kline-info span { white-space: nowrap; }
+.workspace-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: var(--text-500); font-size: 14px; text-align: center; pointer-events: none; }
+.draw-panel { background: var(--bg-700); border-radius: 10px; padding: 16px; }
+.draw-panel-title { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.draw-canvas-wrap { position: relative; background: var(--bg-900); border-radius: 8px; border: 2px dashed var(--bg-400); cursor: crosshair; overflow: hidden; }
+.draw-canvas-wrap.drawing { border-color: var(--accent); }
+.draw-canvas { display: block; width: 100%; }
+.draw-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: var(--text-500); font-size: 13px; pointer-events: none; text-align: center; }
+.draw-toolbar { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.match-results { margin-top: 12px; }
+.match-item { background: var(--bg-600); border-radius: 10px; padding: 12px; }
+.match-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.match-name { font-size: 14px; font-weight: 600; }
+.match-code { font-size: 11px; color: var(--text-500); margin-left: 6px; }
+.match-score { font-size: 13px; font-weight: 600; color: var(--accent-light); }
+.match-date { font-size: 11px; color: var(--text-500); }
+.match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 900px) { .match-grid { grid-template-columns: 1fr; } }
+.stock-search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-600); border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 50; margin-top: 2px; }
+.stock-search-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; }
+.stock-search-item:hover { background: var(--bg-500); }
+.stock-search-wrap { position: relative; }
+    </style>
+</head>
+<body>
+    <div id="root"><div style="color:#fff;padding:40px;font-family:sans-serif">Loading...</div></div>
+    <script src="/static/lib/react.production.min.js"></script>
+    <script src="/static/lib/react-dom.production.min.js"></script>
+    <script src="/static/lib/prop-types.min.js"></script>
+    <script src="/static/lib/Recharts.js"></script>
+    <script src="/static/lib/codemirror.js"></script>
+    <script src="/static/lib/python.js"></script>
+    <script src="/static/lib/babel.min.js"></script>
+    <script>
+    window.onerror = function(msg, url, line, col, err) {
+        document.getElementById('root').innerHTML = '<pre style="color:red;padding:20px;">Error: ' + msg + '\nLine: ' + line + '\n' + (err && err.stack || '') + '</pre>';
+    };
+    </script>
+    <script type="text/babel">
+/** ===== React App ===== **/
+const { useState, useEffect, useRef, useCallback } = React;
+const { ComposedChart, AreaChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, Cell } = Recharts;
+
+const api = {
+    get: (url) => fetch(url).then(r => r.json()),
+    post: (url, data) => fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+    put: (url, data) => fetch(url, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(r => r.json()),
+    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
+};
+
+const METRIC_LABELS = {
+    total_return: ['总收益率', '%'], annual_return: ['年化收益率', '%'],
+    annual_volatility: ['年化波动率', '%'], sharpe_ratio: ['夏普比率', ''],
+    max_drawdown: ['最大回撤', '%'], sortino_ratio: ['索提诺比率', ''],
+    calmar_ratio: ['卡尔玛比率', ''], win_rate: ['胜率', '%'],
+    profit_loss_ratio: ['盈亏比', ''], alpha: ['Alpha', '%'],
+    beta: ['Beta', ''], information_ratio: ['信息比率', ''],
+};
+
+/* ===== Toast ===== */
+function Toast({ message, type, onClose }) {
+    useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
+    return <div className={`toast toast-${type}`}>{message}</div>;
+}
+
+/* ===== CodeEditor ===== */
+function CodeEditor({ value, onChange }) {
+    const ref = useRef(null);
+    const cmRef = useRef(null);
+    useEffect(() => {
+        if (ref.current && !cmRef.current) {
+            cmRef.current = CodeMirror(ref.current, {
+                value: value || '', mode: 'python', theme: 'dracula',
+                lineNumbers: true, indentUnit: 4, tabSize: 4, indentWithTabs: false,
+                extraKeys: { 'Tab': (cm) => cm.replaceSelection('    ', 'end') },
+            });
+            cmRef.current.on('change', (cm) => onChange(cm.getValue()));
+        }
+    }, []);
+    useEffect(() => {
+        if (cmRef.current && value !== cmRef.current.getValue()) cmRef.current.setValue(value || '');
+    }, [value]);
+    return <div ref={ref} />;
+}
+
+/* ===== Settings Page ===== */
+function SettingsPage({ showToast }) {
+    const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '' });
+    const [loading, setLoading] = useState(false);
+    useEffect(() => { api.get('/api/settings').then(setS).catch(() => {}); }, []);
+
+    const save = async () => {
+        setLoading(true);
+        try { const r = await api.put('/api/settings', s); setS(r); showToast('设置已保存', 'success'); }
+        catch (e) { showToast('保存失败', 'error'); }
+        setLoading(false);
+    };
+    const validate = async () => {
+        try { const r = await api.post('/api/data/validate_token'); showToast(r.valid ? 'Token验证成功' : 'Token无效', r.valid ? 'success' : 'error'); }
+        catch (e) { showToast(e.detail || '验证失败', 'error'); }
+    };
+    const F = (label, key, type, step) => (
+        <div className="field">
+            <label className="label">{label}</label>
+            <input className="input" type={type||'text'} step={step} value={s[key]||''}
+                onChange={e => setS({...s, [key]: type==='number' ? parseFloat(e.target.value)||0 : e.target.value})} />
+        </div>
+    );
+    return (
+        <div className="fade-in space-y" style={{maxWidth:640,margin:'0 auto'}}>
+            <h2 style={{fontSize:20,fontWeight:600}}>系统设置</h2>
+            <div className="card space-y">
+                <div className="card-title">数据源配置</div>
+                {F('Tushare Token', 'tushare_token')}
+                <button className="btn-link mt-2" onClick={validate}>验证Token</button>
+            </div>
+            <div className="card space-y">
+                <div className="card-title">回测参数</div>
+                <div className="grid-2">
+                    {F('初始资金', 'default_cash', 'number')}
+                    {F('佣金费率', 'commission_rate', 'number', '0.0001')}
+                    {F('印花税率', 'stamp_tax_rate', 'number', '0.0001')}
+                    {F('滑点', 'slippage', 'number', '0.001')}
+                </div>
+            </div>
+            <div className="card space-y">
+                <div className="card-title">LLM因子挖掘配置</div>
+                <p className="text-xs text-muted" style={{marginBottom:8}}>配置后可在因子页面使用LLM智能挖掘功能，支持OpenAI兼容API</p>
+                {F('API Key', 'llm_api_key')}
+                <div className="grid-2">
+                    {F('API地址', 'llm_base_url')}
+                    {F('模型名称', 'llm_model')}
+                </div>
+            </div>
+            <button className="btn btn-primary" onClick={save} disabled={loading}>
+                {loading ? <span className="spinner"/> : null} 保存设置
+            </button>
+        </div>
+    );
+}
+/* ===== Strategy Page ===== */
+function StrategyPage({ showToast }) {
+    const [strategies, setStrategies] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const [code, setCode] = useState('');
+    const [name, setName] = useState('');
+    const [desc, setDesc] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const load = () => api.get('/api/strategies').then(setStrategies).catch(() => {});
+    useEffect(() => { load(); }, []);
+
+    const initBuiltin = async () => {
+        try { await api.post('/api/strategies/init_builtin'); load(); showToast('内置策略已加载', 'success'); }
+        catch (e) { showToast('加载失败', 'error'); }
+    };
+    const selectStrategy = (s) => { setSelected(s); setName(s.name); setDesc(s.description); setCode(s.code); };
+    const newStrategy = () => {
+        setSelected(null); setName('新策略'); setDesc('');
+        setCode('def initialize(context):\n    pass\n\ndef handle_data(context):\n    pass\n');
+    };
+    const save = async () => {
+        setSaving(true);
+        try {
+            if (selected) { await api.put('/api/strategies/' + selected.id, { name, description: desc, code }); showToast('策略已更新', 'success'); }
+            else { await api.post('/api/strategies', { name, description: desc, code }); showToast('策略已创建', 'success'); }
+            load();
+        } catch (e) { showToast('保存失败', 'error'); }
+        setSaving(false);
+    };
+    const delStrategy = async (id) => {
+        if (!confirm('确认删除?')) return;
+        await api.remove('/api/strategies/' + id);
+        if (selected && selected.id === id) { setSelected(null); setCode(''); setName(''); }
+        load(); showToast('已删除', 'success');
+    };
+
+    return (
+        <div className="fade-in strategy-layout">
+            <div className="strategy-sidebar">
+                <div className="flex gap-sm" style={{marginBottom:8}}>
+                    <button className="btn btn-primary flex-1 text-sm" onClick={newStrategy}>新建</button>
+                    <button className="btn btn-secondary flex-1 text-sm" onClick={initBuiltin}>内置策略</button>
+                </div>
+                <div className="strategy-list">
+                    {strategies.map(s => (
+                        <div key={s.id} onClick={() => selectStrategy(s)}
+                            className={'strategy-item' + (selected && selected.id === s.id ? ' selected' : '')}>
+                            <div className="strategy-item-name">{s.name}</div>
+                            <div className="strategy-item-desc">{s.description || '无描述'}</div>
+                            <button className="btn-danger mt-2" onClick={(e) => { e.stopPropagation(); delStrategy(s.id); }}>删除</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="flex-1 flex-col space-y-sm" style={{display:'flex',flexDirection:'column',gap:12}}>
+                <div className="flex gap-sm" style={{gap:12,display:'flex'}}>
+                    <input className="input flex-1" value={name} onChange={e => setName(e.target.value)} placeholder="策略名称" />
+                    <input className="input flex-1" value={desc} onChange={e => setDesc(e.target.value)} placeholder="策略描述" />
+                    <button className="btn btn-primary" onClick={save} disabled={saving}>
+                        {saving ? <span className="spinner"/> : null} 保存
+                    </button>
+                </div>
+                <CodeEditor value={code} onChange={setCode} />
+            </div>
+        </div>
+    );
+}
+/* ===== Backtest Page ===== */
+function BacktestPage({ showToast }) {
+    const [strategies, setStrategies] = useState([]);
+    const [strategyId, setStrategyId] = useState('');
+    const [universe, setUniverse] = useState('000001.SZ');
+    const [startDate, setStartDate] = useState('20230101');
+    const [endDate, setEndDate] = useState('20231231');
+    const [cash, setCash] = useState(1000000);
+    const [benchmark, setBenchmark] = useState('000300.SH');
+    const [running, setRunning] = useState(false);
+    const [result, setResult] = useState(null);
+    const [resultTab, setResultTab] = useState('chart');
+    const [logs, setLogs] = useState([]);
+    const [showOptimizer, setShowOptimizer] = useState(false);
+    const [paramGrid, setParamGrid] = useState('{"short_period": [3, 5, 10], "long_period": [15, 20, 30]}');
+    const [optimizing, setOptimizing] = useState(false);
+    const [optimizeResults, setOptimizeResults] = useState(null);
+
+    useEffect(() => {
+        api.get('/api/strategies').then(s => {
+            setStrategies(s);
+            if (s.length > 0) setStrategyId(String(s[0].id));
+        }).catch(() => {});
+    }, []);
+
+    const runBacktest = async () => {
+        if (!strategyId) { showToast('请选择策略', 'error'); return; }
+        setRunning(true); setResult(null); setLogs([]);
+        try {
+            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/backtest/run', {
+                strategy_id: parseInt(strategyId), universe: codes,
+                start_date: startDate, end_date: endDate,
+                initial_cash: cash, benchmark,
+            });
+            setResult(res); setLogs(res.logs || []);
+            showToast('回测完成', 'success');
+        } catch (e) { showToast(e.detail || '回测失败', 'error'); }
+        setRunning(false);
+    };
+
+    const runOptimize = async () => {
+        if (!strategyId) { showToast('请选择策略', 'error'); return; }
+        let grid;
+        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误,请输入有效JSON', 'error'); return; }
+        setOptimizing(true); setOptimizeResults(null);
+        try {
+            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/backtest/optimize', {
+                strategy_id: parseInt(strategyId), universe: codes,
+                start_date: startDate, end_date: endDate,
+                initial_cash: cash, benchmark, param_grid: grid,
+            });
+            setOptimizeResults(res.results);
+            showToast(`优化完成, 共${res.results.length}组参数`, 'success');
+        } catch (e) { showToast(e.detail || '优化失败', 'error'); }
+        setOptimizing(false);
+    };
+
+    return (
+        <div className="fade-in space-y">
+            <BacktestForm strategies={strategies} strategyId={strategyId} setStrategyId={setStrategyId}
+                universe={universe} setUniverse={setUniverse} startDate={startDate} setStartDate={setStartDate}
+                endDate={endDate} setEndDate={setEndDate} cash={cash} setCash={setCash}
+                benchmark={benchmark} setBenchmark={setBenchmark} running={running} onRun={runBacktest} />
+            <div className="card space-y">
+                <div className="flex items-center justify-between">
+                    <div className="card-title" style={{marginBottom:0}}>参数优化</div>
+                    <button className="btn btn-secondary" onClick={() => setShowOptimizer(!showOptimizer)}>
+                        {showOptimizer ? '收起' : '展开'}
+                    </button>
+                </div>
+                {showOptimizer && (
+                    <div className="space-y">
+                        <div className="field">
+                            <label className="label">参数网格 (JSON格式)</label>
+                            <textarea className="input" rows={3} value={paramGrid}
+                                onChange={e => setParamGrid(e.target.value)}
+                                style={{fontFamily:'monospace',fontSize:13}} />
+                        </div>
+                        <button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>
+                            {optimizing ? <><span className="spinner"/> 优化中...</> : '开始网格搜索'}
+                        </button>
+                        {optimizeResults && optimizeResults.length > 0 && (
+                            <div className="table-wrap">
+                                <table>
+                                    <thead><tr>
+                                        <th>排名</th><th>参数</th><th style={{textAlign:'right'}}>夏普比率</th>
+                                        <th style={{textAlign:'right'}}>总收益%</th><th style={{textAlign:'right'}}>年化收益%</th>
+                                        <th style={{textAlign:'right'}}>最大回撤%</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        {optimizeResults.map((r, i) => (
+                                            <tr key={i}>
+                                                <td>{i + 1}</td>
+                                                <td style={{fontFamily:'monospace',fontSize:12}}>{JSON.stringify(r.params)}</td>
+                                                <td style={{textAlign:'right'}} className={r.sharpe_ratio >= 1 ? 'text-profit' : 'text-loss'}>{r.sharpe_ratio}</td>
+                                                <td style={{textAlign:'right'}} className={r.total_return >= 0 ? 'text-profit' : 'text-loss'}>{r.total_return}</td>
+                                                <td style={{textAlign:'right'}} className={r.annual_return >= 0 ? 'text-profit' : 'text-loss'}>{r.annual_return}</td>
+                                                <td style={{textAlign:'right'}} className="text-loss">{r.max_drawdown}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            {result && <BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} />}
+        </div>
+    );
+}
+
+function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun }) {
+    return (
+        <div className="card space-y">
+            <div className="card-title">回测配置</div>
+            <div className="grid-6">
+                <div className="field"><label className="label">策略</label>
+                    <select className="input" value={strategyId} onChange={e => setStrategyId(e.target.value)}>
+                        {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </div>
+                <div className="field"><label className="label">股票代码(逗号分隔)</label>
+                    <input className="input" value={universe} onChange={e => setUniverse(e.target.value)} />
+                </div>
+                <div className="field"><label className="label">开始日期</label>
+                    <input className="input" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="YYYYMMDD" />
+                </div>
+                <div className="field"><label className="label">结束日期</label>
+                    <input className="input" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="YYYYMMDD" />
+                </div>
+                <div className="field"><label className="label">初始资金</label>
+                    <input className="input" type="number" value={cash} onChange={e => setCash(parseFloat(e.target.value)||0)} />
+                </div>
+                <div className="field"><label className="label">基准指数</label>
+                    <input className="input" value={benchmark} onChange={e => setBenchmark(e.target.value)} />
+                </div>
+            </div>
+            <button className="btn btn-primary" onClick={onRun} disabled={running}>
+                {running ? <><span className="spinner"/> 回测运行中...</> : '运行回测'}
+            </button>
+        </div>
+    );
+}
+/* ===== Backtest Result View ===== */
+function BacktestResultView({ result, tab, setTab, logs }) {
+    const metrics = result.metrics || {};
+    const tabs = [
+        { key: 'chart', label: '收益曲线' },
+        { key: 'metrics', label: '绩效指标' },
+        { key: 'trades', label: '交易记录' },
+        { key: 'logs', label: '运行日志' },
+    ];
+    const exportCSV = () => {
+        if (result.id) window.open('/api/backtest/export/' + result.id, '_blank');
+    };
+    return (
+        <div className="fade-in space-y">
+            <div className="flex items-center justify-between">
+                <MetricCards metrics={metrics} />
+            </div>
+            <div className="card" style={{padding:0}}>
+                <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
+                    <div style={{display:'flex'}}>
+                        {tabs.map(t => (
+                            <button key={t.key} onClick={() => setTab(t.key)}
+                                className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>
+                        ))}
+                    </div>
+                    {result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={exportCSV}>导出 CSV</button>}
+                </div>
+                <div className="tab-content">
+                    {tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}
+                    {tab === 'metrics' && <MetricsTable metrics={metrics} />}
+                    {tab === 'trades' && <TradesTable trades={result.trades} />}
+                    {tab === 'logs' && <LogsPanel logs={logs} />}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ===== Metric Cards ===== */
+function MetricCards({ metrics }) {
+    const items = [
+        { key: 'total_return', color: v => v >= 0 ? 'text-profit' : 'text-loss' },
+        { key: 'annual_return', color: v => v >= 0 ? 'text-profit' : 'text-loss' },
+        { key: 'sharpe_ratio', color: v => v >= 1 ? 'text-profit' : 'text-loss' },
+        { key: 'max_drawdown', color: () => 'text-loss' },
+    ];
+    return (
+        <div className="grid-4">
+            {items.map(({ key, color }) => {
+                const [label, unit] = METRIC_LABELS[key] || [key, ''];
+                const val = metrics[key] ?? 0;
+                return (
+                    <div key={key} className="metric-card">
+                        <div className="metric-label">{label}</div>
+                        <div className={'metric-value ' + color(val)}>{val}{unit}</div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+/* ===== Equity Chart (Enhanced) ===== */
+function EquityChart({ data, benchmarkData, trades }) {
+    if (!data || data.length === 0) return <div className="text-muted text-center py-10">暂无数据</div>;
+
+    const initial = data[0].value || 1;
+    // 构建基准查找表
+    const bmMap = {};
+    if (benchmarkData && benchmarkData.length > 0) {
+        benchmarkData.forEach(b => { bmMap[b.date] = b.value; });
+    }
+    // 构建买卖标记查找表
+    const buyMap = {};
+    const sellMap = {};
+    if (trades && trades.length > 0) {
+        trades.forEach(t => {
+            if (t.side === 'buy') buyMap[t.date] = true;
+            else sellMap[t.date] = true;
+        });
+    }
+
+    const chartData = data.map(d => {
+        const strategyReturn = ((d.value - initial) / initial) * 100;
+        const item = { date: d.date, strategy: parseFloat(strategyReturn.toFixed(2)) };
+        if (bmMap[d.date] !== undefined) {
+            item.benchmark = parseFloat(((bmMap[d.date] - 1) * 100).toFixed(2));
+        }
+        if (buyMap[d.date]) item.buy = item.strategy;
+        if (sellMap[d.date]) item.sell = item.strategy;
+        return item;
+    });
+
+    const BuyShape = (props) => {
+        const { cx, cy } = props;
+        if (cx == null || cy == null) return null;
+        return <polygon points={`${cx},${cy-7} ${cx-6},${cy+5} ${cx+6},${cy+5}`} fill="#22c55e" />;
+    };
+    const SellShape = (props) => {
+        const { cx, cy } = props;
+        if (cx == null || cy == null) return null;
+        return <polygon points={`${cx},${cy+7} ${cx-6},${cy-5} ${cx+6},${cy-5}`} fill="#ef4444" />;
+    };
+
+    return (
+        <ResponsiveContainer width="100%" height={380}>
+            <ComposedChart data={chartData}>
+                <defs>
+                    <linearGradient id="colorStrategy" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                    interval={Math.floor(chartData.length / 6)} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                    tickFormatter={v => v.toFixed(1) + '%'} />
+                <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }}
+                    formatter={(v, name) => {
+                        const labels = { strategy: '策略收益', benchmark: '基准收益', buy: '买入', sell: '卖出' };
+                        return [v + '%', labels[name] || name];
+                    }}
+                    labelFormatter={l => '日期: ' + l} />
+                <Legend formatter={(v) => {
+                    const labels = { strategy: '策略收益', benchmark: '基准收益', buy: '买入', sell: '卖出' };
+                    return labels[v] || v;
+                }} />
+                <Area type="monotone" dataKey="strategy" stroke="#6366f1" strokeWidth={2}
+                    fillOpacity={1} fill="url(#colorStrategy)" name="strategy" />
+                {benchmarkData && benchmarkData.length > 0 &&
+                    <Line type="monotone" dataKey="benchmark" stroke="#f59e0b" strokeWidth={1.5}
+                        strokeDasharray="5 3" dot={false} name="benchmark" />
+                }
+                <Scatter dataKey="buy" shape={<BuyShape />} name="buy" />
+                <Scatter dataKey="sell" shape={<SellShape />} name="sell" />
+            </ComposedChart>
+        </ResponsiveContainer>
+    );
+}
+
+/* ===== Metrics Table ===== */
+function MetricsTable({ metrics }) {
+    return (
+        <div className="grid-3">
+            {Object.entries(METRIC_LABELS).map(([key, [label, unit]]) => (
+                <div key={key} style={{background:'var(--bg-600)',borderRadius:8,padding:12}}>
+                    <div className="text-xs text-muted">{label}</div>
+                    <div style={{fontSize:16,fontWeight:600,marginTop:4}}>{metrics[key] ?? '-'}{unit}</div>
+                </div>
+            ))}
+        </div>
+    );
+}
+/* ===== Trades Table ===== */
+function TradesTable({ trades }) {
+    if (!trades || trades.length === 0) return <div className="text-muted text-center py-10">暂无交易记录</div>;
+    return (
+        <div className="table-wrap">
+            <table>
+                <thead><tr>
+                    <th>日期</th><th>代码</th><th>方向</th>
+                    <th style={{textAlign:'right'}}>数量</th>
+                    <th style={{textAlign:'right'}}>价格</th>
+                    <th style={{textAlign:'right'}}>佣金</th>
+                    <th style={{textAlign:'right'}}>印花税</th>
+                </tr></thead>
+                <tbody>
+                    {trades.map((t, i) => (
+                        <tr key={i}>
+                            <td>{t.date}</td>
+                            <td>{t.ts_code}</td>
+                            <td className={t.side === 'buy' ? 'text-profit' : 'text-loss'}>
+                                {t.side === 'buy' ? '买入' : '卖出'}
+                            </td>
+                            <td style={{textAlign:'right'}}>{t.amount}</td>
+                            <td style={{textAlign:'right'}}>{t.price}</td>
+                            <td style={{textAlign:'right'}}>{t.commission}</td>
+                            <td style={{textAlign:'right'}}>{t.tax}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+/* ===== Logs Panel ===== */
+function LogsPanel({ logs }) {
+    if (!logs || logs.length === 0) return <div className="text-muted text-center py-10">暂无日志</div>;
+    return (
+        <div className="log-panel">
+            {logs.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+    );
+}
+/* ===== History Page ===== */
+function HistoryPage({ showToast }) {
+    const [results, setResults] = useState([]);
+    const [detail, setDetail] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [comparing, setComparing] = useState(false);
+    const [compareData, setCompareData] = useState(null);
+    useEffect(() => { api.get('/api/backtest/history').then(setResults).catch(() => {}); }, []);
+
+    const viewDetail = async (id) => {
+        try { const res = await api.get('/api/backtest/history/' + id); setDetail(res); }
+        catch (e) { showToast('加载失败', 'error'); }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const runCompare = async () => {
+        if (selectedIds.length < 2) { showToast('请至少选择2个结果', 'error'); return; }
+        setComparing(true); setCompareData(null);
+        try {
+            const res = await api.post('/api/backtest/compare', { result_ids: selectedIds });
+            setCompareData(res);
+        } catch (e) { showToast(e.detail || '对比失败', 'error'); }
+        setComparing(false);
+    };
+
+    if (detail) {
+        return (
+            <div className="fade-in space-y">
+                <div className="flex items-center justify-between">
+                    <button className="btn-link" onClick={() => setDetail(null)}>&larr; 返回列表</button>
+                    <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}}
+                        onClick={() => window.open('/api/backtest/export/' + detail.id, '_blank')}>导出 CSV</button>
+                </div>
+                <MetricCards metrics={detail.metrics} />
+                <div className="card"><EquityChart data={detail.equity_curve} benchmarkData={detail.benchmark_curve} trades={detail.trades} /></div>
+                <div className="card">
+                    <div className="card-title">交易记录</div>
+                    <TradesTable trades={detail.trades} />
+                </div>
+            </div>
+        );
+    }
+
+    if (compareData) {
+        return (
+            <div className="fade-in space-y">
+                <button className="btn-link" onClick={() => setCompareData(null)}>&larr; 返回列表</button>
+                <h2 style={{fontSize:20,fontWeight:600}}>回测对比</h2>
+                <CompareView data={compareData} />
+            </div>
+        );
+    }
+
+    return (
+        <div className="fade-in space-y">
+            <div className="flex items-center justify-between">
+                <h2 style={{fontSize:20,fontWeight:600}}>回测历史</h2>
+                <div className="flex gap-sm items-center" style={{gap:8}}>
+                    {selectedIds.length >= 2 && (
+                        <button className="btn btn-primary" style={{fontSize:13,padding:'6px 14px'}} onClick={runCompare} disabled={comparing}>
+                            {comparing ? '对比中...' : `对比 (${selectedIds.length})`}
+                        </button>
+                    )}
+                    {selectedIds.length > 0 && (
+                        <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => setSelectedIds([])}>清除选择</button>
+                    )}
+                </div>
+            </div>
+            {results.length === 0 ? (
+                <div className="text-muted text-center py-10">暂无回测记录</div>
+            ) : (
+                <div className="space-y-sm">
+                    {results.map(r => (
+                        <div key={r.id} className="history-item" style={{position:'relative'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,flex:1,cursor:'pointer'}} onClick={() => viewDetail(r.id)}>
+                                <div>
+                                    <div style={{fontWeight:500}}>{r.strategy_name}</div>
+                                    <div className="text-xs text-muted" style={{marginTop:4}}>
+                                        {r.start_date} ~ {r.end_date} | {r.universe}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <div style={{textAlign:'right'}}>
+                                    <div className={'history-return ' + ((r.metrics?.total_return ?? 0) >= 0 ? 'text-profit' : 'text-loss')}>
+                                        {r.metrics?.total_return ?? 0}%
+                                    </div>
+                                    <div className="text-xs text-muted">{(r.created_at || '').slice(0, 10)}</div>
+                                </div>
+                                <input type="checkbox" checked={selectedIds.includes(r.id)}
+                                    onChange={() => toggleSelect(r.id)}
+                                    style={{width:16,height:16,cursor:'pointer',accentColor:'var(--accent)'}} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+/* ===== Compare View ===== */
+function CompareView({ data }) {
+    const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    const curves = data.curves || [];
+    const metrics = data.metrics || [];
+
+    // Build chart data: merge all curves by date
+    const dateMap = {};
+    curves.forEach((c, idx) => {
+        (c.equity_curve || []).forEach(p => {
+            if (!dateMap[p.date]) dateMap[p.date] = { date: p.date };
+            dateMap[p.date]['s' + idx] = parseFloat(((p.value - 1) * 100).toFixed(2));
+        });
+    });
+    const chartData = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    return (
+        <div className="space-y">
+            <div className="card">
+                <div className="card-title">净值对比曲线</div>
+                <ResponsiveContainer width="100%" height={350}>
+                    <ComposedChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                        <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                            interval={Math.floor(chartData.length / 6)} />
+                        <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                            tickFormatter={v => v.toFixed(1) + '%'} />
+                        <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }} />
+                        <Legend />
+                        {curves.map((c, idx) => (
+                            <Line key={idx} type="monotone" dataKey={'s' + idx} name={c.strategy_name}
+                                stroke={COLORS[idx % COLORS.length]} strokeWidth={2} dot={false} />
+                        ))}
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="card">
+                <div className="card-title">指标对比</div>
+                <div className="table-wrap">
+                    <table>
+                        <thead><tr>
+                            <th>策略</th><th style={{textAlign:'right'}}>总收益%</th>
+                            <th style={{textAlign:'right'}}>年化收益%</th><th style={{textAlign:'right'}}>夏普</th>
+                            <th style={{textAlign:'right'}}>最大回撤%</th><th style={{textAlign:'right'}}>最终资产</th>
+                        </tr></thead>
+                        <tbody>
+                            {metrics.map((m, i) => {
+                                const mt = m.metrics || {};
+                                return (
+                                    <tr key={i}>
+                                        <td>{m.strategy_name}</td>
+                                        <td style={{textAlign:'right'}} className={(mt.total_return||0) >= 0 ? 'text-profit' : 'text-loss'}>{mt.total_return ?? '-'}</td>
+                                        <td style={{textAlign:'right'}} className={(mt.annual_return||0) >= 0 ? 'text-profit' : 'text-loss'}>{mt.annual_return ?? '-'}</td>
+                                        <td style={{textAlign:'right'}}>{mt.sharpe_ratio ?? '-'}</td>
+                                        <td style={{textAlign:'right'}} className="text-loss">{mt.max_drawdown ?? '-'}</td>
+                                        <td style={{textAlign:'right'}}>{m.final_value?.toLocaleString() ?? '-'}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+/* ===== Help Page ===== */
+function HelpPage() {
+    return (
+        <div className="fade-in help-page">
+            <h2 style={{fontSize:20,fontWeight:600,marginBottom:16}}>策略开发文档</h2>
+
+            <div className="help-section">
+                <h3>策略代码结构</h3>
+                <p>每个策略由两个函数组成:</p>
+                <div className="help-code-block">{`def initialize(context):
+    """初始化: 在回测开始前调用一次"""
+    context.short_period = 5   # 设置自定义参数
+    context.long_period = 20
+
+def handle_data(context):
+    """每日执行: 每个交易日调用一次"""
+    for ts_code in context.universe:
+        price = context.get_price(ts_code)
+        # 你的交易逻辑...`}</div>
+                <ul>
+                    <li><code>initialize(context)</code> — 回测开始前调用一次，用于设置参数</li>
+                    <li><code>handle_data(context)</code> — 每个交易日调用一次，用于执行交易逻辑</li>
+                </ul>
+            </div>
+
+            <HelpApiSection />
+            <HelpLibsSection />
+            <HelpExampleSection />
+            <HelpRulesSection />
+        </div>
+    );
+}
+
+function HelpApiSection() {
+    return (
+        <div className="help-section">
+            <h3>Context API 参考</h3>
+
+            <h4>属性</h4>
+            <table className="help-api-table">
+                <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context.universe</code></td><td>list[str]</td><td>股票代码列表, 如 ["000001.SZ"]</td></tr>
+                    <tr><td><code>context.cash</code></td><td>float</td><td>当前可用现金</td></tr>
+                    <tr><td><code>context.portfolio_value</code></td><td>float</td><td>总资产 = 现金 + 持仓市值</td></tr>
+                    <tr><td><code>context.positions</code></td><td>dict</td><td>持仓字典, key为股票代码, value为Position对象</td></tr>
+                    <tr><td><code>context.current_date</code></td><td>str</td><td>当前交易日期, 格式YYYYMMDD</td></tr>
+                </tbody>
+            </table>
+
+            <h4>Position 对象属性</h4>
+            <table className="help-api-table">
+                <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>pos.amount</code></td><td>int</td><td>持仓数量(股)</td></tr>
+                    <tr><td><code>pos.available</code></td><td>int</td><td>可卖数量(T+1限制)</td></tr>
+                    <tr><td><code>pos.avg_cost</code></td><td>float</td><td>持仓均价</td></tr>
+                    <tr><td><code>pos.last_price</code></td><td>float</td><td>最新价格</td></tr>
+                    <tr><td><code>pos.market_value</code></td><td>float</td><td>持仓市值</td></tr>
+                    <tr><td><code>pos.profit</code></td><td>float</td><td>持仓盈亏金额</td></tr>
+                    <tr><td><code>pos.profit_pct</code></td><td>float</td><td>持仓盈亏比例</td></tr>
+                </tbody>
+            </table>
+
+            <h4>下单方法</h4>
+            <table className="help-api-table">
+                <thead><tr><th>方法</th><th>参数</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context.order(ts_code, amount)</code></td><td>ts_code: str, amount: int</td><td>按数量下单, 正数买入负数卖出, 买入自动取整到100股</td></tr>
+                    <tr><td><code>context.order_value(ts_code, value)</code></td><td>ts_code: str, value: float</td><td>按金额下单, 自动计算数量</td></tr>
+                    <tr><td><code>context.order_target_percent(ts_code, pct)</code></td><td>ts_code: str, pct: float</td><td>目标仓位百分比下单, 如0.3表示30%仓位</td></tr>
+                    <tr><td><code>context.set_stop_loss(ts_code, pct)</code></td><td>ts_code: str, pct: float</td><td>设置止损比例, 如0.05表示亏损5%自动平仓</td></tr>
+                    <tr><td><code>context.set_take_profit(ts_code, pct)</code></td><td>ts_code: str, pct: float</td><td>设置止盈比例, 如0.10表示盈利10%自动平仓</td></tr>
+                </tbody>
+            </table>
+
+            <h4>数据方法</h4>
+            <table className="help-api-table">
+                <thead><tr><th>方法</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context.get_price(ts_code)</code></td><td>ts_code: str</td><td>float | None</td><td>获取当日收盘价</td></tr>
+                    <tr><td><code>context.get_history(ts_code, count, field)</code></td><td>ts_code: str, count: int, field: str</td><td>pd.Series</td><td>获取历史数据, field可选: close/open/high/low/vol/amount</td></tr>
+                </tbody>
+            </table>
+
+            <h4>日志方法</h4>
+            <table className="help-api-table">
+                <thead><tr><th>方法</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context.log(msg)</code></td><td>输出日志信息, 可在回测结果的"运行日志"标签页查看</td></tr>
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function HelpLibsSection() {
+    return (
+        <div className="help-section">
+            <h3>可用库与内置函数</h3>
+            <p>策略代码在沙箱环境中运行, 可使用以下库:</p>
+            <ul>
+                <li><code>numpy</code> (import numpy as np) — 数值计算</li>
+                <li><code>pandas</code> (import pandas as pd) — 数据分析</li>
+            </ul>
+            <p>可用内置函数:</p>
+            <ul>
+                <li>数学: <code>abs</code>, <code>round</code>, <code>min</code>, <code>max</code>, <code>sum</code>, <code>pow</code></li>
+                <li>类型: <code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code>, <code>list</code>, <code>dict</code>, <code>tuple</code>, <code>set</code></li>
+                <li>工具: <code>len</code>, <code>range</code>, <code>enumerate</code>, <code>zip</code>, <code>sorted</code>, <code>reversed</code>, <code>map</code>, <code>filter</code></li>
+                <li>其他: <code>print</code>, <code>isinstance</code>, <code>hasattr</code>, <code>getattr</code></li>
+            </ul>
+            <p style={{color:'var(--loss)',marginTop:8}}>禁止使用: os, sys, subprocess, socket, http, eval, exec, __import__ 等危险操作</p>
+        </div>
+    );
+}
+
+function HelpExampleSection() {
+    return (
+        <div className="help-section">
+            <h3>示例策略: 双均线交叉</h3>
+            <div className="help-code-block">{`def initialize(context):
+    context.short_period = 5
+    context.long_period = 20
+
+def handle_data(context):
+    for ts_code in context.universe:
+        closes = context.get_history(ts_code, context.long_period + 1, "close")
+        if len(closes) < context.long_period:
+            continue
+
+        ma_short = closes.tail(context.short_period).mean()
+        ma_long = closes.tail(context.long_period).mean()
+
+        closes_prev = closes.iloc[:-1]
+        ma_short_prev = closes_prev.tail(context.short_period).mean()
+        ma_long_prev = closes_prev.tail(context.long_period).mean()
+
+        pos = context.positions.get(ts_code)
+        has_position = pos is not None and pos.amount > 0
+
+        # 金叉买入: 短均线上穿长均线
+        if ma_short > ma_long and ma_short_prev <= ma_long_prev and not has_position:
+            context.order_value(ts_code, context.portfolio_value * 0.3)
+            context.log(f"{ts_code} 金叉买入")
+
+        # 死叉卖出: 短均线下穿长均线
+        elif ma_short < ma_long and ma_short_prev >= ma_long_prev and has_position:
+            context.order(ts_code, -pos.amount)
+            context.log(f"{ts_code} 死叉卖出")`}</div>
+        </div>
+    );
+}
+
+function HelpRulesSection() {
+    return (
+        <div className="help-section">
+            <h3>A股交易规则提示</h3>
+            <ul>
+                <li><code>T+1交割</code> — 买入当天不可卖出, 次日才可卖出</li>
+                <li><code>100股整数倍</code> — 买入数量自动取整到100股(手), 卖出不限</li>
+                <li><code>涨跌停限制</code> — 涨停价无法买入, 跌停价无法卖出 (±10%)</li>
+                <li><code>佣金</code> — 默认万三(0.03%), 最低5元, 买卖双向收取</li>
+                <li><code>印花税</code> — 默认千一(0.1%), 仅卖出时收取</li>
+                <li><code>滑点</code> — 默认0.2%, 买入价格上浮, 卖出价格下浮</li>
+                <li><code>成交量限制</code> — 单笔成交不超过当日成交量的25%</li>
+            </ul>
+        </div>
+    );
+}
+
+/* ===== Factor Sub-Components ===== */
+function FactorSidebar({ factors, selected, setSelected, deleteFactor, initBuiltin, BADGE, BADGE_LABEL }) {
+    return (
+        <div className="factor-sidebar">
+            <div className="flex gap-sm" style={{marginBottom:8,display:'flex',gap:8}}>
+                <button className="btn btn-secondary flex-1 text-sm" onClick={initBuiltin}>加载内置因子</button>
+            </div>
+            <div className="factor-list">
+                {factors.map(f => (
+                    <div key={f.id} onClick={() => setSelected(f)}
+                        className={'factor-item' + (selected && selected.id === f.id ? ' selected' : '')}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <span className={'factor-badge ' + (BADGE[f.source] || 'factor-badge-user')}>
+                                {BADGE_LABEL[f.source] || '自定义'}
+                            </span>
+                            <span className="factor-item-name">{f.name}</span>
+                        </div>
+                        <div className="factor-item-cat">{f.category}</div>
+                        <div className="factor-item-expr">{f.expression}</div>
+                        <button className="btn-danger mt-2" onClick={(e) => { e.stopPropagation(); deleteFactor(f.id); }}>删除</button>
+                    </div>
+                ))}
+                {factors.length === 0 && <div className="text-muted text-center" style={{padding:20}}>暂无因子，点击上方加载内置因子</div>}
+            </div>
+        </div>
+    );
+}
+
+function FactorCreatePanel({ newName, setNewName, newExpr, setNewExpr, newDesc, setNewDesc, newCat, setNewCat, createFactor }) {
+    return (
+        <div className="card" style={{padding:14}}>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:10,color:'var(--text-100)'}}>创建自定义因子</div>
+            <div className="grid-2" style={{gap:8}}>
+                <div className="field">
+                    <label className="label">因子名称</label>
+                    <input className="input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="如: 动量反转因子" />
+                </div>
+                <div className="field">
+                    <label className="label">分类</label>
+                    <select className="input" value={newCat} onChange={e => setNewCat(e.target.value)}>
+                        <option value="custom">自定义</option>
+                        <option value="动量">动量</option>
+                        <option value="反转">反转</option>
+                        <option value="波动率">波动率</option>
+                        <option value="成交量">成交量</option>
+                        <option value="技术指标">技术指标</option>
+                    </select>
+                </div>
+            </div>
+            <div className="field" style={{marginTop:8}}>
+                <label className="label">因子表达式</label>
+                <input className="input" value={newExpr} onChange={e => setNewExpr(e.target.value)}
+                    placeholder="如: mean(close, 5) / mean(close, 20) - 1" style={{fontFamily:'monospace'}} />
+            </div>
+            <div className="field" style={{marginTop:8}}>
+                <label className="label">描述 (可选)</label>
+                <input className="input" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="因子含义说明" />
+            </div>
+            <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={createFactor}>创建因子</button>
+        </div>
+    );
+}
+
+function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, loading, evaluateFactor }) {
+    return (
+        <div className="card" style={{padding:14}}>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:'var(--text-100)'}}>
+                评价因子: <span style={{color:'var(--accent-light)'}}>{selected.name}</span>
+            </div>
+            <div style={{fontSize:12,color:'var(--text-400)',marginBottom:10,fontFamily:'monospace'}}>{selected.expression}</div>
+            <div className="grid-4" style={{gap:8}}>
+                <div className="field">
+                    <label className="label">股票池 (逗号分隔)</label>
+                    <input className="input" value={evalUniverse} onChange={e => setEvalUniverse(e.target.value)} />
+                </div>
+                <div className="field">
+                    <label className="label">开始日期</label>
+                    <input className="input" value={evalStart} onChange={e => setEvalStart(e.target.value)} placeholder="YYYYMMDD" />
+                </div>
+                <div className="field">
+                    <label className="label">结束日期</label>
+                    <input className="input" value={evalEnd} onChange={e => setEvalEnd(e.target.value)} placeholder="YYYYMMDD" />
+                </div>
+                <div className="field">
+                    <label className="label">分组数</label>
+                    <input className="input" type="number" value={evalGroups} onChange={e => setEvalGroups(parseInt(e.target.value)||5)} />
+                </div>
+            </div>
+            <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={evaluateFactor} disabled={loading}>
+                {loading ? <><span className="spinner"/> 评价中...</> : '运行因子评价'}
+            </button>
+        </div>
+    );
+}
+
+function FactorResultView({ result, tab, setTab }) {
+    const m = result.metrics || {};
+    const tabs = [
+        { key: 'ic', label: 'IC序列' },
+        { key: 'group', label: '分组收益' },
+        { key: 'ls', label: '多空曲线' },
+        { key: 'turnover', label: '换手率' },
+    ];
+    return (
+        <div className="fade-in space-y" style={{gap:12}}>
+            <FactorMetricCards metrics={m} />
+            <div className="card" style={{padding:0}}>
+                <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
+                    <div style={{display:'flex'}}>
+                        {tabs.map(t => (
+                            <button key={t.key} onClick={() => setTab(t.key)}
+                                className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>
+                        ))}
+                    </div>
+                    {result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}}
+                        onClick={() => window.open('/api/factors/export/' + result.id, '_blank')}>导出 CSV</button>}
+                </div>
+                <div className="tab-content">
+                    {tab === 'ic' && <ICChart data={result.ic_series} />}
+                    {tab === 'group' && <GroupReturnChart data={result.group_returns} />}
+                    {tab === 'ls' && <LongShortChart data={result.long_short_curve} />}
+                    {tab === 'turnover' && <TurnoverChart data={result.turnover_series} />}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FactorMetricCards({ metrics }) {
+    const items = [
+        { label: 'IC均值', val: metrics.ic_mean, fmt: v => v?.toFixed(4) },
+        { label: 'IC_IR', val: metrics.ic_ir, fmt: v => v?.toFixed(4) },
+        { label: 'IC正比例', val: metrics.ic_positive_pct, fmt: v => v + '%' },
+        { label: '多头收益', val: metrics.top_group_return, fmt: v => v + '%', color: v => v >= 0 ? 'text-profit' : 'text-loss' },
+        { label: '空头收益', val: metrics.bottom_group_return, fmt: v => v + '%' },
+        { label: '多空收益', val: metrics.long_short_return, fmt: v => v + '%', color: v => v >= 0 ? 'text-profit' : 'text-loss' },
+        { label: '单调性', val: metrics.monotonicity, fmt: v => v?.toFixed(2) },
+        { label: '平均换手', val: metrics.avg_turnover, fmt: v => v + '%' },
+    ];
+    return (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:8}}>
+            {items.map((it, i) => (
+                <div key={i} className="factor-metric-box">
+                    <div className="factor-metric-label">{it.label}</div>
+                    <div className={'factor-metric-val ' + (it.color ? it.color(it.val) : '')}>{it.fmt(it.val ?? 0)}</div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function ICChart({ data }) {
+    if (!data || data.length === 0) return <div className="text-muted text-center py-10">暂无IC数据</div>;
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false}
+                    interval={Math.floor(data.length / 6)} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} />
+                <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }} />
+                <Bar dataKey="ic" name="IC">
+                    {data.map((d, i) => <Cell key={i} fill={d.ic >= 0 ? '#22c55e' : '#ef4444'} />)}
+                </Bar>
+            </ComposedChart>
+        </ResponsiveContainer>
+    );
+}
+
+function GroupReturnChart({ data }) {
+    if (!data || data.length === 0) return <div className="text-muted text-center py-10">暂无分组数据</div>;
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 12 }} tickLine={false} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} tickFormatter={v => v + '%'} />
+                <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }}
+                    formatter={v => [v + '%', '累计收益']} />
+                <Bar dataKey="cumulative_return" name="累计收益">
+                    {data.map((d, i) => <Cell key={i} fill={d.cumulative_return >= 0 ? '#22c55e' : '#ef4444'} />)}
+                </Bar>
+            </BarChart>
+        </ResponsiveContainer>
+    );
+}
+
+function LongShortChart({ data }) {
+    if (!data || data.length === 0) return <div className="text-muted text-center py-10">暂无多空数据</div>;
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={data}>
+                <defs>
+                    <linearGradient id="colorLS" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false}
+                    interval={Math.floor(data.length / 6)} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} tickFormatter={v => v + '%'} />
+                <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }}
+                    formatter={v => [v + '%', '多空收益']} />
+                <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2}
+                    fillOpacity={1} fill="url(#colorLS)" name="多空收益" />
+            </AreaChart>
+        </ResponsiveContainer>
+    );
+}
+
+function TurnoverChart({ data }) {
+    if (!data || data.length === 0) return <div className="text-muted text-center py-10">暂无换手率数据</div>;
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false}
+                    interval={Math.floor(data.length / 6)} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                    tickFormatter={v => (v * 100).toFixed(0) + '%'} />
+                <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }}
+                    formatter={v => [(v * 100).toFixed(1) + '%', '换手率']} />
+                <Area type="monotone" dataKey="turnover" stroke="#f59e0b" strokeWidth={1.5}
+                    fill="#f59e0b" fillOpacity={0.15} name="换手率" />
+            </AreaChart>
+        </ResponsiveContainer>
+    );
+}
+
+function FactorMinePanel({ mineTab, setMineTab, gpPopSize, setGpPopSize, gpGenerations, setGpGenerations, gpRunning, runGP, llmCount, setLlmCount, llmHint, setLlmHint, llmRunning, runLLM }) {
+    return (
+        <div className="mine-panel">
+            <div style={{fontSize:14,fontWeight:600,marginBottom:10,color:'var(--text-100)'}}>因子挖掘</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+                <button className={'btn ' + (mineTab === 'gp' ? 'btn-primary' : 'btn-secondary')} onClick={() => setMineTab(mineTab === 'gp' ? 'none' : 'gp')}>
+                    遗传算法(GP)
+                </button>
+                <button className={'btn ' + (mineTab === 'llm' ? 'btn-primary' : 'btn-secondary')} onClick={() => setMineTab(mineTab === 'llm' ? 'none' : 'llm')}>
+                    LLM智能挖掘
+                </button>
+            </div>
+            {mineTab === 'gp' && (
+                <div className="fade-in">
+                    <p className="text-xs text-muted" style={{marginBottom:10}}>使用遗传算法自动搜索因子表达式空间，通过交叉、变异、选择进化出高IC因子</p>
+                    <div className="grid-2" style={{gap:8}}>
+                        <div className="field">
+                            <label className="label">种群大小</label>
+                            <input className="input" type="number" value={gpPopSize} onChange={e => setGpPopSize(parseInt(e.target.value)||30)} />
+                        </div>
+                        <div className="field">
+                            <label className="label">进化代数</label>
+                            <input className="input" type="number" value={gpGenerations} onChange={e => setGpGenerations(parseInt(e.target.value)||10)} />
+                        </div>
+                    </div>
+                    <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={runGP} disabled={gpRunning}>
+                        {gpRunning ? <><span className="spinner"/> GP挖掘中...</> : '开始GP挖掘'}
+                    </button>
+                </div>
+            )}
+            {mineTab === 'llm' && (
+                <div className="fade-in">
+                    <p className="text-xs text-muted" style={{marginBottom:10}}>通过大语言模型生成因子表达式，请先在设置页面配置LLM API</p>
+                    <div className="grid-2" style={{gap:8}}>
+                        <div className="field">
+                            <label className="label">生成数量</label>
+                            <input className="input" type="number" value={llmCount} onChange={e => setLlmCount(parseInt(e.target.value)||5)} />
+                        </div>
+                        <div className="field">
+                            <label className="label">额外提示 (可选)</label>
+                            <input className="input" value={llmHint} onChange={e => setLlmHint(e.target.value)} placeholder="如: 侧重动量类因子" />
+                        </div>
+                    </div>
+                    <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={runLLM} disabled={llmRunning}>
+                        {llmRunning ? <><span className="spinner"/> LLM生成中...</> : '开始LLM挖掘'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ===== News Sub-Components ===== */
+function NewsFilterBar({ filterSource, setFilterSource, filterSentiment, setFilterSentiment, filterSector, setFilterSector, searchText, setSearchText, doSearch, refreshing, refresh }) {
+    const sources = ['', '新浪财经', '东方财富', '财联社', '同花顺'];
+    const sentiments = ['', '利好', '利空', '中性'];
+    const sectors = ['', '银行', '房地产', '科技', '新能源', '医药', '消费', '军工', '宏观经济'];
+    return (
+        <div className="news-filter-bar">
+            <button className="btn btn-primary" onClick={refresh} disabled={refreshing} style={{fontSize:12,padding:'5px 12px'}}>
+                {refreshing ? <><span className="spinner"/> 刷新中...</> : '刷新新闻'}
+            </button>
+            {sources.map(s => (
+                <button key={s||'all-src'} className={'news-filter-btn' + (filterSource === s ? ' active' : '')}
+                    onClick={() => setFilterSource(s)}>{s || '全部来源'}</button>
+            ))}
+            <span style={{color:'var(--border)'}}>|</span>
+            {sentiments.map(s => (
+                <button key={s||'all-sent'} className={'news-filter-btn' + (filterSentiment === s ? ' active' : '')}
+                    onClick={() => setFilterSentiment(s)}>{s || '全部情感'}</button>
+            ))}
+            <span style={{color:'var(--border)'}}>|</span>
+            <select className="input" style={{width:100,padding:'3px 6px',fontSize:12}} value={filterSector}
+                onChange={e => setFilterSector(e.target.value)}>
+                {sectors.map(s => <option key={s||'all-sec'} value={s}>{s || '全部板块'}</option>)}
+            </select>
+            <input className="input" style={{width:140,padding:'3px 8px',fontSize:12}} value={searchText}
+                onChange={e => setSearchText(e.target.value)} placeholder="搜索关键词..."
+                onKeyDown={e => e.key === 'Enter' && doSearch()} />
+            <button className="news-filter-btn" onClick={doSearch}>搜索</button>
+        </div>
+    );
+}
+
+function NewsList({ news, onView }) {
+    const sentClass = (label) => label === '利好' ? 'sentiment-bullish' : (label === '利空' ? 'sentiment-bearish' : 'sentiment-neutral');
+    const badgeClass = (label) => label === '利好' ? 'news-badge-bullish' : (label === '利空' ? 'news-badge-bearish' : 'news-badge-neutral');
+    return (
+        <div>
+            {news.map(n => (
+                <div key={n.id} className={'news-item ' + sentClass(n.sentiment_label)} onClick={() => onView(n.id)}>
+                    <div className="news-title">{n.title}</div>
+                    <div className="news-meta">
+                        <span className={'news-badge ' + badgeClass(n.sentiment_label)}>{n.sentiment_label}</span>
+                        {n.impact_level !== '低' && <span className={'news-badge ' + (n.impact_level === '高' ? 'news-badge-high' : 'news-badge-mid')}>{n.impact_level}影响</span>}
+                        <span>{n.source}</span>
+                        <span>{n.publish_time}</span>
+                        {(n.sectors || []).slice(0, 3).map(s => <span key={s} className="news-sector-tag">{s}</span>)}
+                    </div>
+                    {n.summary && <div style={{fontSize:12,color:'var(--text-400)',marginTop:6,lineHeight:1.5}}>{n.summary.slice(0, 120)}</div>}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function NewsDetail({ detail, onBack, showToast }) {
+    const [analyzing, setAnalyzing] = useState(false);
+    const analyzeLLM = async () => {
+        setAnalyzing(true);
+        try {
+            await api.post('/api/news/' + detail.id + '/analyze_llm');
+            showToast('LLM分析完成', 'success');
+        } catch (e) { showToast(e.detail || 'LLM分析失败', 'error'); }
+        setAnalyzing(false);
+    };
+    const badgeClass = (label) => label === '利好' ? 'news-badge-bullish' : (label === '利空' ? 'news-badge-bearish' : 'news-badge-neutral');
+    return (
+        <div className="fade-in space-y">
+            <button className="btn-link" onClick={onBack}>&larr; 返回列表</button>
+            <div className="news-detail">
+                <h3 style={{fontSize:18,fontWeight:600,marginBottom:12}}>{detail.title}</h3>
+                <div className="news-meta" style={{marginBottom:16}}>
+                    <span className={'news-badge ' + badgeClass(detail.sentiment_label)}>{detail.sentiment_label}</span>
+                    <span>情感分数: {detail.sentiment_score}</span>
+                    <span>影响等级: {detail.impact_level}</span>
+                    <span>{detail.source}</span>
+                    <span>{detail.publish_time}</span>
+                </div>
+                {(detail.sectors || []).length > 0 && (
+                    <div style={{marginBottom:12}}>
+                        <span className="text-xs text-muted">涉及板块: </span>
+                        {detail.sectors.map(s => <span key={s} className="news-sector-tag">{s}</span>)}
+                    </div>
+                )}
+                {detail.sentiment_reason && (
+                    <div style={{background:'var(--bg-600)',borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:'var(--text-300)'}}>
+                        {detail.sentiment_reason}
+                    </div>
+                )}
+                <button className="btn btn-secondary" style={{fontSize:12,marginBottom:12}} onClick={analyzeLLM} disabled={analyzing}>
+                    {analyzing ? <><span className="spinner"/> 分析中...</> : 'LLM深度分析'}
+                </button>
+                <div className="news-detail-content">{detail.content || detail.summary || '暂无正文内容'}</div>
+                {detail.url && <a href={detail.url} target="_blank" rel="noopener" className="btn-link mt-4" style={{display:'inline-block',marginTop:12}}>查看原文 &rarr;</a>}
+            </div>
+        </div>
+    );
+}
+
+function SentimentDashboard({ sentiment }) {
+    if (!sentiment) return <div className="sentiment-dashboard text-muted text-center" style={{padding:20}}>加载中...</div>;
+    const total = sentiment.total || 1;
+    const bullPct = (sentiment.bullish / total * 100).toFixed(0);
+    const bearPct = (sentiment.bearish / total * 100).toFixed(0);
+    const neutPct = (100 - bullPct - bearPct);
+    const sectors = sentiment.sectors || {};
+    const sectorList = Object.entries(sectors).sort((a, b) => b[1].count - a[1].count);
+
+    return (
+        <div>
+            <div className="sentiment-dashboard">
+                <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:'var(--text-100)'}}>市场情绪</div>
+                <div style={{fontSize:24,fontWeight:700,color: sentiment.overall === '偏多' ? 'var(--profit)' : (sentiment.overall === '偏空' ? 'var(--loss)' : 'var(--text-300)')}}>
+                    {sentiment.overall}
+                </div>
+                <div className="text-xs text-muted" style={{marginTop:4}}>综合评分: {sentiment.score}</div>
+                <div className="sentiment-bar">
+                    <div className="sentiment-bar-bull" style={{width: bullPct + '%'}} />
+                    <div className="sentiment-bar-neut" style={{width: neutPct + '%'}} />
+                    <div className="sentiment-bar-bear" style={{width: bearPct + '%'}} />
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text-400)'}}>
+                    <span className="text-profit">利好 {sentiment.bullish}</span>
+                    <span>中性 {sentiment.neutral}</span>
+                    <span className="text-loss">利空 {sentiment.bearish}</span>
+                </div>
+            </div>
+            {sectorList.length > 0 && (
+                <div className="sentiment-dashboard">
+                    <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:'var(--text-100)'}}>板块情绪</div>
+                    {sectorList.map(([name, info]) => (
+                        <div key={name} className="sector-heat-item">
+                            <span style={{color:'var(--text-200)'}}>{name}</span>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                <span className="text-xs">{info.count}条</span>
+                                <span style={{
+                                    color: info.label === '利好' ? 'var(--profit)' : (info.label === '利空' ? 'var(--loss)' : 'var(--text-400)'),
+                                    fontWeight: 600, fontSize: 12,
+                                }}>{info.avg_score > 0 ? '+' : ''}{info.avg_score}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ===== News Page ===== */
+function NewsPage({ showToast }) {
+    const [news, setNews] = useState([]);
+    const [detail, setDetail] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [sentiment, setSentiment] = useState(null);
+    const [filterSource, setFilterSource] = useState('');
+    const [filterSentiment, setFilterSentiment] = useState('');
+    const [filterSector, setFilterSector] = useState('');
+    const [keyword, setKeyword] = useState('');
+    const [searchText, setSearchText] = useState('');
+
+    const loadNews = async () => {
+        setLoading(true);
+        try {
+            let url = '/api/news?limit=80';
+            if (filterSource) url += '&source=' + encodeURIComponent(filterSource);
+            if (filterSentiment) url += '&sentiment=' + encodeURIComponent(filterSentiment);
+            if (filterSector) url += '&sector=' + encodeURIComponent(filterSector);
+            if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+            const data = await api.get(url);
+            setNews(data);
+        } catch (e) { showToast('加载失败', 'error'); }
+        setLoading(false);
+    };
+
+    const loadSentiment = async () => {
+        try { const data = await api.get('/api/news/sentiment/summary'); setSentiment(data); }
+        catch (e) {}
+    };
+
+    useEffect(() => { loadNews(); loadSentiment(); }, [filterSource, filterSentiment, filterSector, keyword]);
+
+    const refresh = async () => {
+        setRefreshing(true);
+        try {
+            const r = await api.post('/api/news/refresh');
+            showToast(r.message, 'success');
+            loadNews(); loadSentiment();
+        } catch (e) { showToast('刷新失败', 'error'); }
+        setRefreshing(false);
+    };
+
+    const viewDetail = async (id) => {
+        try { const data = await api.get('/api/news/' + id); setDetail(data); }
+        catch (e) { showToast('加载失败', 'error'); }
+    };
+
+    const doSearch = () => { setKeyword(searchText); };
+
+    if (detail) {
+        return <NewsDetail detail={detail} onBack={() => setDetail(null)} showToast={showToast} />;
+    }
+
+    return (
+        <div className="fade-in news-layout">
+            <div className="news-main">
+                <NewsFilterBar filterSource={filterSource} setFilterSource={setFilterSource}
+                    filterSentiment={filterSentiment} setFilterSentiment={setFilterSentiment}
+                    filterSector={filterSector} setFilterSector={setFilterSector}
+                    searchText={searchText} setSearchText={setSearchText} doSearch={doSearch}
+                    refreshing={refreshing} refresh={refresh} />
+                {loading ? <div className="text-center text-muted py-10"><span className="spinner" /> 加载中...</div> :
+                    news.length === 0 ? <div className="text-muted text-center py-10">暂无新闻，点击"刷新新闻"获取最新资讯</div> :
+                    <NewsList news={news} onView={viewDetail} />
+                }
+            </div>
+            <div className="news-sidebar">
+                <SentimentDashboard sentiment={sentiment} />
+            </div>
+        </div>
+    );
+}
+
+/* ===== Market Watch Page ===== */
+
+function KlineChart({ data, width, height }) {
+    const mainRef = useRef(null);
+    const overlayRef = useRef(null);
+    const hoverRef = useRef(-1);
+
+    // Main chart: only redraws when data/size changes
+    useEffect(() => {
+        const canvas = mainRef.current;
+        if (!canvas || !data || data.length === 0) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+
+        const pad = { top: 8, bottom: 28, left: 2, right: 2 };
+        const cw = width - pad.left - pad.right;
+        const ch = height - pad.top - pad.bottom;
+        const n = data.length;
+        const gap = cw / n;
+        const barW = Math.max(1, gap * 0.65);
+
+        let hi = -Infinity, lo = Infinity;
+        for (let i = 0; i < n; i++) { hi = Math.max(hi, data[i].high); lo = Math.min(lo, data[i].low); }
+        const range = hi - lo || 1;
+        const toY = v => pad.top + ch * (1 - (v - lo) / range);
+
+        ctx.strokeStyle = '#252a3a'; ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 4; i++) {
+            const y = pad.top + ch * i / 4;
+            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+            ctx.fillStyle = '#64748b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText((hi - range * i / 4).toFixed(2), width - 2, y - 2);
+        }
+
+        for (let i = 0; i < n; i++) {
+            const d = data[i];
+            const x = pad.left + gap * i + gap / 2;
+            const isUp = d.close >= d.open;
+            ctx.strokeStyle = ctx.fillStyle = isUp ? '#22c55e' : '#ef4444';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x, toY(d.high)); ctx.lineTo(x, toY(d.low)); ctx.stroke();
+            const bt = toY(Math.max(d.open, d.close));
+            const bh = Math.max(1, toY(Math.min(d.open, d.close)) - bt);
+            isUp ? ctx.strokeRect(x - barW/2, bt, barW, bh) : ctx.fillRect(x - barW/2, bt, barW, bh);
+        }
+
+        const maxVol = Math.max(...data.map(d => d.vol || 0)) || 1;
+        for (let i = 0; i < n; i++) {
+            const d = data[i]; const x = pad.left + gap * i + gap / 2;
+            ctx.fillStyle = d.close >= d.open ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)';
+            const vh = (d.vol / maxVol) * 22;
+            ctx.fillRect(x - barW/2, height - pad.bottom + 4 + (22 - vh), barW, vh);
+        }
+
+        ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+        const step = Math.max(1, Math.floor(n / 6));
+        for (let i = 0; i < n; i += step) {
+            ctx.fillText(data[i].date.slice(5), pad.left + gap * i + gap / 2, height - 2);
+        }
+    }, [data, width, height]);
+
+    // Overlay: lightweight crosshair, no React state
+    const handleMouseMove = (e) => {
+        if (!data || data.length === 0) return;
+        const rect = mainRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const gap = (width - 4) / data.length;
+        const idx = Math.max(0, Math.min(data.length - 1, Math.floor((x - 2) / gap)));
+        if (idx === hoverRef.current) return;
+        hoverRef.current = idx;
+        // draw crosshair on overlay
+        const oc = overlayRef.current;
+        if (!oc) return;
+        const octx = oc.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        oc.width = width * dpr; oc.height = height * dpr;
+        octx.scale(dpr, dpr); octx.clearRect(0, 0, width, height);
+        const cx = 2 + gap * idx + gap / 2;
+        octx.strokeStyle = 'rgba(99,102,241,0.5)'; octx.lineWidth = 0.5;
+        octx.setLineDash([3, 3]);
+        octx.beginPath(); octx.moveTo(cx, 8); octx.lineTo(cx, height - 28); octx.stroke();
+        octx.setLineDash([]);
+        // update info text via DOM
+        const info = mainRef.current.parentElement.querySelector('.kline-info-text');
+        if (info) {
+            const d = data[idx];
+            const c = d.close >= d.open ? 'var(--profit)' : 'var(--loss)';
+            info.innerHTML = `<span>${d.date}</span><span>开 ${d.open}</span><span>高 ${d.high}</span><span>低 ${d.low}</span><span style="color:${c}">收 ${d.close}</span><span>${d.pct_chg > 0 ? '+' : ''}${d.pct_chg}%</span>`;
+        }
+    };
+
+    const handleMouseLeave = () => {
+        hoverRef.current = -1;
+        const oc = overlayRef.current;
+        if (oc) { const octx = oc.getContext('2d'); octx.clearRect(0, 0, oc.width, oc.height); }
+        const info = mainRef.current && mainRef.current.parentElement.querySelector('.kline-info-text');
+        if (info) info.innerHTML = '';
+    };
+
+    return (
+        <div className="kline-container">
+            <div style={{position:'relative'}}>
+                <canvas ref={mainRef} className="kline-canvas" style={{width, height}} />
+                <canvas ref={overlayRef} className="kline-canvas"
+                    style={{width, height, position:'absolute', top:0, left:0}}
+                    onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} />
+            </div>
+            <div className="kline-info kline-info-text"></div>
+        </div>
+    );
+}
+
+function StockSearchInput({ onSelect, placeholder }) {
+    const [text, setText] = useState('');
+    const [results, setResults] = useState([]);
+    const [show, setShow] = useState(false);
+    const timerRef = useRef(null);
+
+    const doSearch = (val) => {
+        setText(val);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (!val || val.length < 1) { setResults([]); setShow(false); return; }
+        timerRef.current = setTimeout(async () => {
+            try {
+                const r = await api.get('/api/data/stock_search?keyword=' + encodeURIComponent(val));
+                setResults(r.data || []);
+                setShow(true);
+            } catch(e) { setResults([]); }
+        }, 300);
+    };
+
+    return (
+        <div className="stock-search-wrap">
+            <input className="input" placeholder={placeholder || '输入股票代码/名称'}
+                value={text} onChange={e => doSearch(e.target.value)}
+                onFocus={() => results.length > 0 && setShow(true)}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' && text) {
+                        onSelect(text.toUpperCase().includes('.') ? text.toUpperCase() : text);
+                        setShow(false);
+                    }
+                }}
+            />
+            {show && results.length > 0 && (
+                <div className="stock-search-dropdown">
+                    {results.map(s => (
+                        <div key={s.ts_code} className="stock-search-item"
+                            onMouseDown={() => { onSelect(s.ts_code); setText(s.name); setShow(false); }}>
+                            <span>{s.name}</span>
+                            <span style={{color:'var(--text-500)'}}>{s.ts_code}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function StockWindowContent({ data, chartW, chartH }) {
+    const last = data && data.length > 0 ? data[data.length - 1] : null;
+    const chg = last ? last.pct_chg : 0;
+    const isUp = chg >= 0;
+    return (
+        <div>
+            {last && (
+                <div className="stock-window-info">
+                    <span className={'stock-window-price ' + (isUp ? 'text-profit' : 'text-loss')}>{last.close}</span>
+                    <span className={'stock-window-chg ' + (isUp ? 'text-profit' : 'text-loss')}>
+                        {chg > 0 ? '+' : ''}{chg}%
+                    </span>
+                </div>
+            )}
+            {data && data.length > 0 ? (
+                <KlineChart data={data} width={chartW || 380} height={chartH || 200} />
+            ) : (
+                <div className="text-muted text-center py-10">暂无数据</div>
+            )}
+        </div>
+    );
+}
+
+function DrawingCanvas({ showToast }) {
+    const canvasRef = useRef(null);
+    const drawingRef = useRef(false);
+    const pointsRef = useRef([]);
+    const [matching, setMatching] = useState(false);
+    const [matches, setMatches] = useState([]);
+    const [pointCount, setPointCount] = useState(0);
+    const wrapRef = useRef(null);
+
+    const drawGrid = (ctx, w, h) => {
+        ctx.strokeStyle = '#252a3a'; ctx.lineWidth = 0.5;
+        for (let i = 1; i < 4; i++) {
+            const y = h * i / 4;
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+    };
+
+    const drawCurve = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const w = rect.width, h = 200;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr); ctx.clearRect(0, 0, w, h);
+        drawGrid(ctx, w, h);
+        const pts = pointsRef.current;
+        if (pts.length < 2) return;
+        ctx.strokeStyle = '#818cf8'; ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+    };
+
+    const getPos = (e) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const startDraw = (e) => {
+        drawingRef.current = true;
+        pointsRef.current = [getPos(e)];
+        setMatches([]);
+        if (wrapRef.current) wrapRef.current.classList.add('drawing');
+        drawCurve();
+    };
+
+    const moveDraw = (e) => {
+        if (!drawingRef.current) return;
+        pointsRef.current.push(getPos(e));
+        drawCurve();
+    };
+
+    const endDraw = () => {
+        drawingRef.current = false;
+        if (wrapRef.current) wrapRef.current.classList.remove('drawing');
+        setPointCount(pointsRef.current.length);
+    };
+
+    const clearDraw = () => {
+        pointsRef.current = []; setMatches([]); setPointCount(0);
+        drawCurve();
+    };
+
+    useEffect(() => { drawCurve(); }, []);
+
+    const doMatch = async () => {
+        const pts = pointsRef.current;
+        if (pts.length < 10) { showToast('请绘制更长的曲线', 'error'); return; }
+        const ys = pts.map(p => p.y);
+        const mn = Math.min(...ys), mx = Math.max(...ys);
+        const range = mx - mn || 1;
+        const curve = ys.map(y => 1 - (y - mn) / range);
+        const sampled = [];
+        const step = Math.max(1, Math.floor(curve.length / 50));
+        for (let i = 0; i < curve.length; i += step) sampled.push(curve[i]);
+        setMatching(true);
+        try {
+            const r = await api.post('/api/market/pattern_match', { curve: sampled, top_n: 6 });
+            setMatches(r.matches || []);
+            if ((r.matches || []).length === 0) showToast('未找到相似走势', 'info');
+        } catch(e) { showToast(e.detail || '匹配失败', 'error'); }
+        setMatching(false);
+    };
+
+    return (
+        <div className="draw-panel">
+            <div className="draw-panel-title">形态匹配 - 画线找相似走势</div>
+            <div className="draw-canvas-wrap" ref={wrapRef}>
+                <canvas ref={canvasRef} className="draw-canvas"
+                    onMouseDown={startDraw} onMouseMove={moveDraw}
+                    onMouseUp={endDraw} onMouseLeave={endDraw} />
+                {pointCount === 0 && <div className="draw-hint">按住鼠标左键绘制走势曲线</div>}
+            </div>
+            <div className="draw-toolbar">
+                <button className="btn btn-primary" onClick={doMatch} disabled={matching || pointCount < 10}>
+                    {matching ? <><span className="spinner"/> 匹配中...</> : '开始匹配'}
+                </button>
+                <button className="btn btn-secondary" onClick={clearDraw}>清除</button>
+                <span className="text-xs text-muted" style={{marginLeft:8}}>
+                    {pointCount > 0 ? `已绘制 ${pointCount} 个点` : '在上方画布中绘制您预期的走势形态'}
+                </span>
+            </div>
+            {matches.length > 0 && (
+                <div className="match-results">
+                    <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>匹配结果 (共{matches.length}个)</div>
+                    <div className="match-grid">
+                        {matches.map((m, i) => (
+                            <div key={i} className="match-item">
+                                <div className="match-header">
+                                    <div>
+                                        <span className="match-name">{m.name}</span>
+                                        <span className="match-code">{m.code}</span>
+                                    </div>
+                                    <span className="match-score">相似度 {(m.score * 100).toFixed(1)}%</span>
+                                </div>
+                                <div className="match-date">{m.start_date} ~ {m.end_date}</div>
+                                <KlineChart data={m.kline} width={280} height={150} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MarketPage({ showToast }) {
+    const [panels, setPanels] = useState([]);
+    const [klineCount, setKlineCount] = useState(60);
+    const [tab, setTab] = useState('watch');
+    const workspaceRef = useRef(null);
+    const dragRef = useRef(null);
+    const zRef = useRef(10);
+    const nextPos = useRef({ x: 20, y: 20 });
+
+    // Draggable window logic
+    const bringToFront = (code) => {
+        zRef.current += 1;
+        setPanels(prev => prev.map(p => ({
+            ...p, z: p.code === code ? zRef.current : p.z,
+            active: p.code === code
+        })));
+    };
+
+    const onBarMouseDown = (e, code) => {
+        if (e.target.closest('.stock-window-btn')) return;
+        e.preventDefault();
+        bringToFront(code);
+        const panel = panels.find(p => p.code === code);
+        if (!panel) return;
+        const startX = e.clientX, startY = e.clientY;
+        const origX = panel.x, origY = panel.y;
+        const onMove = (ev) => {
+            const dx = ev.clientX - startX, dy = ev.clientY - startY;
+            setPanels(prev => prev.map(p => p.code === code ? { ...p, x: origX + dx, y: origY + dy } : p));
+        };
+        const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    };
+
+    const onResizeMouseDown = (e, code) => {
+        e.preventDefault(); e.stopPropagation();
+        bringToFront(code);
+        const panel = panels.find(p => p.code === code);
+        if (!panel) return;
+        const startX = e.clientX, startY = e.clientY;
+        const origW = panel.w, origH = panel.h;
+        const onMove = (ev) => {
+            const nw = Math.max(320, origW + ev.clientX - startX);
+            const nh = Math.max(240, origH + ev.clientY - startY);
+            setPanels(prev => prev.map(p => p.code === code ? { ...p, w: nw, h: nh } : p));
+        };
+        const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    };
+
+    const addStock = async (code) => {
+        if (panels.find(p => p.code === code)) { showToast('该股票已在看盘列表中', 'info'); return; }
+        const pos = { ...nextPos.current };
+        nextPos.current = { x: pos.x + 30, y: pos.y + 30 };
+        if (nextPos.current.x > 400) nextPos.current = { x: 20, y: 20 };
+        zRef.current += 1;
+        const placeholder = { code, name: '加载中...', data: [], x: pos.x, y: pos.y, w: 420, h: 300, z: zRef.current, active: true };
+        setPanels(prev => [...prev.map(p => ({ ...p, active: false })), placeholder]);
+        try {
+            const r = await api.get('/api/market/kline?ts_code=' + encodeURIComponent(code) + '&limit=' + klineCount);
+            setPanels(prev => prev.map(p => p.code === code ? { ...p, name: r.name || code, data: r.data || [] } : p));
+        } catch(e) {
+            showToast(e.detail || '加载失败', 'error');
+            setPanels(prev => prev.filter(p => p.code !== code));
+        }
+    };
+
+    const removePanel = (code) => { setPanels(prev => prev.filter(p => p.code !== code)); };
+
+    const refreshAll = async () => {
+        if (panels.length === 0) return;
+        const promises = panels.map(p =>
+            api.get('/api/market/kline?ts_code=' + encodeURIComponent(p.code) + '&limit=' + klineCount)
+                .then(r => ({ code: p.code, name: r.name || p.name, data: r.data || [] }))
+                .catch(() => ({ code: p.code, name: p.name, data: p.data }))
+        );
+        const results = await Promise.all(promises);
+        setPanels(prev => prev.map(p => {
+            const r = results.find(rr => rr.code === p.code);
+            return r ? { ...p, name: r.name, data: r.data } : p;
+        }));
+    };
+
+    useEffect(() => { if (panels.length > 0) refreshAll(); }, [klineCount]);
+
+    // Auto-tile: arrange windows in grid
+    const autoTile = () => {
+        if (panels.length === 0) return;
+        const ws = workspaceRef.current;
+        const totalW = ws ? ws.offsetWidth : 1000;
+        const totalH = ws ? ws.offsetHeight : 600;
+        const cols = panels.length <= 2 ? panels.length : panels.length <= 4 ? 2 : 3;
+        const rows = Math.ceil(panels.length / cols);
+        const ww = Math.floor(totalW / cols) - 8;
+        const wh = Math.floor(totalH / rows) - 8;
+        setPanels(prev => prev.map((p, i) => ({
+            ...p,
+            x: (i % cols) * (ww + 8) + 4,
+            y: Math.floor(i / cols) * (wh + 8) + 4,
+            w: Math.max(320, ww), h: Math.max(240, wh)
+        })));
+    };
+
+    return (
+        <div className="market-page fade-in">
+            <div className="tabs">
+                <button className={'tab-btn' + (tab === 'watch' ? ' active' : '')} onClick={() => setTab('watch')}>自选看盘</button>
+                <button className={'tab-btn' + (tab === 'pattern' ? ' active' : '')} onClick={() => setTab('pattern')}>形态匹配</button>
+            </div>
+
+            {tab === 'watch' && (<div>
+                <div className="market-toolbar">
+                    <StockSearchInput onSelect={addStock} placeholder="添加股票..." />
+                    <div className="field" style={{width:90}}>
+                        <label className="label">K线数</label>
+                        <select className="input" value={klineCount} onChange={e => setKlineCount(+e.target.value)}>
+                            <option value={30}>30</option>
+                            <option value={60}>60</option>
+                            <option value={120}>120</option>
+                            <option value={250}>250</option>
+                        </select>
+                    </div>
+                    <button className="btn btn-secondary" onClick={autoTile} disabled={panels.length===0} title="自动排列">整理窗口</button>
+                    <button className="btn btn-secondary" onClick={refreshAll} disabled={panels.length===0}>刷新全部</button>
+                </div>
+
+                <div className="market-workspace" ref={workspaceRef} style={{height: 620}}>
+                    {panels.length === 0 && (
+                        <div className="workspace-empty">在上方搜索框输入股票代码或名称添加看盘<br/>窗口可自由拖动和缩放</div>
+                    )}
+                    {panels.map(p => (
+                        <div key={p.code}
+                            className={'stock-window' + (p.active ? ' active' : '')}
+                            style={{left: p.x, top: p.y, width: p.w, height: p.h, zIndex: p.z}}
+                            onMouseDown={() => bringToFront(p.code)}>
+                            <div className="stock-window-bar" onMouseDown={e => onBarMouseDown(e, p.code)}>
+                                <div className="stock-window-title">
+                                    <span>{p.name || '加载中...'}</span>
+                                    <span style={{fontSize:11,color:'var(--text-500)'}}>{p.code}</span>
+                                </div>
+                                <div className="stock-window-btns">
+                                    <button className="stock-window-btn close-btn" onClick={() => removePanel(p.code)} title="关闭">×</button>
+                                </div>
+                            </div>
+                            <div className="stock-window-body">
+                                <StockWindowContent data={p.data} chartW={Math.max(280, (p.w || 420) - 24)} chartH={Math.max(150, (p.h || 300) - 90)} />
+                            </div>
+                            <div className="stock-window-resize" onMouseDown={e => onResizeMouseDown(e, p.code)} />
+                        </div>
+                    ))}
+                </div>
+            </div>)}
+
+            {tab === 'pattern' && <DrawingCanvas showToast={showToast} />}
+        </div>
+    );
+}
+
+/* ===== Factor Page ===== */
+function FactorPage({ showToast }) {
+    const [factors, setFactors] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const [evalResult, setEvalResult] = useState(null);
+    const [evalTab, setEvalTab] = useState('ic');
+    const [loading, setLoading] = useState(false);
+    const [mineTab, setMineTab] = useState('none');
+
+    // 新建因子表单
+    const [newName, setNewName] = useState('');
+    const [newExpr, setNewExpr] = useState('');
+    const [newDesc, setNewDesc] = useState('');
+    const [newCat, setNewCat] = useState('custom');
+
+    // 评价参数
+    const [evalUniverse, setEvalUniverse] = useState('000001.SZ,000002.SZ,600036.SH');
+    const [evalStart, setEvalStart] = useState('20230101');
+    const [evalEnd, setEvalEnd] = useState('20231231');
+    const [evalGroups, setEvalGroups] = useState(5);
+
+    // GP挖掘参数
+    const [gpPopSize, setGpPopSize] = useState(30);
+    const [gpGenerations, setGpGenerations] = useState(10);
+    const [gpRunning, setGpRunning] = useState(false);
+
+    // LLM挖掘参数
+    const [llmCount, setLlmCount] = useState(5);
+    const [llmHint, setLlmHint] = useState('');
+    const [llmRunning, setLlmRunning] = useState(false);
+
+    const loadFactors = () => api.get('/api/factors').then(setFactors).catch(() => {});
+    useEffect(() => { loadFactors(); }, []);
+
+    const BADGE = { builtin: 'factor-badge-builtin', gp: 'factor-badge-gp', llm: 'factor-badge-llm', user: 'factor-badge-user' };
+    const BADGE_LABEL = { builtin: '内置', gp: 'GP', llm: 'LLM', user: '自定义' };
+
+    const initBuiltin = async () => {
+        try { const r = await api.post('/api/factors/init_builtin'); loadFactors(); showToast(r.message, 'success'); }
+        catch (e) { showToast('加载失败', 'error'); }
+    };
+
+    const createFactor = async () => {
+        if (!newName || !newExpr) { showToast('请填写名称和表达式', 'error'); return; }
+        try {
+            await api.post('/api/factors', { name: newName, expression: newExpr, description: newDesc, category: newCat });
+            loadFactors(); setNewName(''); setNewExpr(''); setNewDesc('');
+            showToast('因子已创建', 'success');
+        } catch (e) { showToast('创建失败', 'error'); }
+    };
+
+    const deleteFactor = async (id) => {
+        if (!confirm('确认删除?')) return;
+        await api.remove('/api/factors/' + id);
+        if (selected && selected.id === id) { setSelected(null); setEvalResult(null); }
+        loadFactors(); showToast('已删除', 'success');
+    };
+
+    const evaluateFactor = async () => {
+        if (!selected) { showToast('请先选择因子', 'error'); return; }
+        setLoading(true); setEvalResult(null);
+        try {
+            const codes = evalUniverse.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/factors/evaluate', {
+                factor_id: selected.id, universe: codes,
+                start_date: evalStart, end_date: evalEnd, groups: evalGroups,
+            });
+            setEvalResult(res); showToast('评价完成', 'success');
+        } catch (e) { showToast(e.detail || '评价失败', 'error'); }
+        setLoading(false);
+    };
+
+    const runGP = async () => {
+        setGpRunning(true);
+        try {
+            const codes = evalUniverse.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/factors/mine/gp', {
+                universe: codes, start_date: evalStart, end_date: evalEnd,
+                pop_size: gpPopSize, generations: gpGenerations,
+            });
+            loadFactors();
+            showToast(`GP挖掘完成, 发现${res.factors.length}个因子`, 'success');
+        } catch (e) { showToast(e.detail || 'GP挖掘失败', 'error'); }
+        setGpRunning(false);
+    };
+
+    const runLLM = async () => {
+        setLlmRunning(true);
+        try {
+            const codes = evalUniverse.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/factors/mine/llm', {
+                universe: codes, start_date: evalStart, end_date: evalEnd,
+                count: llmCount, hint: llmHint,
+            });
+            loadFactors();
+            showToast(`LLM挖掘完成, 生成${res.factors.length}个因子`, 'success');
+        } catch (e) { showToast(e.detail || 'LLM挖掘失败', 'error'); }
+        setLlmRunning(false);
+    };
+
+    return (
+        <div className="fade-in factor-layout">
+            <FactorSidebar factors={factors} selected={selected} setSelected={(f) => { setSelected(f); setEvalResult(null); }}
+                deleteFactor={deleteFactor} initBuiltin={initBuiltin} BADGE={BADGE} BADGE_LABEL={BADGE_LABEL} />
+            <div className="flex-1" style={{display:'flex',flexDirection:'column',gap:12}}>
+                <FactorCreatePanel newName={newName} setNewName={setNewName} newExpr={newExpr} setNewExpr={setNewExpr}
+                    newDesc={newDesc} setNewDesc={setNewDesc} newCat={newCat} setNewCat={setNewCat} createFactor={createFactor} />
+                {selected && <FactorEvalPanel selected={selected} evalUniverse={evalUniverse} setEvalUniverse={setEvalUniverse}
+                    evalStart={evalStart} setEvalStart={setEvalStart} evalEnd={evalEnd} setEvalEnd={setEvalEnd}
+                    evalGroups={evalGroups} setEvalGroups={setEvalGroups} loading={loading} evaluateFactor={evaluateFactor} />}
+                {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab} />}
+                <FactorMinePanel mineTab={mineTab} setMineTab={setMineTab}
+                    gpPopSize={gpPopSize} setGpPopSize={setGpPopSize} gpGenerations={gpGenerations} setGpGenerations={setGpGenerations}
+                    gpRunning={gpRunning} runGP={runGP}
+                    llmCount={llmCount} setLlmCount={setLlmCount} llmHint={llmHint} setLlmHint={setLlmHint}
+                    llmRunning={llmRunning} runLLM={runLLM} />
+            </div>
+        </div>
+    );
+}
+
+/* ===== Main App ===== */
+function App() {
+    const [page, setPage] = useState('backtest');
+    const [toast, setToast] = useState(null);
+    const showToast = (message, type) => setToast({ message, type: type || 'info' });
+
+    const navItems = [
+        { key: 'backtest', label: '回测' },
+        { key: 'strategy', label: '策略' },
+        { key: 'market', label: '看盘' },
+        { key: 'factor', label: '因子' },
+        { key: 'news', label: '新闻' },
+        { key: 'history', label: '历史' },
+        { key: 'settings', label: '设置' },
+        { key: 'help', label: '帮助' },
+    ];
+
+    return (
+        <div className="app">
+            <header className="header">
+                <div className="header-brand">
+                    <h1>QTsys</h1>
+                    <span>量化交易回测系统</span>
+                </div>
+                <nav className="nav">
+                    {navItems.map(n => (
+                        <button key={n.key} onClick={() => setPage(n.key)}
+                            className={'nav-btn' + (page === n.key ? ' active' : '')}>
+                            {n.label}
+                        </button>
+                    ))}
+                </nav>
+            </header>
+            <main className="main">
+                {page === 'settings' && <SettingsPage showToast={showToast} />}
+                {page === 'strategy' && <StrategyPage showToast={showToast} />}
+                {page === 'backtest' && <BacktestPage showToast={showToast} />}
+                {page === 'market' && <MarketPage showToast={showToast} />}
+                {page === 'factor' && <FactorPage showToast={showToast} />}
+                {page === 'news' && <NewsPage showToast={showToast} />}
+                {page === 'history' && <HistoryPage showToast={showToast} />}
+                {page === 'help' && <HelpPage />}
+            </main>
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        </div>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

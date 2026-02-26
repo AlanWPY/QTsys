@@ -1,0 +1,1 @@
+dist/QTsys_DBManager.exe filter=lfs diff=lfs merge=lfs -text

@@ -1,4 +1,4 @@
-"""QTsys - 量化交易回测系统 FastAPI入口"""
+"""QTsys - 量化金融分析系统 FastAPI入口"""
 import sys
 import os
 from contextlib import asynccontextmanager

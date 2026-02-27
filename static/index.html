@@ -258,6 +258,44 @@ tr:hover td { background: var(--bg-600); }
 .wf-expr-bar.error { color: var(--loss); }
 .wf-minimap { position: absolute; right: 8px; bottom: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-800); opacity: 0.8; }
 .wf-backtest-panel { background: var(--bg-700); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 16px; }
+
+/* ===== 风险分析 ===== */
+.underwater-chart { background: var(--bg-600); border-radius: 8px; padding: 12px; }
+.drawdown-table { max-height: 300px; overflow-y: auto; }
+.risk-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+.risk-card { background: var(--bg-600); border-radius: 8px; padding: 12px; text-align: center; }
+.risk-card-label { font-size: 11px; color: var(--text-400); }
+.risk-card-value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+.monthly-heatmap-wrap { overflow-x: auto; }
+.monthly-heatmap canvas { border-radius: 8px; }
+.histogram-wrap canvas { border-radius: 8px; }
+
+/* ===== 归因分析 ===== */
+.pnl-bar { display: inline-block; height: 14px; border-radius: 3px; min-width: 2px; vertical-align: middle; }
+.pnl-bar-profit { background: var(--profit); }
+.pnl-bar-loss { background: var(--loss); }
+
+/* ===== 组合分析 ===== */
+.portfolio-page { display: flex; flex-direction: column; gap: 16px; }
+.portfolio-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.portfolio-check { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; background: var(--bg-600); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.portfolio-check.selected { background: var(--accent); color: white; }
+.portfolio-check:hover { background: var(--bg-500); }
+.portfolio-check.selected:hover { background: var(--accent-light); }
+.corr-heatmap-wrap canvas { border-radius: 8px; }
+.weight-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.weight-bar-fill { height: 20px; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
+.weight-bar-label { font-size: 12px; min-width: 80px; }
+.weight-bar-value { font-size: 12px; color: var(--text-300); min-width: 50px; text-align: right; }
+
+/* ===== 数据质量 ===== */
+.quality-panel { background: var(--bg-700); border-radius: 12px; padding: 16px; }
+.quality-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.quality-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.quality-badge-clean { background: #14532d; color: #4ade80; }
+.quality-badge-warning { background: #713f12; color: #fbbf24; }
+.quality-badge-error { background: #450a0a; color: #f87171; }
+@media (max-width: 900px) { .risk-cards { grid-template-columns: repeat(2, 1fr); } .quality-summary { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
@@ -634,6 +672,7 @@ function BacktestPage({ showToast }) {
                     </div>
                 )}
             </div>
+            <QualityPanel universe={universe} startDate={startDate} endDate={endDate} showToast={showToast} />
             {result && <BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} />}
         </div>
     );
@@ -689,6 +728,8 @@ function BacktestResultView({ result, tab, setTab, logs }) {
         { key: 'chart', label: '收益曲线' },
         { key: 'metrics', label: '绩效指标' },
         { key: 'trades', label: '交易记录' },
+        { key: 'risk', label: '风险分析' },
+        { key: 'attribution', label: '归因分析' },
         { key: 'logs', label: '运行日志' },
     ];
     const exportCSV = () => {
@@ -701,7 +742,7 @@ function BacktestResultView({ result, tab, setTab, logs }) {
             </div>
             <div className="card" style={{padding:0}}>
                 <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
-                    <div style={{display:'flex'}}>
+                    <div style={{display:'flex',flexWrap:'wrap'}}>
                         {tabs.map(t => (
                             <button key={t.key} onClick={() => setTab(t.key)}
                                 className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>
@@ -713,9 +754,359 @@ function BacktestResultView({ result, tab, setTab, logs }) {
                     {tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}
                     {tab === 'metrics' && <MetricsTable metrics={metrics} />}
                     {tab === 'trades' && <TradesTable trades={result.trades} />}
+                    {tab === 'risk' && <RiskAnalysisTab resultId={result.id} />}
+                    {tab === 'attribution' && <AttributionTab resultId={result.id} />}
                     {tab === 'logs' && <LogsPanel logs={logs} />}
                 </div>
             </div>
+        </div>
+    );
+}
+
+/* ===== Risk Analysis Tab ===== */
+function RiskAnalysisTab({ resultId }) {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        if (!resultId) return;
+        setLoading(true);
+        api.post('/api/backtest/risk_analysis', { result_id: resultId })
+            .then(setData).catch(() => {}).finally(() => setLoading(false));
+    }, [resultId]);
+    if (loading) return <div className="text-center py-10"><span className="spinner"/></div>;
+    if (!data) return <div className="text-muted text-center py-10">无数据</div>;
+    const rm = data.risk_metrics || {};
+    return (
+        <div className="space-y">
+            <div className="risk-cards">
+                <div className="risk-card"><div className="risk-card-label">VaR (95%)</div><div className="risk-card-value text-loss">{rm.var_95 ?? '-'}%</div></div>
+                <div className="risk-card"><div className="risk-card-label">CVaR (95%)</div><div className="risk-card-value text-loss">{rm.cvar_95 ?? '-'}%</div></div>
+                <div className="risk-card"><div className="risk-card-label">偏度</div><div className="risk-card-value">{rm.skewness ?? '-'}</div></div>
+                <div className="risk-card"><div className="risk-card-label">峰度</div><div className="risk-card-value">{rm.kurtosis ?? '-'}</div></div>
+            </div>
+            <UnderwaterChart underwater={data.drawdowns?.underwater || []} />
+            <DrawdownTable drawdowns={data.drawdowns?.drawdowns || []} />
+            <RollingVolChart vol20={rm.rolling_vol_20 || []} vol60={rm.rolling_vol_60 || []} />
+            <ReturnHistogram histogram={rm.histogram} var95={rm.var_95} cvar95={rm.cvar_95} />
+            <MonthlyHeatmap data={data.monthly_returns || []} />
+        </div>
+    );
+}
+
+/* ===== Underwater Chart ===== */
+function UnderwaterChart({ underwater }) {
+    if (!underwater || underwater.length === 0) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>水下曲线</div>
+            <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={underwater}>
+                    <defs>
+                        <linearGradient id="colorUW" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05}/>
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis dataKey="date" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        interval={Math.floor(underwater.length/6)}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        tickFormatter={v=>v.toFixed(1)+'%'} reversed={true}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
+                        formatter={v=>[v+'%','回撤']}/>
+                    <Area type="monotone" dataKey="depth" stroke="#ef4444" fill="url(#colorUW)" strokeWidth={1.5}/>
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+/* ===== Drawdown Table ===== */
+function DrawdownTable({ drawdowns }) {
+    if (!drawdowns || drawdowns.length === 0) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>回撤事件</div>
+            <div className="table-wrap drawdown-table">
+                <table>
+                    <thead><tr>
+                        <th>开始</th><th>谷底</th><th>恢复</th>
+                        <th style={{textAlign:'right'}}>深度%</th>
+                        <th style={{textAlign:'right'}}>持续天数</th>
+                        <th style={{textAlign:'right'}}>恢复天数</th>
+                    </tr></thead>
+                    <tbody>{drawdowns.map((d,i) => (
+                        <tr key={i}>
+                            <td>{d.start_date}</td><td>{d.trough_date}</td>
+                            <td>{d.recovery_date || '未恢复'}</td>
+                            <td style={{textAlign:'right'}} className="text-loss">{d.depth}</td>
+                            <td style={{textAlign:'right'}}>{d.duration_days}</td>
+                            <td style={{textAlign:'right'}}>{d.recovery_days ?? '-'}</td>
+                        </tr>
+                    ))}</tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+/* ===== Rolling Volatility Chart ===== */
+function RollingVolChart({ vol20, vol60 }) {
+    if ((!vol20 || vol20.length === 0) && (!vol60 || vol60.length === 0)) return null;
+    const chartData = [];
+    const maxLen = Math.max(vol20?.length || 0, vol60?.length || 0);
+    for (let i = 0; i < maxLen; i++) {
+        const item = { idx: i };
+        if (vol20 && vol20[i]) item.vol20 = vol20[i].value;
+        if (vol60 && vol60[i]) item.vol60 = vol60[i].value;
+        chartData.push(item);
+    }
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>滚动波动率</div>
+            <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis dataKey="idx" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        interval={Math.floor(chartData.length/6)}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        tickFormatter={v=>v.toFixed(0)+'%'}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
+                        formatter={(v,name)=>[v+'%', name==='vol20'?'20日波动率':'60日波动率']}/>
+                    <Legend formatter={v=>v==='vol20'?'20日':'60日'}/>
+                    <Line type="monotone" dataKey="vol20" stroke="#f59e0b" strokeWidth={1.5} dot={false}/>
+                    <Line type="monotone" dataKey="vol60" stroke="#6366f1" strokeWidth={1.5} dot={false}/>
+                </ComposedChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+/* ===== Return Histogram (Canvas) ===== */
+function ReturnHistogram({ histogram, var95, cvar95 }) {
+    const canvasRef = useRef(null);
+    useEffect(() => {
+        if (!histogram || !canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const W = 600, H = 250;
+        canvas.width = W; canvas.height = H;
+        ctx.fillStyle = '#252a3a'; ctx.fillRect(0, 0, W, H);
+        const counts = histogram.counts || [];
+        const edges = histogram.bin_edges || [];
+        if (counts.length === 0) return;
+        const maxCount = Math.max(...counts);
+        const barW = (W - 60) / counts.length;
+        const chartH = H - 40;
+        // bars
+        for (let i = 0; i < counts.length; i++) {
+            const h = maxCount > 0 ? (counts[i] / maxCount) * chartH : 0;
+            const x = 40 + i * barW;
+            const mid = (edges[i] + edges[i + 1]) / 2;
+            ctx.fillStyle = mid >= 0 ? '#22c55e88' : '#ef444488';
+            ctx.fillRect(x, H - 20 - h, barW - 1, h);
+        }
+        // VaR/CVaR lines
+        const minE = edges[0], maxE = edges[edges.length - 1];
+        const range = maxE - minE || 1;
+        if (var95 != null) {
+            const vx = 40 + ((var95 / 100 - minE) / range) * (W - 60);
+            ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(vx, 10); ctx.lineTo(vx, H - 20); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle = '#f59e0b'; ctx.font = '10px sans-serif'; ctx.fillText('VaR', vx + 2, 18);
+        }
+        if (cvar95 != null) {
+            const cx = 40 + ((cvar95 / 100 - minE) / range) * (W - 60);
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(cx, 10); ctx.lineTo(cx, H - 20); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle = '#ef4444'; ctx.font = '10px sans-serif'; ctx.fillText('CVaR', cx + 2, 18);
+        }
+        // axis labels
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif';
+        ctx.fillText((minE * 100).toFixed(1) + '%', 40, H - 4);
+        ctx.fillText((maxE * 100).toFixed(1) + '%', W - 50, H - 4);
+    }, [histogram, var95, cvar95]);
+    if (!histogram) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>日收益分布</div>
+            <div className="histogram-wrap"><canvas ref={canvasRef} style={{width:'100%',maxWidth:600,height:250}}/></div>
+        </div>
+    );
+}
+
+/* ===== Monthly Heatmap (Canvas) ===== */
+function MonthlyHeatmap({ data }) {
+    const canvasRef = useRef(null);
+    const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月','年度'];
+    useEffect(() => {
+        if (!data || data.length === 0 || !canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const cellW = 52, cellH = 28, padL = 50, padT = 24;
+        const W = padL + 13 * cellW + 10, H = padT + data.length * cellH + 10;
+        canvas.width = W; canvas.height = H;
+        ctx.fillStyle = '#252a3a'; ctx.fillRect(0, 0, W, H);
+        // header
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        MONTHS.forEach((m, i) => ctx.fillText(m, padL + i * cellW + cellW / 2, 16));
+        // rows
+        data.forEach((row, ri) => {
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right';
+            ctx.fillText(String(row.year), padL - 6, padT + ri * cellH + cellH / 2 + 4);
+            const vals = [...(row.months || []), row.annual];
+            vals.forEach((v, ci) => {
+                const x = padL + ci * cellW, y = padT + ri * cellH;
+                if (v == null) { ctx.fillStyle = '#1a1d29'; ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2); return; }
+                const intensity = Math.min(Math.abs(v) / 10, 1);
+                if (v >= 0) ctx.fillStyle = `rgba(34,197,94,${0.15 + intensity * 0.6})`;
+                else ctx.fillStyle = `rgba(239,68,68,${0.15 + intensity * 0.6})`;
+                ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+                ctx.fillStyle = '#e2e8f0'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(v.toFixed(1) + '%', x + cellW / 2, y + cellH / 2 + 4);
+            });
+        });
+    }, [data]);
+    if (!data || data.length === 0) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>月度收益热力图</div>
+            <div className="monthly-heatmap-wrap"><canvas ref={canvasRef} style={{maxWidth:'100%'}}/></div>
+        </div>
+    );
+}
+
+/* ===== Attribution Tab ===== */
+function AttributionTab({ resultId }) {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        if (!resultId) return;
+        setLoading(true);
+        api.post('/api/backtest/attribution', { result_id: resultId })
+            .then(setData).catch(() => {}).finally(() => setLoading(false));
+    }, [resultId]);
+    if (loading) return <div className="text-center py-10"><span className="spinner"/></div>;
+    if (!data) return <div className="text-muted text-center py-10">无数据</div>;
+    return (
+        <div className="space-y">
+            <StockPnLTable stocks={data.stock_pnl || []} />
+            <TopContributorsChart stocks={data.stock_pnl || []} />
+            <SectorAttributionChart sectors={data.sector_attribution || []} />
+            <MonthlyAttributionChart monthly={data.monthly_attribution || []} />
+        </div>
+    );
+}
+
+/* ===== Stock PnL Table ===== */
+function StockPnLTable({ stocks }) {
+    if (!stocks || stocks.length === 0) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>个股盈亏分解</div>
+            <div className="table-wrap" style={{maxHeight:300}}>
+                <table>
+                    <thead><tr>
+                        <th>代码</th><th style={{textAlign:'right'}}>买入成本</th>
+                        <th style={{textAlign:'right'}}>卖出收入</th><th style={{textAlign:'right'}}>已实现盈亏</th>
+                        <th style={{textAlign:'right'}}>贡献率%</th><th style={{textAlign:'right'}}>交易次数</th>
+                    </tr></thead>
+                    <tbody>{stocks.map((s,i) => (
+                        <tr key={i}>
+                            <td>{s.ts_code}</td>
+                            <td style={{textAlign:'right'}}>{s.buy_cost?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}}>{s.sell_income?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}} className={s.realized_pnl>=0?'text-profit':'text-loss'}>{s.realized_pnl?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}} className={s.contribution_pct>=0?'text-profit':'text-loss'}>{s.contribution_pct}</td>
+                            <td style={{textAlign:'right'}}>{s.trade_count}</td>
+                        </tr>
+                    ))}</tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+/* ===== Top Contributors Chart ===== */
+function TopContributorsChart({ stocks }) {
+    if (!stocks || stocks.length === 0) return null;
+    const sorted = [...stocks].sort((a,b) => b.realized_pnl - a.realized_pnl);
+    const top5 = sorted.slice(0, 5);
+    const bottom5 = sorted.slice(-5).reverse();
+    const items = [...top5, ...bottom5].filter((v,i,a) => a.findIndex(x=>x.ts_code===v.ts_code)===i);
+    const maxAbs = Math.max(...items.map(s => Math.abs(s.realized_pnl || 0)), 1);
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>Top 盈亏贡献</div>
+            {items.map((s,i) => (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,fontSize:12}}>
+                    <span style={{minWidth:80,color:'var(--text-300)'}}>{s.ts_code}</span>
+                    <div style={{flex:1,display:'flex',alignItems:'center'}}>
+                        <span className={'pnl-bar ' + (s.realized_pnl>=0?'pnl-bar-profit':'pnl-bar-loss')}
+                            style={{width: Math.abs(s.realized_pnl)/maxAbs*100+'%'}}/>
+                    </div>
+                    <span className={s.realized_pnl>=0?'text-profit':'text-loss'} style={{minWidth:80,textAlign:'right'}}>
+                        {s.realized_pnl?.toLocaleString()}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/* ===== Sector Attribution Chart ===== */
+function SectorAttributionChart({ sectors }) {
+    if (!sectors || sectors.length === 0) return null;
+    const COLORS = ['#6366f1','#22c55e','#f59e0b'];
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>行业归因</div>
+            <ResponsiveContainer width="100%" height={Math.max(200, sectors.length * 35)}>
+                <BarChart data={sectors} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis type="number" tick={{fill:'#94a3b8',fontSize:10}} tickFormatter={v=>v.toFixed(2)+'%'}/>
+                    <YAxis type="category" dataKey="sector" tick={{fill:'#94a3b8',fontSize:11}} width={70}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
+                        formatter={v=>[v+'%']}/>
+                    <Legend/>
+                    <Bar dataKey="allocation" name="配置效应" fill={COLORS[0]} stackId="a"/>
+                    <Bar dataKey="selection" name="选择效应" fill={COLORS[1]} stackId="a"/>
+                    <Bar dataKey="interaction" name="交互效应" fill={COLORS[2]} stackId="a"/>
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+/* ===== Monthly Attribution Chart ===== */
+function MonthlyAttributionChart({ monthly }) {
+    if (!monthly || monthly.length === 0) return null;
+    return (
+        <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>月度超额收益</div>
+            <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={monthly}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis dataKey="month" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        interval={Math.max(0,Math.floor(monthly.length/8)-1)}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        tickFormatter={v=>v.toFixed(1)+'%'}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
+                        formatter={(v,name)=>{
+                            const labels={strategy_return:'策略',benchmark_return:'基准',excess_return:'超额'};
+                            return [v+'%',labels[name]||name];
+                        }}/>
+                    <Legend formatter={v=>{
+                        const labels={strategy_return:'策略',benchmark_return:'基准',excess_return:'超额'};
+                        return labels[v]||v;
+                    }}/>
+                    <Bar dataKey="excess_return" name="excess_return">
+                        {monthly.map((m,i)=>(
+                            <Cell key={i} fill={m.excess_return>=0?'#22c55e':'#ef4444'}/>
+                        ))}
+                    </Bar>
+                </BarChart>
+            </ResponsiveContainer>
         </div>
     );
 }
@@ -1046,6 +1437,282 @@ function CompareView({ data }) {
         </div>
     );
 }
+/* ===== Portfolio Page ===== */
+function PortfolioPage({ showToast }) {
+    const [results, setResults] = useState([]);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [method, setMethod] = useState('max_sharpe');
+    const [loading, setLoading] = useState(false);
+    const [data, setData] = useState(null);
+
+    useEffect(() => {
+        api.get('/api/backtest/history').then(setResults).catch(() => {});
+    }, []);
+
+    const toggleId = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+    };
+
+    const runAnalysis = async () => {
+        if (selectedIds.length < 2) { showToast('至少选择2个回测结果', 'error'); return; }
+        setLoading(true); setData(null);
+        try {
+            const res = await api.post('/api/backtest/portfolio_analysis', {
+                result_ids: selectedIds, method
+            });
+            setData(res);
+            showToast('组合分析完成', 'success');
+        } catch (e) { showToast(e.detail || '分析失败', 'error'); }
+        setLoading(false);
+    };
+
+    return (
+        <div className="fade-in portfolio-page">
+            <div className="card space-y">
+                <div className="card-title">策略组合分析</div>
+                <div style={{fontSize:13,color:'var(--text-300)',marginBottom:8}}>选择回测结果 (2-10个)</div>
+                <div className="portfolio-selector">
+                    {results.map(r => (
+                        <div key={r.id} className={'portfolio-check' + (selectedIds.includes(r.id)?' selected':'')}
+                            onClick={() => toggleId(r.id)}>
+                            {r.strategy_name} #{r.id}
+                        </div>
+                    ))}
+                </div>
+                <div className="flex items-center gap-sm">
+                    <div className="field" style={{width:180}}>
+                        <label className="label">权重方法</label>
+                        <select className="input" value={method} onChange={e=>setMethod(e.target.value)}>
+                            <option value="equal">等权 (1/N)</option>
+                            <option value="inverse_variance">反方差加权</option>
+                            <option value="max_sharpe">最大夏普</option>
+                            <option value="risk_parity">风险平价</option>
+                        </select>
+                    </div>
+                    <button className="btn btn-primary" onClick={runAnalysis} disabled={loading} style={{marginTop:16}}>
+                        {loading ? <><span className="spinner"/> 分析中...</> : '开始分析'}
+                    </button>
+                </div>
+            </div>
+            {data && <PortfolioResults data={data} />}
+        </div>
+    );
+}
+
+/* ===== Portfolio Results ===== */
+function PortfolioResults({ data }) {
+    const corr = data.correlations || {};
+    const weights = data.weights || {};
+    const portfolio = data.portfolio || {};
+    return (
+        <div className="space-y">
+            <div className="card">
+                <div className="card-title">相关性矩阵</div>
+                <CorrelationHeatmap names={corr.names||[]} matrix={corr.correlation_matrix||[]} />
+            </div>
+            <div className="card">
+                <div className="card-title">策略权重 ({weights.method})</div>
+                <WeightsDisplay weights={weights.weights||[]} />
+            </div>
+            <PortfolioEquitySection portfolio={portfolio} />
+            <RollingCorrelationSection corr={corr} />
+        </div>
+    );
+}
+
+/* ===== Correlation Heatmap (Canvas) ===== */
+function CorrelationHeatmap({ names, matrix }) {
+    const canvasRef = useRef(null);
+    useEffect(() => {
+        if (!matrix || matrix.length === 0 || !canvasRef.current) return;
+        const n = names.length;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const cellS = 60, padL = 80, padT = 40;
+        const W = padL + n * cellS + 10, H = padT + n * cellS + 10;
+        canvas.width = W; canvas.height = H;
+        ctx.fillStyle = '#252a3a'; ctx.fillRect(0, 0, W, H);
+        // headers
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif';
+        names.forEach((nm, i) => {
+            ctx.save(); ctx.translate(padL + i * cellS + cellS/2, padT - 6);
+            ctx.rotate(-0.5); ctx.textAlign = 'left';
+            ctx.fillText(nm.slice(0,8), 0, 0); ctx.restore();
+            ctx.textAlign = 'right';
+            ctx.fillText(nm.slice(0,8), padL - 6, padT + i * cellS + cellS/2 + 4);
+        });
+        // cells
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                const v = matrix[i][j];
+                const x = padL + j * cellS, y = padT + i * cellS;
+                const intensity = Math.abs(v);
+                if (v >= 0) ctx.fillStyle = `rgba(239,68,68,${0.1 + intensity*0.7})`;
+                else ctx.fillStyle = `rgba(99,102,241,${0.1 + intensity*0.7})`;
+                ctx.fillRect(x+1, y+1, cellS-2, cellS-2);
+                ctx.fillStyle = '#e2e8f0'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(v.toFixed(2), x + cellS/2, y + cellS/2 + 4);
+            }
+        }
+    }, [names, matrix]);
+    if (!matrix || matrix.length === 0) return <div className="text-muted">无数据</div>;
+    return <div className="corr-heatmap-wrap"><canvas ref={canvasRef} style={{maxWidth:'100%'}}/></div>;
+}
+
+/* ===== Weights Display ===== */
+function WeightsDisplay({ weights }) {
+    if (!weights || weights.length === 0) return null;
+    const maxW = Math.max(...weights.map(w => w.weight), 0.01);
+    return (
+        <div>
+            {weights.map((w, i) => (
+                <div key={i} className="weight-bar">
+                    <span className="weight-bar-label">{w.name}</span>
+                    <div style={{flex:1,background:'var(--bg-900)',borderRadius:4,height:20}}>
+                        <div className="weight-bar-fill" style={{width:(w.weight/maxW*100)+'%'}}/>
+                    </div>
+                    <span className="weight-bar-value">{(w.weight*100).toFixed(1)}%</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/* ===== Portfolio Equity Section ===== */
+function PortfolioEquitySection({ portfolio }) {
+    if (!portfolio || !portfolio.equity_curve || portfolio.equity_curve.length === 0) return null;
+    const pm = portfolio.metrics || {};
+    return (
+        <div className="card">
+            <div className="card-title">组合净值曲线</div>
+            <div className="grid-4" style={{gap:8,marginBottom:12}}>
+                {['total_return','annual_return','sharpe_ratio','max_drawdown'].map(k => {
+                    const [label,unit] = METRIC_LABELS[k]||[k,''];
+                    const val = pm[k] ?? '-';
+                    return (
+                        <div key={k} className="metric-card">
+                            <div className="metric-label">{label}</div>
+                            <div className="metric-value">{val}{unit}</div>
+                        </div>
+                    );
+                })}
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={portfolio.equity_curve}>
+                    <defs><linearGradient id="colorPort" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis dataKey="date" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        interval={Math.floor(portfolio.equity_curve.length/6)}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
+                        tickFormatter={v=>v.toLocaleString()}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
+                    <Area type="monotone" dataKey="value" stroke="#6366f1" fill="url(#colorPort)" strokeWidth={2}/>
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+/* ===== Rolling Correlation Section ===== */
+function RollingCorrelationSection({ corr }) {
+    const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
+    if (!corr.rolling_correlations || corr.rolling_correlations.length === 0) return null;
+    const chartData = {};
+    corr.rolling_correlations.forEach((rc, i) => {
+        (rc.series || []).forEach(p => {
+            if (!chartData[p.idx]) chartData[p.idx] = { idx: p.idx };
+            chartData[p.idx]['p' + i] = p.value;
+        });
+    });
+    const sorted = Object.values(chartData).sort((a, b) => a.idx - b.idx);
+    return (
+        <div className="card">
+            <div className="card-title">滚动相关性 (60日)</div>
+            <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={sorted}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                    <XAxis dataKey="idx" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false} domain={[-1,1]}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
+                    <Legend/>
+                    {corr.rolling_correlations.map((rc,i) => (
+                        <Line key={i} type="monotone" dataKey={'p'+i} name={rc.pair}
+                            stroke={COLORS[i%COLORS.length]} strokeWidth={1.5} dot={false}/>
+                    ))}
+                </ComposedChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+/* ===== Quality Panel ===== */
+function QualityPanel({ universe, startDate, endDate, showToast }) {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const runCheck = async () => {
+        const codes = universe.split(',').map(s=>s.trim()).filter(Boolean);
+        if (codes.length === 0) { showToast('请输入股票代码', 'error'); return; }
+        setLoading(true); setData(null);
+        try {
+            const res = await api.post('/api/quality/check', {
+                universe: codes, start_date: startDate, end_date: endDate
+            });
+            setData(res);
+        } catch (e) { showToast(e.detail || '检测失败', 'error'); }
+        setLoading(false);
+    };
+    return (
+        <div className="quality-panel">
+            <div className="flex items-center justify-between" style={{marginBottom:12}}>
+                <div style={{fontSize:14,fontWeight:600}}>数据质量检测</div>
+                <button className="btn btn-secondary" onClick={runCheck} disabled={loading}>
+                    {loading ? <><span className="spinner"/> 检测中...</> : '检查数据质量'}
+                </button>
+            </div>
+            {data && <QualityReport data={data} />}
+        </div>
+    );
+}
+
+/* ===== Quality Report ===== */
+function QualityReport({ data }) {
+    const s = data.summary || {};
+    const stocks = data.per_stock || [];
+    const recs = data.recommendations || [];
+    return (
+        <div className="space-y-sm">
+            <div className="quality-summary">
+                <div className="risk-card"><div className="risk-card-label">总计</div><div className="risk-card-value">{s.total||0}</div></div>
+                <div className="risk-card"><div className="risk-card-label">正常</div><div className="risk-card-value text-profit">{s.clean||0}</div></div>
+                <div className="risk-card"><div className="risk-card-label">警告</div><div className="risk-card-value" style={{color:'#fbbf24'}}>{s.warning||0}</div></div>
+                <div className="risk-card"><div className="risk-card-label">异常</div><div className="risk-card-value text-loss">{s.error||0}</div></div>
+            </div>
+            {recs.length > 0 && (
+                <div style={{fontSize:12,color:'var(--text-300)',padding:'8px 12px',background:'var(--bg-600)',borderRadius:8}}>
+                    {recs.map((r,i) => <div key={i}>{r}</div>)}
+                </div>
+            )}
+            {stocks.filter(st=>st.status!=='clean').length > 0 && (
+                <div className="table-wrap" style={{maxHeight:250}}>
+                    <table>
+                        <thead><tr><th>代码</th><th>状态</th><th>问题</th></tr></thead>
+                        <tbody>{stocks.filter(st=>st.status!=='clean').map((st,i) => (
+                            <tr key={i}>
+                                <td>{st.ts_code}</td>
+                                <td><span className={'quality-badge quality-badge-'+st.status}>{st.status==='warning'?'警告':'异常'}</span></td>
+                                <td style={{fontSize:11}}>{(st.issues||[]).map(is=>is.desc).join('; ')}</td>
+                            </tr>
+                        ))}</tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ===== Help Page ===== */
 function HelpPage({ showToast }) {
     const [verInfo, setVerInfo] = useState(null);
@@ -3374,6 +4041,7 @@ function App() {
     const navItems = [
         { key: 'backtest', label: '回测' },
         { key: 'strategy', label: '策略' },
+        { key: 'portfolio', label: '组合' },
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
         { key: 'workflow', label: '因子工作流' },
@@ -3404,6 +4072,7 @@ function App() {
                 {page === 'settings' && <SettingsPage showToast={showToast} />}
                 {page === 'strategy' && <StrategyPage showToast={showToast} />}
                 {page === 'backtest' && <BacktestPage showToast={showToast} />}
+                {page === 'portfolio' && <PortfolioPage showToast={showToast} />}
                 {page === 'market' && <MarketPage showToast={showToast} />}
                 {page === 'factor' && <FactorPage showToast={showToast} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}

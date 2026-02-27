@@ -579,3 +579,10 @@ AttributeError: 'NoneType' object has no attribute 'get'
 2026-02-27 19:39:24 [INFO] qtsys.main: 自动刷新: 抓取169条, 新增23条
 2026-02-27 19:39:33 [INFO] qtsys.main: 新闻自动刷新任务已停止
 2026-02-27 19:39:33 [INFO] qtsys.main: QTsys 已关闭
+2026-02-28 01:54:44 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-28 01:54:44 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-28 01:54:51 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-28 01:54:51 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-28 01:54:52 [INFO] qtsys.main: QTsys v2.0.0 启动中...
+2026-02-28 01:54:52 [INFO] qtsys.main: 数据库初始化完成
+2026-02-28 01:54:52 [INFO] qtsys.main: 新闻自动刷新任务已启动

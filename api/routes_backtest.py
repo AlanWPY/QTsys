@@ -351,3 +351,136 @@ async def export_result(result_id: int, db: AsyncSession = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ===== 风险分析 =====
+
+class RiskAnalysisRequest(BaseModel):
+    result_id: int
+    drawdown_threshold: float = 0.02
+
+
+@router.post("/risk_analysis")
+async def risk_analysis(req: RiskAnalysisRequest, db: AsyncSession = Depends(get_db)):
+    """风险分析 - 回撤分解、风险度量、月度收益"""
+    result = await db.execute(
+        select(BacktestResult).where(BacktestResult.id == req.result_id)
+    )
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="结果不存在")
+
+    from engine.risk import analyze_drawdowns, compute_risk_metrics, compute_monthly_returns
+
+    data = await asyncio.to_thread(
+        _compute_risk, r.equity_curve, r.daily_returns, req.drawdown_threshold
+    )
+    return data
+
+
+def _compute_risk(equity_curve, daily_returns, threshold):
+    from engine.risk import analyze_drawdowns, compute_risk_metrics, compute_monthly_returns
+    dd = analyze_drawdowns(equity_curve, threshold)
+    risk = compute_risk_metrics(daily_returns)
+    monthly = compute_monthly_returns(equity_curve)
+    return {"drawdowns": dd, "risk_metrics": risk, "monthly_returns": monthly}
+
+
+# ===== 归因分析 =====
+
+class AttributionRequest(BaseModel):
+    result_id: int
+
+
+@router.post("/attribution")
+async def compute_attribution(req: AttributionRequest, db: AsyncSession = Depends(get_db)):
+    """归因分析 - 个股盈亏、行业归因、月度归因"""
+    result = await db.execute(
+        select(BacktestResult).where(BacktestResult.id == req.result_id)
+    )
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="结果不存在")
+
+    # 获取行业映射
+    settings_result = await db.execute(select(Settings).where(Settings.id == 1))
+    settings = settings_result.scalar_one_or_none()
+    industry_map = {}
+    if settings and settings.tushare_token:
+        try:
+            client = TushareClient(settings.tushare_token)
+            df = await asyncio.to_thread(client.get_stock_basic)
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    industry_map[row.get("ts_code", "")] = row.get("industry", "未知")
+        except Exception:
+            pass
+
+    from engine.attribution import compute_stock_pnl, compute_sector_attribution, compute_monthly_attribution
+
+    stock_pnl = await asyncio.to_thread(
+        compute_stock_pnl, r.trades or [], r.initial_cash
+    )
+    sector_attr = await asyncio.to_thread(
+        compute_sector_attribution, r.trades or [], industry_map,
+        None, (r.metrics or {}).get("total_return", 0), r.initial_cash
+    )
+    monthly_attr = await asyncio.to_thread(
+        compute_monthly_attribution, r.equity_curve or [], r.benchmark_curve or []
+    )
+
+    return {
+        "stock_pnl": stock_pnl,
+        "sector_attribution": sector_attr,
+        "monthly_attribution": monthly_attr,
+    }
+
+
+# ===== 组合分析 =====
+
+class PortfolioAnalysisRequest(BaseModel):
+    result_ids: list[int]
+    method: str = "max_sharpe"
+
+
+@router.post("/portfolio_analysis")
+async def portfolio_analysis(req: PortfolioAnalysisRequest, db: AsyncSession = Depends(get_db)):
+    """组合分析 - 相关性、最优权重、组合回测"""
+    if len(req.result_ids) < 2:
+        raise HTTPException(status_code=400, detail="至少选择2个结果")
+    if len(req.result_ids) > 10:
+        raise HTTPException(status_code=400, detail="最多选择10个结果")
+
+    items = []
+    for rid in req.result_ids:
+        result = await db.execute(
+            select(BacktestResult).where(BacktestResult.id == rid)
+        )
+        r = result.scalar_one_or_none()
+        if not r:
+            raise HTTPException(status_code=404, detail=f"结果 {rid} 不存在")
+        items.append({
+            "id": r.id,
+            "strategy_name": r.strategy_name,
+            "daily_returns": r.daily_returns or [],
+            "equity_curve": r.equity_curve or [],
+            "initial_cash": r.initial_cash,
+        })
+
+    from engine.portfolio import analyze_correlations, compute_optimal_weights, simulate_portfolio
+
+    corr = await asyncio.to_thread(analyze_correlations, items)
+    weights_result = await asyncio.to_thread(
+        compute_optimal_weights, items, req.method
+    )
+    weight_values = [w["weight"] for w in weights_result["weights"]]
+    initial_cash = items[0]["initial_cash"] if items else 1_000_000.0
+    portfolio = await asyncio.to_thread(
+        simulate_portfolio, items, weight_values, initial_cash
+    )
+
+    return {
+        "correlations": corr,
+        "weights": weights_result,
+        "portfolio": portfolio,
+    }

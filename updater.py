@@ -151,6 +151,15 @@ def auto_update_on_startup():
             return
 
         print(f"[QTsys] 发现新版本: 本地 {info['local']} → 远程 {info['remote']} (落后{info['behind']}个提交)")
+        try:
+            choice = input("[QTsys] 是否立即更新？(y/n, 默认n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            choice = "n"
+
+        if choice != "y":
+            print("[QTsys] 已跳过更新，使用当前版本启动")
+            return
+
         result = do_update()
 
         if result["success"]:

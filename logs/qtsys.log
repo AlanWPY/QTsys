@@ -510,3 +510,72 @@ AttributeError: 'NoneType' object has no attribute 'get'
 2026-02-27 18:44:02 [INFO] qtsys.news.scraper: 财联社: 抓取60条
 2026-02-27 18:44:03 [INFO] qtsys.news.scraper: 总计抓取219条, 去重后175条
 2026-02-27 18:44:03 [INFO] qtsys.main: 自动刷新: 抓取175条, 新增36条
+2026-02-27 19:17:14 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:17:14 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:17:17 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:17:17 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:17:17 [INFO] qtsys.main: QTsys v2.0.0 启动中...
+2026-02-27 19:17:17 [INFO] qtsys.main: 数据库初始化完成
+2026-02-27 19:17:17 [INFO] qtsys.main: 新闻自动刷新任务已启动
+2026-02-27 19:17:18 [WARNING] qtsys.news.scraper: 同花顺: 所有CSS选择器均未匹配，页面可能已改版
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 同花顺: 抓取0条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 证监会: 抓取0条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 央行: 抓取0条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 金十数据: 抓取20条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 东方财富: 抓取0条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 华尔街见闻: 抓取50条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 新浪财经: 抓取90条
+2026-02-27 19:17:18 [INFO] qtsys.news.scraper: 财联社: 抓取60条
+2026-02-27 19:17:19 [INFO] qtsys.news.scraper: 总计抓取220条, 去重后172条
+2026-02-27 19:17:21 [INFO] qtsys.main: 自动刷新: 抓取172条, 新增55条
+2026-02-27 19:17:37 [INFO] qtsys.main: 新闻自动刷新任务已停止
+2026-02-27 19:17:37 [INFO] qtsys.main: QTsys 已关闭
+2026-02-27 19:24:35 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:24:35 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:25:36 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:25:36 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:25:37 [INFO] qtsys.main: QTsys v2.0.0 启动中...
+2026-02-27 19:25:37 [INFO] qtsys.main: 数据库初始化完成
+2026-02-27 19:25:37 [INFO] qtsys.main: 新闻自动刷新任务已启动
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 证监会: 抓取0条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 央行: 抓取0条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 金十数据: 抓取19条
+2026-02-27 19:25:38 [WARNING] qtsys.news.scraper: 同花顺: 所有CSS选择器均未匹配，页面可能已改版
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 同花顺: 抓取0条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 东方财富: 抓取0条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 华尔街见闻: 抓取50条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 新浪财经: 抓取90条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 财联社: 抓取60条
+2026-02-27 19:25:38 [INFO] qtsys.news.scraper: 总计抓取219条, 去重后172条
+2026-02-27 19:25:39 [INFO] qtsys.main: 自动刷新: 抓取172条, 新增12条
+2026-02-27 19:37:04 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:37:04 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:37:04 [INFO] qtsys.main: QTsys v2.0.0 启动中...
+2026-02-27 19:37:05 [INFO] qtsys.main: 数据库初始化完成
+2026-02-27 19:37:05 [INFO] qtsys.main: 新闻自动刷新任务已启动
+2026-02-27 19:37:05 [INFO] qtsys.main: 新闻自动刷新任务已停止
+2026-02-27 19:37:05 [INFO] qtsys.main: QTsys 已关闭
+2026-02-27 19:38:07 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:38:07 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:38:28 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:38:28 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:39:17 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:39:17 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:39:20 [INFO] numexpr.utils: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2026-02-27 19:39:20 [INFO] numexpr.utils: NumExpr defaulting to 8 threads.
+2026-02-27 19:39:20 [INFO] qtsys.main: QTsys v2.0.0 启动中...
+2026-02-27 19:39:20 [INFO] qtsys.main: 数据库初始化完成
+2026-02-27 19:39:20 [INFO] qtsys.main: 新闻自动刷新任务已启动
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 金十数据: 抓取19条
+2026-02-27 19:39:21 [WARNING] qtsys.news.scraper: 同花顺: 所有CSS选择器均未匹配，页面可能已改版
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 同花顺: 抓取0条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 央行: 抓取0条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 证监会: 抓取0条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 东方财富: 抓取0条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 华尔街见闻: 抓取50条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 财联社: 抓取60条
+2026-02-27 19:39:21 [INFO] qtsys.news.scraper: 新浪财经: 抓取90条
+2026-02-27 19:39:22 [INFO] qtsys.news.scraper: 总计抓取219条, 去重后169条
+2026-02-27 19:39:24 [INFO] qtsys.main: 自动刷新: 抓取169条, 新增23条
+2026-02-27 19:39:33 [INFO] qtsys.main: 新闻自动刷新任务已停止
+2026-02-27 19:39:33 [INFO] qtsys.main: QTsys 已关闭

@@ -296,17 +296,18 @@ tr:hover td { background: var(--bg-600); }
 const { useState, useEffect, useRef, useCallback } = React;
 const { ComposedChart, AreaChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, Cell } = Recharts;
 
+const _rejectHttp = (r) => r.text().then(t => { try { return Promise.reject(JSON.parse(t)); } catch(_) { return Promise.reject({ detail: 'HTTP ' + r.status }); } });
 const api = {
-    get: (url) => fetch(url).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+    get: (url) => fetch(url).then(r => r.ok ? r.json() : _rejectHttp(r)),
     post: (url, data) => fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+    }).then(r => r.ok ? r.json() : _rejectHttp(r)),
     put: (url, data) => fetch(url, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
-    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+    }).then(r => r.ok ? r.json() : _rejectHttp(r)),
+    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.ok ? r.json() : _rejectHttp(r)),
 };
 
 const METRIC_LABELS = {
@@ -2591,6 +2592,18 @@ function FactorWorkflowPage({ showToast }) {
     // Draw canvas
     useEffect(() => { drawCanvas(); }, [nodes, edges, viewport, selectedNode, selectedEdge]);
 
+    // Size overlay canvas on mount + resize (separate from drawCanvas to avoid clearing overlay buffer)
+    useEffect(() => {
+        const syncSize = () => {
+            const ov = overlayRef.current;
+            const wrap = wrapRef.current;
+            if (ov && wrap) { ov.width = wrap.clientWidth; ov.height = wrap.clientHeight; }
+        };
+        syncSize();
+        window.addEventListener('resize', syncSize);
+        return () => window.removeEventListener('resize', syncSize);
+    }, []);
+
     const genId = (prefix) => { nextIdRef.current++; return prefix + nextIdRef.current; };
 
     // Push undo history
@@ -2755,7 +2768,7 @@ function FactorWorkflowPage({ showToast }) {
 
     // Mouse → canvas coords
     const toCanvas = (e) => {
-        const rect = canvasRef.current.getBoundingClientRect();
+        const rect = wrapRef.current.getBoundingClientRect();
         return {
             x: (e.clientX - rect.left - viewport.x) / viewport.zoom,
             y: (e.clientY - rect.top - viewport.y) / viewport.zoom,
@@ -2882,16 +2895,15 @@ function FactorWorkflowPage({ showToast }) {
             if (port && port.isInput) {
                 // Check not connecting to same node
                 if (port.nodeId !== st.dragWire.from.nodeId) {
-                    // Remove existing edge to this input
-                    const newEdges = edges.filter(ed =>
-                        !(ed.to.nodeId === port.nodeId && ed.to.port === port.port)
-                    );
-                    newEdges.push({
-                        id: genId('e'),
-                        from: st.dragWire.from,
-                        to: { nodeId: port.nodeId, port: port.port },
+                    const fromInfo = st.dragWire.from;
+                    const toInfo = { nodeId: port.nodeId, port: port.port };
+                    setEdges(prev => {
+                        const filtered = prev.filter(ed =>
+                            !(ed.to.nodeId === toInfo.nodeId && ed.to.port === toInfo.port)
+                        );
+                        filtered.push({ id: genId('e'), from: fromInfo, to: toInfo });
+                        return filtered;
                     });
-                    setEdges(newEdges);
                 }
             }
             // Clear overlay
@@ -2934,7 +2946,9 @@ function FactorWorkflowPage({ showToast }) {
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             setViewport(v => {
                 const nz = Math.max(0.25, Math.min(3.0, v.zoom * delta));
-                const rect = canvasRef.current.getBoundingClientRect();
+                const el2 = wrapRef.current;
+                if (!el2) return v;
+                const rect = el2.getBoundingClientRect();
                 const mx = e.clientX - rect.left;
                 const my = e.clientY - rect.top;
                 return { x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom), zoom: nz };

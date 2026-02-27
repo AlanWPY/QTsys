@@ -58,7 +58,10 @@ class Factor(Base):
     expression = Column(Text, nullable=False)
     category = Column(String(50), default="custom")
     source = Column(String(20), default="user")
+    graph_json = Column(JSON, default=None)
+    factor_type = Column(String(20), default="technical")
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class FactorResult(Base):
@@ -75,6 +78,20 @@ class FactorResult(Base):
     group_returns = Column(JSON, default=list)
     turnover_series = Column(JSON, default=list)
     long_short_curve = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FactorBacktestResult(Base):
+    __tablename__ = "factor_backtest_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    factor_id = Column(Integer, nullable=False)
+    backtest_type = Column(String(20), default="selection")
+    params = Column(JSON, default=dict)
+    metrics = Column(JSON, default=dict)
+    equity_curve = Column(JSON, default=list)
+    trades = Column(JSON, default=list)
+    stock_pool_history = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

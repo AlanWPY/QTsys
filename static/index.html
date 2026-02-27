@@ -237,6 +237,27 @@ tr:hover td { background: var(--bg-600); }
 .stock-search-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; }
 .stock-search-item:hover { background: var(--bg-500); }
 .stock-search-wrap { position: relative; }
+
+/* ===== 因子工作流页面 ===== */
+.wf-page { display: flex; flex-direction: column; height: calc(100vh - 120px); gap: 0; }
+.wf-toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--bg-700); border-radius: 10px 10px 0 0; flex-wrap: wrap; }
+.wf-toolbar .input { width: 160px; }
+.wf-toolbar select.input { width: 120px; }
+.wf-body { display: flex; flex: 1; min-height: 0; border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+.wf-palette { width: 200px; background: var(--bg-700); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+.wf-palette-cat { padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--text-400); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.wf-palette-cat:hover { background: var(--bg-600); }
+.wf-palette-item { padding: 6px 12px 6px 20px; font-size: 12px; color: var(--text-300); cursor: grab; user-select: none; display: flex; align-items: center; gap: 6px; }
+.wf-palette-item:hover { background: var(--bg-600); color: var(--text-100); }
+.wf-palette-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.wf-canvas-wrap { flex: 1; position: relative; background: var(--bg-900); overflow: hidden; }
+.wf-canvas { position: absolute; top: 0; left: 0; }
+.wf-inspector { width: 220px; background: var(--bg-700); border-left: 1px solid var(--border); padding: 12px; overflow-y: auto; flex-shrink: 0; }
+.wf-inspector-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-100); }
+.wf-expr-bar { background: var(--bg-700); border-top: 1px solid var(--border); padding: 8px 16px; font-family: monospace; font-size: 12px; color: var(--text-300); min-height: 32px; display: flex; align-items: center; gap: 8px; }
+.wf-expr-bar.error { color: var(--loss); }
+.wf-minimap { position: absolute; right: 8px; bottom: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-800); opacity: 0.8; }
+.wf-backtest-panel { background: var(--bg-700); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 16px; }
     </style>
 </head>
 <body>
@@ -252,6 +273,23 @@ tr:hover td { background: var(--bg-600); }
     window.onerror = function(msg, url, line, col, err) {
         document.getElementById('root').innerHTML = '<pre style="color:red;padding:20px;">Error: ' + msg + '\nLine: ' + line + '\n' + (err && err.stack || '') + '</pre>';
     };
+    // roundRect polyfill for older browsers
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+            var r = typeof radii === 'number' ? [radii,radii,radii,radii] : Array.isArray(radii) ? radii : [0,0,0,0];
+            while (r.length < 4) r.push(r[r.length-1]||0);
+            this.moveTo(x+r[0], y);
+            this.lineTo(x+w-r[1], y);
+            this.arcTo(x+w, y, x+w, y+r[1], r[1]);
+            this.lineTo(x+w, y+h-r[2]);
+            this.arcTo(x+w, y+h, x+w-r[2], y+h, r[2]);
+            this.lineTo(x+r[3], y+h);
+            this.arcTo(x, y+h, x, y+h-r[3], r[3]);
+            this.lineTo(x, y+r[0]);
+            this.arcTo(x, y, x+r[0], y, r[0]);
+            this.closePath();
+        };
+    }
     </script>
     <script type="text/babel">
 /** ===== React App ===== **/
@@ -259,7 +297,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const { ComposedChart, AreaChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, Cell } = Recharts;
 
 const api = {
-    get: (url) => fetch(url).then(r => r.json()),
+    get: (url) => fetch(url).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
     post: (url, data) => fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -267,8 +305,8 @@ const api = {
     put: (url, data) => fetch(url, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(r => r.json()),
-    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
 };
 
 const METRIC_LABELS = {
@@ -446,6 +484,12 @@ function BacktestPage({ showToast }) {
     const [paramGrid, setParamGrid] = useState('{"short_period": [3, 5, 10], "long_period": [15, 20, 30]}');
     const [optimizing, setOptimizing] = useState(false);
     const [optimizeResults, setOptimizeResults] = useState(null);
+    // 风控参数
+    const [maxPosPct, setMaxPosPct] = useState(0.25);
+    const [maxDdLimit, setMaxDdLimit] = useState(0);
+    // Walk-Forward
+    const [wfRunning, setWfRunning] = useState(false);
+    const [wfResult, setWfResult] = useState(null);
 
     useEffect(() => {
         api.get('/api/strategies').then(s => {
@@ -463,6 +507,8 @@ function BacktestPage({ showToast }) {
                 strategy_id: parseInt(strategyId), universe: codes,
                 start_date: startDate, end_date: endDate,
                 initial_cash: cash, benchmark,
+                max_position_pct: maxPosPct,
+                max_drawdown_limit: maxDdLimit,
             });
             setResult(res); setLogs(res.logs || []);
             showToast('回测完成', 'success');
@@ -488,12 +534,31 @@ function BacktestPage({ showToast }) {
         setOptimizing(false);
     };
 
+    const runWalkForward = async () => {
+        if (!strategyId) { showToast('请选择策略', 'error'); return; }
+        let grid;
+        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误', 'error'); return; }
+        setWfRunning(true); setWfResult(null);
+        try {
+            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const res = await api.post('/api/backtest/walk_forward', {
+                strategy_id: parseInt(strategyId), universe: codes,
+                start_date: startDate, end_date: endDate,
+                param_grid: grid, benchmark,
+            });
+            setWfResult(res);
+            showToast('Walk-Forward验证完成', 'success');
+        } catch (e) { showToast(e.detail || 'Walk-Forward失败', 'error'); }
+        setWfRunning(false);
+    };
+
     return (
         <div className="fade-in space-y">
             <BacktestForm strategies={strategies} strategyId={strategyId} setStrategyId={setStrategyId}
                 universe={universe} setUniverse={setUniverse} startDate={startDate} setStartDate={setStartDate}
                 endDate={endDate} setEndDate={setEndDate} cash={cash} setCash={setCash}
-                benchmark={benchmark} setBenchmark={setBenchmark} running={running} onRun={runBacktest} />
+                benchmark={benchmark} setBenchmark={setBenchmark} running={running} onRun={runBacktest}
+                maxPosPct={maxPosPct} setMaxPosPct={setMaxPosPct} maxDdLimit={maxDdLimit} setMaxDdLimit={setMaxDdLimit} />
             <div className="card space-y">
                 <div className="flex items-center justify-between">
                     <div className="card-title" style={{marginBottom:0}}>参数优化</div>
@@ -509,9 +574,14 @@ function BacktestPage({ showToast }) {
                                 onChange={e => setParamGrid(e.target.value)}
                                 style={{fontFamily:'monospace',fontSize:13}} />
                         </div>
-                        <button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>
-                            {optimizing ? <><span className="spinner"/> 优化中...</> : '开始网格搜索'}
-                        </button>
+                        <div className="flex gap-sm">
+                            <button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>
+                                {optimizing ? <><span className="spinner"/> 优化中...</> : '开始网格搜索'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={runWalkForward} disabled={wfRunning}>
+                                {wfRunning ? <><span className="spinner"/> 验证中...</> : 'Walk-Forward验证'}
+                            </button>
+                        </div>
                         {optimizeResults && optimizeResults.length > 0 && (
                             <div className="table-wrap">
                                 <table>
@@ -535,6 +605,31 @@ function BacktestPage({ showToast }) {
                                 </table>
                             </div>
                         )}
+                        {wfResult && wfResult.summary && (
+                            <div>
+                                <div style={{fontSize:13,fontWeight:600,color:'var(--text-100)',marginBottom:8}}>Walk-Forward验证结果</div>
+                                <div className="grid-4" style={{gap:8,marginBottom:10}}>
+                                    <div className="metric-card"><div className="metric-label">窗口数</div><div className="metric-value">{wfResult.summary.total_windows}</div></div>
+                                    <div className="metric-card"><div className="metric-label">训练期夏普</div><div className="metric-value">{wfResult.summary.avg_train_sharpe}</div></div>
+                                    <div className="metric-card"><div className="metric-label">样本外夏普</div><div className="metric-value" className={wfResult.summary.avg_oos_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{wfResult.summary.avg_oos_sharpe}</div></div>
+                                    <div className="metric-card"><div className="metric-label">过拟合比率</div><div className="metric-value" style={{color: wfResult.summary.overfit_ratio >= 0.5 ? 'var(--profit)' : 'var(--loss)'}}>{wfResult.summary.overfit_ratio}</div></div>
+                                </div>
+                                <div className="table-wrap">
+                                    <table>
+                                        <thead><tr><th>窗口</th><th>训练期</th><th>测试期</th><th>最优参数</th><th style={{textAlign:'right'}}>训练夏普</th><th style={{textAlign:'right'}}>测试夏普</th><th style={{textAlign:'right'}}>测试收益%</th></tr></thead>
+                                        <tbody>{wfResult.windows.map((w,i) => (
+                                            <tr key={i}>
+                                                <td>{w.window}</td><td className="text-xs">{w.train_period}</td><td className="text-xs">{w.test_period}</td>
+                                                <td style={{fontFamily:'monospace',fontSize:11}}>{JSON.stringify(w.best_params)}</td>
+                                                <td style={{textAlign:'right'}}>{w.train_sharpe}</td>
+                                                <td style={{textAlign:'right'}} className={w.test_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{w.test_sharpe}</td>
+                                                <td style={{textAlign:'right'}} className={w.test_return >= 0 ? 'text-profit' : 'text-loss'}>{w.test_return}</td>
+                                            </tr>
+                                        ))}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -543,7 +638,7 @@ function BacktestPage({ showToast }) {
     );
 }
 
-function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun }) {
+function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun, maxPosPct, setMaxPosPct, maxDdLimit, setMaxDdLimit }) {
     return (
         <div className="card space-y">
             <div className="card-title">回测配置</div>
@@ -567,6 +662,17 @@ function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniv
                 </div>
                 <div className="field"><label className="label">基准指数</label>
                     <input className="input" value={benchmark} onChange={e => setBenchmark(e.target.value)} />
+                </div>
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:'var(--text-300)',marginTop:8}}>风控参数</div>
+            <div className="grid-4" style={{gap:8}}>
+                <div className="field"><label className="label">单股最大仓位%</label>
+                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxPosPct}
+                        onChange={e => setMaxPosPct(parseFloat(e.target.value)||0)} />
+                </div>
+                <div className="field"><label className="label">回撤熔断% (0=关闭)</label>
+                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxDdLimit}
+                        onChange={e => setMaxDdLimit(parseFloat(e.target.value)||0)} />
                 </div>
             </div>
             <button className="btn btn-primary" onClick={onRun} disabled={running}>
@@ -940,10 +1046,47 @@ function CompareView({ data }) {
     );
 }
 /* ===== Help Page ===== */
-function HelpPage() {
+function HelpPage({ showToast }) {
+    const [verInfo, setVerInfo] = useState(null);
+    const [updating, setUpdating] = useState(false);
+    useEffect(() => {
+        api.get('/api/system/version').then(setVerInfo).catch(() => {});
+    }, []);
+    const doUpdate = async () => {
+        setUpdating(true);
+        try {
+            const r = await api.post('/api/system/update', {});
+            showToast(r.message || (r.success ? '更新成功，请重启系统' : '更新失败'), r.success ? 'success' : 'error');
+            if (r.success) api.get('/api/system/version').then(setVerInfo).catch(() => {});
+        } catch { showToast('更新请求失败', 'error'); }
+        setUpdating(false);
+    };
     return (
         <div className="fade-in help-page">
-            <h2 style={{fontSize:20,fontWeight:600,marginBottom:16}}>策略开发文档</h2>
+            <h2 style={{fontSize:20,fontWeight:600,marginBottom:16}}>系统帮助文档</h2>
+
+            {/* 版本信息 */}
+            <div className="help-section">
+                <h3>系统版本</h3>
+                {verInfo ? (
+                    <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+                        <span style={{fontSize:13,color:'var(--text-300)'}}>当前版本: <b style={{color:'var(--text-100)'}}>v{verInfo.version}</b></span>
+                        <span style={{fontSize:13,color:'var(--text-300)'}}>本地: <code>{verInfo.local_commit}</code></span>
+                        <span style={{fontSize:13,color:'var(--text-300)'}}>远程: <code>{verInfo.remote_commit || '—'}</code></span>
+                        {verInfo.has_update ? (
+                            <span style={{display:'flex',alignItems:'center',gap:8}}>
+                                <span style={{color:'#f59e0b',fontSize:13}}>有 {verInfo.behind_count} 个新提交</span>
+                                <button className="btn btn-sm" onClick={doUpdate} disabled={updating}>{updating ? '更新中...' : '立即更新'}</button>
+                            </span>
+                        ) : (
+                            <span style={{color:'#34d399',fontSize:13}}>已是最新版本</span>
+                        )}
+                        {verInfo.error && <span style={{color:'#f87171',fontSize:12}}>{verInfo.error}</span>}
+                    </div>
+                ) : <span style={{color:'var(--text-400)',fontSize:13}}>加载中...</span>}
+            </div>
+
+            <HelpWorkflowSection />
 
             <div className="help-section">
                 <h3>策略代码结构</h3>
@@ -969,6 +1112,112 @@ def handle_data(context):
             <HelpExampleSection />
             <HelpRulesSection />
         </div>
+    );
+}
+
+function HelpWorkflowSection() {
+    return (
+        <React.Fragment>
+        <div className="help-section">
+            <h3>因子工作流系统</h3>
+            <p>可视化因子工作流允许你通过拖拽节点、连线的方式构建自定义因子，无需手写表达式。</p>
+            <h4>基本操作</h4>
+            <ul>
+                <li>从左侧节点面板拖拽节点到画布中</li>
+                <li>从节点右侧输出端口拖线到另一个节点的左侧输入端口，建立连接</li>
+                <li>点击节点可在右侧面板编辑参数（如窗口期、常数值等）</li>
+                <li>每个工作流必须有且仅有一个<code>输出节点</code>，作为因子值的最终输出</li>
+                <li>底部表达式栏实时显示编译后的因子表达式</li>
+            </ul>
+            <h4>画布交互</h4>
+            <ul>
+                <li><code>鼠标滚轮</code> — 缩放画布 (0.25x ~ 3.0x)</li>
+                <li><code>鼠标中键/右键拖拽</code> — 平移画布</li>
+                <li><code>Delete / Backspace</code> — 删除选中的节点或连线</li>
+                <li><code>Ctrl+Z</code> — 撤销 (最多50步)</li>
+                <li><code>Ctrl+Y</code> — 重做</li>
+            </ul>
+        </div>
+
+        <div className="help-section">
+            <h3>节点类型一览</h3>
+            <h4>数据源节点 (蓝色)</h4>
+            <table className="help-api-table">
+                <thead><tr><th>节点</th><th>输出</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>收盘价 / 开盘价 / 最高价 / 最低价</code></td><td>价格序列</td><td>OHLC 日线数据</td></tr>
+                    <tr><td><code>成交量 / 日收益率</code></td><td>数值序列</td><td>vol / pct_change</td></tr>
+                    <tr><td><code>PE / PB / PS / 总市值 / 流通市值 / 换手率</code></td><td>财务序列</td><td>来自 daily_basic 接口</td></tr>
+                    <tr><td><code>常数</code></td><td>标量</td><td>自定义常数值，如 1.0、20 等</td></tr>
+                </tbody>
+            </table>
+
+            <h4>数学运算节点 (琥珀色)</h4>
+            <table className="help-api-table">
+                <thead><tr><th>节点</th><th>输入</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>加 / 减 / 乘 / 除</code></td><td>a, b</td><td>基本四则运算</td></tr>
+                    <tr><td><code>绝对值 / 对数 / 平方根 / 取负</code></td><td>in</td><td>单输入数学函数</td></tr>
+                    <tr><td><code>幂次 / 最大 / 最小 / 截断</code></td><td>多输入</td><td>power(in,exp), max(a,b), clip(in,lo,hi)</td></tr>
+                </tbody>
+            </table>
+
+            <h4>时序运算节点 (绿色)</h4>
+            <table className="help-api-table">
+                <thead><tr><th>节点</th><th>参数</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>均值 / 标准差 / 求和</code></td><td>window</td><td>滚动窗口统计</td></tr>
+                    <tr><td><code>最大 / 最小 / 排名</code></td><td>window</td><td>滚动窗口极值与排名</td></tr>
+                    <tr><td><code>延迟 / 差分 / 变化率</code></td><td>periods</td><td>delay / delta / pctchange</td></tr>
+                    <tr><td><code>相关系数 / 协方差</code></td><td>window</td><td>双序列滚动 corr / cov</td></tr>
+                    <tr><td><code>衰减加权 / 指数加权</code></td><td>window/span</td><td>ts_decay / ewm</td></tr>
+                </tbody>
+            </table>
+
+            <h4>截面运算节点 (紫色) / 条件逻辑节点 (红色)</h4>
+            <table className="help-api-table">
+                <thead><tr><th>节点</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><code>截面排名 / Z-Score / 百分位 / 去均值</code></td><td>跨股票截面标准化</td></tr>
+                    <tr><td><code>大于 / 小于 / 与 / 或</code></td><td>条件判断，输出 0/1</td></tr>
+                    <tr><td><code>三元选择</code></td><td>cond ? true_val : false_val</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div className="help-section">
+            <h3>因子回测</h3>
+            <p>工作流构建完成后，可直接在底部面板运行因子回测，支持两种模式:</p>
+            <h4>选股因子回测</h4>
+            <ul>
+                <li>每个调仓日计算全股票池因子值，按排序选取 Top/Bottom N% 等权买入</li>
+                <li>参数: 选股方向(做多Top/Bottom)、选股比例、调仓周期(天)</li>
+                <li>输出: 收益率曲线、夏普比率、最大回撤等指标、交易记录</li>
+            </ul>
+            <h4>技术因子回测</h4>
+            <ul>
+                <li>单/多股票: 因子值突破阈值时开仓，回落时平仓</li>
+                <li>参数: 开仓条件(因子值 &gt;/&lt; 阈值)、平仓条件</li>
+                <li>输出: 收益率曲线、指标卡片、交易记录</li>
+            </ul>
+            <h4>因子预览</h4>
+            <p>在底部"因子预览"面板输入股票代码和日期范围，可实时查看因子值曲线，快速验证因子逻辑。</p>
+        </div>
+
+        <div className="help-section">
+            <h3>内置工作流模板</h3>
+            <table className="help-api-table">
+                <thead><tr><th>模板</th><th>表达式</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td>动量因子</td><td><code>close / delay(close, 20) - 1</code></td><td>20日价格动量</td></tr>
+                    <tr><td>波动率因子</td><td><code>std(returns, 20)</code></td><td>20日收益率标准差</td></tr>
+                    <tr><td>价值因子</td><td><code>1 / pe</code></td><td>市盈率倒数 (EP)</td></tr>
+                    <tr><td>反转因子</td><td><code>-pctchange(close, 5)</code></td><td>5日反转</td></tr>
+                    <tr><td>量价背离</td><td><code>corr(close, volume, 10)</code></td><td>10日价量相关性</td></tr>
+                </tbody>
+            </table>
+        </div>
+        </React.Fragment>
     );
 }
 
@@ -1173,15 +1422,28 @@ function FactorCreatePanel({ newName, setNewName, newExpr, setNewExpr, newDesc, 
     );
 }
 
-function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, loading, evaluateFactor }) {
+function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor }) {
+    const POOL_PRESETS = {
+        '': '',
+        '沪深300': '000001.SZ,000002.SZ,600036.SH,601318.SH,600519.SH,000858.SZ,601166.SH,600276.SH,000333.SZ,002415.SZ',
+        '中证500': '000009.SZ,000012.SZ,000027.SZ,000039.SZ,000060.SZ,000063.SZ,000100.SZ,000157.SZ,000301.SZ,000408.SZ',
+        '银行股': '601398.SH,601939.SH,601288.SH,600036.SH,601166.SH,600000.SH,000001.SZ,601328.SH',
+        '科技龙头': '002415.SZ,300750.SZ,688981.SH,002230.SZ,603501.SH,300124.SZ,002049.SZ,688036.SH',
+    };
     return (
         <div className="card" style={{padding:14}}>
             <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:'var(--text-100)'}}>
                 评价因子: <span style={{color:'var(--accent-light)'}}>{selected.name}</span>
             </div>
             <div style={{fontSize:12,color:'var(--text-400)',marginBottom:10,fontFamily:'monospace'}}>{selected.expression}</div>
-            <div className="grid-4" style={{gap:8}}>
-                <div className="field">
+            <div className="flex gap-sm" style={{marginBottom:8,gap:6}}>
+                <span className="text-xs text-muted" style={{lineHeight:'28px'}}>预设股票池:</span>
+                {Object.keys(POOL_PRESETS).filter(Boolean).map(k => (
+                    <button key={k} className="news-filter-btn" style={{fontSize:11}} onClick={() => setEvalUniverse(POOL_PRESETS[k])}>{k}</button>
+                ))}
+            </div>
+            <div className="grid-6" style={{gap:8}}>
+                <div className="field" style={{gridColumn:'span 2'}}>
                     <label className="label">股票池 (逗号分隔)</label>
                     <input className="input" value={evalUniverse} onChange={e => setEvalUniverse(e.target.value)} />
                 </div>
@@ -1196,6 +1458,15 @@ function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, s
                 <div className="field">
                     <label className="label">分组数</label>
                     <input className="input" type="number" value={evalGroups} onChange={e => setEvalGroups(parseInt(e.target.value)||5)} />
+                </div>
+                <div className="field">
+                    <label className="label">预测周期(天)</label>
+                    <select className="input" value={forwardDays} onChange={e => setForwardDays(parseInt(e.target.value))}>
+                        <option value={1}>1日</option>
+                        <option value={5}>5日</option>
+                        <option value={10}>10日</option>
+                        <option value={20}>20日</option>
+                    </select>
                 </div>
             </div>
             <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={evaluateFactor} disabled={loading}>
@@ -1393,19 +1664,21 @@ function FactorMinePanel({ mineTab, setMineTab, gpPopSize, setGpPopSize, gpGener
 }
 
 /* ===== News Sub-Components ===== */
-function NewsFilterBar({ filterSource, setFilterSource, filterSentiment, setFilterSentiment, filterSector, setFilterSector, searchText, setSearchText, doSearch, refreshing, refresh }) {
-    const sources = ['', '新浪财经', '东方财富', '财联社', '同花顺'];
+function NewsFilterBar({ filterSource, setFilterSource, filterSentiment, setFilterSentiment, filterSector, setFilterSector, searchText, setSearchText, doSearch, refreshing, refresh, lastRefresh }) {
+    const sources = ['', '新浪财经', '东方财富', '财联社', '同花顺', '华尔街见闻', '金十数据', '央行', '证监会'];
     const sentiments = ['', '利好', '利空', '中性'];
-    const sectors = ['', '银行', '房地产', '科技', '新能源', '医药', '消费', '军工', '宏观经济'];
+    const sectors = ['', '银行', '房地产', '科技', '新能源', '医药', '消费', '军工', '宏观经济', '半导体', '信创', '数据要素', '低空经济'];
+    const fmtTime = (d) => { if (!d) return ''; const m = Math.floor((Date.now() - d.getTime()) / 60000); return m < 1 ? '刚刚' : m + '分钟前'; };
     return (
         <div className="news-filter-bar">
             <button className="btn btn-primary" onClick={refresh} disabled={refreshing} style={{fontSize:12,padding:'5px 12px'}}>
                 {refreshing ? <><span className="spinner"/> 刷新中...</> : '刷新新闻'}
             </button>
-            {sources.map(s => (
-                <button key={s||'all-src'} className={'news-filter-btn' + (filterSource === s ? ' active' : '')}
-                    onClick={() => setFilterSource(s)}>{s || '全部来源'}</button>
-            ))}
+            {lastRefresh && <span className="text-xs text-muted" style={{whiteSpace:'nowrap'}}>更新于 {fmtTime(lastRefresh)}</span>}
+            <select className="input" style={{width:110,padding:'3px 6px',fontSize:12}} value={filterSource}
+                onChange={e => setFilterSource(e.target.value)}>
+                {sources.map(s => <option key={s||'all-src'} value={s}>{s || '全部来源'}</option>)}
+            </select>
             <span style={{color:'var(--border)'}}>|</span>
             {sentiments.map(s => (
                 <button key={s||'all-sent'} className={'news-filter-btn' + (filterSentiment === s ? ' active' : '')}
@@ -1551,6 +1824,7 @@ function NewsPage({ showToast }) {
     const [filterSector, setFilterSector] = useState('');
     const [keyword, setKeyword] = useState('');
     const [searchText, setSearchText] = useState('');
+    const [lastRefresh, setLastRefresh] = useState(null);
 
     const loadNews = async () => {
         setLoading(true);
@@ -1578,6 +1852,7 @@ function NewsPage({ showToast }) {
         try {
             const r = await api.post('/api/news/refresh');
             showToast(r.message, 'success');
+            setLastRefresh(new Date());
             loadNews(); loadSentiment();
         } catch (e) { showToast('刷新失败', 'error'); }
         setRefreshing(false);
@@ -1601,7 +1876,7 @@ function NewsPage({ showToast }) {
                     filterSentiment={filterSentiment} setFilterSentiment={setFilterSentiment}
                     filterSector={filterSector} setFilterSector={setFilterSector}
                     searchText={searchText} setSearchText={setSearchText} doSearch={doSearch}
-                    refreshing={refreshing} refresh={refresh} />
+                    refreshing={refreshing} refresh={refresh} lastRefresh={lastRefresh} />
                 {loading ? <div className="text-center text-muted py-10"><span className="spinner" /> 加载中...</div> :
                     news.length === 0 ? <div className="text-muted text-center py-10">暂无新闻，点击"刷新新闻"获取最新资讯</div> :
                     <NewsList news={news} onView={viewDetail} />
@@ -2109,6 +2384,7 @@ function FactorPage({ showToast }) {
     const [evalStart, setEvalStart] = useState('20230101');
     const [evalEnd, setEvalEnd] = useState('20231231');
     const [evalGroups, setEvalGroups] = useState(5);
+    const [forwardDays, setForwardDays] = useState(5);
 
     // GP挖掘参数
     const [gpPopSize, setGpPopSize] = useState(30);
@@ -2155,6 +2431,7 @@ function FactorPage({ showToast }) {
             const res = await api.post('/api/factors/evaluate', {
                 factor_id: selected.id, universe: codes,
                 start_date: evalStart, end_date: evalEnd, groups: evalGroups,
+                forward_days: forwardDays,
             });
             setEvalResult(res); showToast('评价完成', 'success');
         } catch (e) { showToast(e.detail || '评价失败', 'error'); }
@@ -2198,7 +2475,8 @@ function FactorPage({ showToast }) {
                     newDesc={newDesc} setNewDesc={setNewDesc} newCat={newCat} setNewCat={setNewCat} createFactor={createFactor} />
                 {selected && <FactorEvalPanel selected={selected} evalUniverse={evalUniverse} setEvalUniverse={setEvalUniverse}
                     evalStart={evalStart} setEvalStart={setEvalStart} evalEnd={evalEnd} setEvalEnd={setEvalEnd}
-                    evalGroups={evalGroups} setEvalGroups={setEvalGroups} loading={loading} evaluateFactor={evaluateFactor} />}
+                    evalGroups={evalGroups} setEvalGroups={setEvalGroups} forwardDays={forwardDays} setForwardDays={setForwardDays}
+                    loading={loading} evaluateFactor={evaluateFactor} />}
                 {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab} />}
                 <FactorMinePanel mineTab={mineTab} setMineTab={setMineTab}
                     gpPopSize={gpPopSize} setGpPopSize={setGpPopSize} gpGenerations={gpGenerations} setGpGenerations={setGpGenerations}
@@ -2210,17 +2488,881 @@ function FactorPage({ showToast }) {
     );
 }
 
+/* ===== Factor Workflow Page ===== */
+const WF_NODE_W = 160;
+const WF_PORT_R = 6;
+const WF_GRID = 20;
+
+const WF_CATEGORIES = [
+    { key: 'data', label: '数据源', color: '#3b82f6' },
+    { key: 'math', label: '数学运算', color: '#f59e0b' },
+    { key: 'timeseries', label: '时序运算', color: '#22c55e' },
+    { key: 'cross_section', label: '截面运算', color: '#a855f7' },
+    { key: 'condition', label: '条件逻辑', color: '#ef4444' },
+    { key: 'output', label: '输出', color: '#6366f1' },
+];
+
+function wfNodeH(reg) {
+    const ports = Math.max((reg.inputs||[]).length, (reg.outputs||[]).length, 1);
+    return 24 + 28 * ports + 8;
+}
+
+function wfPortPos(node, reg, portName, isInput) {
+    const ports = isInput ? reg.inputs : reg.outputs;
+    const idx = ports.indexOf(portName);
+    const h = wfNodeH(reg);
+    const py = 24 + 14 + idx * 28;
+    return { x: node.x + (isInput ? 0 : WF_NODE_W), y: node.y + py };
+}
+
+function FactorWorkflowPage({ showToast }) {
+    const [registry, setRegistry] = useState({});
+    const [catColors, setCatColors] = useState({});
+    const [templates, setTemplates] = useState([]);
+    const [nodes, setNodes] = useState([]);
+    const [edges, setEdges] = useState([]);
+    const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1.0 });
+    const [selectedNode, setSelectedNode] = useState(null);
+    const [selectedEdge, setSelectedEdge] = useState(null);
+    const [expression, setExpression] = useState('');
+    const [compileErrors, setCompileErrors] = useState([]);
+    const [factorName, setFactorName] = useState('新因子');
+    const [factorType, setFactorType] = useState('technical');
+    const [savedFactors, setSavedFactors] = useState([]);
+    const [editingId, setEditingId] = useState(null);
+    const [collapsedCats, setCollapsedCats] = useState({});
+    const [previewData, setPreviewData] = useState(null);
+    const [previewCode, setPreviewCode] = useState('000001.SZ');
+    const [previewStart, setPreviewStart] = useState('20240101');
+    const [previewEnd, setPreviewEnd] = useState('20241231');
+    const [previewLoading, setPreviewLoading] = useState(false);
+
+    // Backtest state
+    const [btMode, setBtMode] = useState('selection');
+    const [btUniverse, setBtUniverse] = useState('000001.SZ,000002.SZ,600036.SH,601318.SH,000858.SZ');
+    const [btStart, setBtStart] = useState('20230101');
+    const [btEnd, setBtEnd] = useState('20241231');
+    const [btSelectMode, setBtSelectMode] = useState('top');
+    const [btSelectPct, setBtSelectPct] = useState(0.2);
+    const [btRebalDays, setBtRebalDays] = useState(5);
+    const [btOpenThresh, setBtOpenThresh] = useState(0);
+    const [btCloseThresh, setBtCloseThresh] = useState(0);
+    const [btOpenCond, setBtOpenCond] = useState('gt');
+    const [btCloseCond, setBtCloseCond] = useState('lt');
+    const [btTaskId, setBtTaskId] = useState(null);
+    const [btResult, setBtResult] = useState(null);
+    const [btLoading, setBtLoading] = useState(false);
+
+    // Canvas refs
+    const canvasRef = useRef(null);
+    const overlayRef = useRef(null);
+    const wrapRef = useRef(null);
+    const stateRef = useRef({ mode: 'idle', dragNode: null, dragWire: null, panStart: null, startVP: null });
+    const historyRef = useRef({ stack: [], idx: -1 });
+    const nextIdRef = useRef(1);
+    const pollRef = useRef(null);
+
+    // Load registry & templates on mount
+    useEffect(() => {
+        api.get('/api/factors/workflow/templates').then(res => {
+            setRegistry(res.node_registry || {});
+            setCatColors(res.category_colors || {});
+            setTemplates(res.templates || []);
+        }).catch(() => {});
+        loadSavedFactors();
+    }, []);
+
+    const loadSavedFactors = () => {
+        api.get('/api/factors').then(list => {
+            setSavedFactors(list.filter(f => f.source === 'workflow'));
+        }).catch(() => {});
+    };
+
+    // Auto-compile on node/edge change
+    useEffect(() => {
+        if (nodes.length === 0) { setExpression(''); setCompileErrors([]); return; }
+        const graph = { nodes, edges, viewport };
+        api.post('/api/factors/workflow/compile', { graph }).then(res => {
+            setExpression(res.expression || '');
+            setCompileErrors(res.errors || []);
+        }).catch(() => setCompileErrors(['编译请求失败']));
+    }, [nodes, edges]);
+
+    // Draw canvas
+    useEffect(() => { drawCanvas(); }, [nodes, edges, viewport, selectedNode, selectedEdge]);
+
+    const genId = (prefix) => { nextIdRef.current++; return prefix + nextIdRef.current; };
+
+    // Push undo history
+    const pushHistory = () => {
+        const h = historyRef.current;
+        const snap = JSON.stringify({ nodes, edges });
+        h.stack = h.stack.slice(0, h.idx + 1);
+        h.stack.push(snap);
+        if (h.stack.length > 50) h.stack.shift();
+        h.idx = h.stack.length - 1;
+    };
+
+    const undo = () => {
+        const h = historyRef.current;
+        if (h.idx > 0) {
+            h.idx--;
+            const s = JSON.parse(h.stack[h.idx]);
+            setNodes(s.nodes); setEdges(s.edges);
+        }
+    };
+
+    const redo = () => {
+        const h = historyRef.current;
+        if (h.idx < h.stack.length - 1) {
+            h.idx++;
+            const s = JSON.parse(h.stack[h.idx]);
+            setNodes(s.nodes); setEdges(s.edges);
+        }
+    };
+
+    // Canvas drawing
+    const drawCanvas = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const wrap = wrapRef.current;
+        if (!wrap) return;
+        canvas.width = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+        const ctx = canvas.getContext('2d');
+        const { x: vx, y: vy, zoom } = viewport;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(vx, vy);
+        ctx.scale(zoom, zoom);
+
+        // Grid
+        ctx.strokeStyle = '#1e2235';
+        ctx.lineWidth = 0.5 / zoom;
+        const gw = canvas.width / zoom + 200;
+        const gh = canvas.height / zoom + 200;
+        const ox = (-vx / zoom) - 100;
+        const oy = (-vy / zoom) - 100;
+        for (let x = Math.floor(ox / WF_GRID) * WF_GRID; x < ox + gw; x += WF_GRID) {
+            ctx.beginPath(); ctx.moveTo(x, oy); ctx.lineTo(x, oy + gh); ctx.stroke();
+        }
+        for (let y = Math.floor(oy / WF_GRID) * WF_GRID; y < oy + gh; y += WF_GRID) {
+            ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + gw, y); ctx.stroke();
+        }
+
+        // Edges
+        edges.forEach(e => {
+            const fromNode = nodes.find(n => n.id === e.from.nodeId);
+            const toNode = nodes.find(n => n.id === e.to.nodeId);
+            if (!fromNode || !toNode) return;
+            const fromReg = registry[fromNode.type];
+            const toReg = registry[toNode.type];
+            if (!fromReg || !toReg) return;
+            const fp = wfPortPos(fromNode, fromReg, e.from.port, false);
+            const tp = wfPortPos(toNode, toReg, e.to.port, true);
+            const sel = selectedEdge === e.id;
+            ctx.strokeStyle = sel ? '#818cf8' : '#64748b';
+            ctx.lineWidth = sel ? 2.5 / zoom : 1.5 / zoom;
+            const dx = Math.abs(fp.x - tp.x) * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(fp.x, fp.y);
+            ctx.bezierCurveTo(fp.x + dx, fp.y, tp.x - dx, tp.y, tp.x, tp.y);
+            ctx.stroke();
+        });
+
+        // Nodes
+        nodes.forEach(node => {
+            const reg = registry[node.type];
+            if (!reg) return;
+            const cat = WF_CATEGORIES.find(c => c.key === reg.category);
+            const color = cat ? cat.color : '#6366f1';
+            const h = wfNodeH(reg);
+            const sel = selectedNode === node.id;
+
+            // Shadow
+            ctx.shadowColor = sel ? color : 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = sel ? 12 : 6;
+            ctx.shadowOffsetY = 2;
+
+            // Body
+            ctx.fillStyle = '#1e2235';
+            ctx.beginPath();
+            ctx.roundRect(node.x, node.y, WF_NODE_W, h, 6);
+            ctx.fill();
+            ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+            // Header
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(node.x, node.y, WF_NODE_W, 24, [6, 6, 0, 0]);
+            ctx.fill();
+
+            // Title
+            ctx.fillStyle = '#fff';
+            ctx.font = '11px sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(reg.label || node.type, node.x + 8, node.y + 12);
+
+            // Border
+            if (sel) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2 / zoom;
+                ctx.beginPath();
+                ctx.roundRect(node.x, node.y, WF_NODE_W, h, 6);
+                ctx.stroke();
+            }
+
+            // Input ports
+            (reg.inputs || []).forEach((p, i) => {
+                const py = 24 + 14 + i * 28;
+                ctx.fillStyle = '#3b4261';
+                ctx.beginPath();
+                ctx.arc(node.x, node.y + py, WF_PORT_R, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(p, node.x + 10, node.y + py + 1);
+            });
+
+            // Output ports
+            (reg.outputs || []).forEach((p, i) => {
+                const py = 24 + 14 + i * 28;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(node.x + WF_NODE_W, node.y + py, WF_PORT_R, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(p, node.x + WF_NODE_W - 10, node.y + py + 1);
+            });
+
+            // Param values
+            const params = node.params || {};
+            const paramKeys = Object.keys(reg.params || {});
+            if (paramKeys.length > 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                const txt = paramKeys.map(k => `${k}=${params[k] !== undefined ? params[k] : reg.params[k].default}`).join(' ');
+                ctx.fillText(txt, node.x + WF_NODE_W / 2, node.y + h - 4);
+            }
+        });
+
+        ctx.restore();
+    };
+
+    // Mouse → canvas coords
+    const toCanvas = (e) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left - viewport.x) / viewport.zoom,
+            y: (e.clientY - rect.top - viewport.y) / viewport.zoom,
+        };
+    };
+
+    // Hit test: find node at position
+    const hitNode = (cx, cy) => {
+        for (let i = nodes.length - 1; i >= 0; i--) {
+            const n = nodes[i];
+            const reg = registry[n.type];
+            if (!reg) continue;
+            const h = wfNodeH(reg);
+            if (cx >= n.x && cx <= n.x + WF_NODE_W && cy >= n.y && cy <= n.y + h) return n;
+        }
+        return null;
+    };
+
+    // Hit test: find port at position
+    const hitPort = (cx, cy) => {
+        for (const n of nodes) {
+            const reg = registry[n.type];
+            if (!reg) continue;
+            for (const p of (reg.outputs || [])) {
+                const pos = wfPortPos(n, reg, p, false);
+                if (Math.hypot(cx - pos.x, cy - pos.y) < WF_PORT_R + 4) return { nodeId: n.id, port: p, isInput: false };
+            }
+            for (const p of (reg.inputs || [])) {
+                const pos = wfPortPos(n, reg, p, true);
+                if (Math.hypot(cx - pos.x, cy - pos.y) < WF_PORT_R + 4) return { nodeId: n.id, port: p, isInput: true };
+            }
+        }
+        return null;
+    };
+
+    // Mouse handlers
+    const onMouseDown = (e) => {
+        const c = toCanvas(e);
+        const st = stateRef.current;
+
+        // Right/middle click → pan
+        if (e.button === 1 || e.button === 2) {
+            st.mode = 'pan'; st.panStart = { x: e.clientX, y: e.clientY };
+            st.startVP = { ...viewport };
+            e.preventDefault(); return;
+        }
+
+        // Check port hit first
+        const port = hitPort(c.x, c.y);
+        if (port && !port.isInput) {
+            st.mode = 'drag_wire';
+            st.dragWire = { from: { nodeId: port.nodeId, port: port.port }, mx: c.x, my: c.y };
+            pushHistory(); return;
+        }
+
+        // Check node hit
+        const node = hitNode(c.x, c.y);
+        if (node) {
+            st.mode = 'drag_node';
+            st.dragNode = { id: node.id, ox: c.x - node.x, oy: c.y - node.y };
+            setSelectedNode(node.id); setSelectedEdge(null);
+            pushHistory(); return;
+        }
+
+        // Click on empty → deselect
+        setSelectedNode(null); setSelectedEdge(null);
+    };
+
+    const onMouseMove = (e) => {
+        const st = stateRef.current;
+        if (st.mode === 'pan') {
+            const dx = e.clientX - st.panStart.x;
+            const dy = e.clientY - st.panStart.y;
+            setViewport({ ...st.startVP, x: st.startVP.x + dx, y: st.startVP.y + dy });
+            return;
+        }
+        if (st.mode === 'drag_node') {
+            const c = toCanvas(e);
+            setNodes(prev => prev.map(n =>
+                n.id === st.dragNode.id ? { ...n, x: c.x - st.dragNode.ox, y: c.y - st.dragNode.oy } : n
+            ));
+            return;
+        }
+        if (st.mode === 'drag_wire') {
+            const c = toCanvas(e);
+            st.dragWire.mx = c.x;
+            st.dragWire.my = c.y;
+            // Draw wire preview on overlay
+            const ov = overlayRef.current;
+            if (ov) {
+                ov.width = ov.parentElement.clientWidth;
+                ov.height = ov.parentElement.clientHeight;
+                const octx = ov.getContext('2d');
+                octx.clearRect(0, 0, ov.width, ov.height);
+                const fromNode = nodes.find(n => n.id === st.dragWire.from.nodeId);
+                if (fromNode) {
+                    const reg = registry[fromNode.type];
+                    if (reg) {
+                        const fp = wfPortPos(fromNode, reg, st.dragWire.from.port, false);
+                        const sx = fp.x * viewport.zoom + viewport.x;
+                        const sy = fp.y * viewport.zoom + viewport.y;
+                        const ex = c.x * viewport.zoom + viewport.x;
+                        const ey = c.y * viewport.zoom + viewport.y;
+                        octx.strokeStyle = '#818cf8';
+                        octx.lineWidth = 2;
+                        octx.setLineDash([6, 4]);
+                        const ddx = Math.abs(sx - ex) * 0.5;
+                        octx.beginPath();
+                        octx.moveTo(sx, sy);
+                        octx.bezierCurveTo(sx + ddx, sy, ex - ddx, ey, ex, ey);
+                        octx.stroke();
+                        octx.setLineDash([]);
+                    }
+                }
+            }
+        }
+    };
+
+    const onMouseUp = (e) => {
+        const st = stateRef.current;
+        if (st.mode === 'drag_wire') {
+            const c = toCanvas(e);
+            const port = hitPort(c.x, c.y);
+            if (port && port.isInput) {
+                // Check not connecting to same node
+                if (port.nodeId !== st.dragWire.from.nodeId) {
+                    // Remove existing edge to this input
+                    const newEdges = edges.filter(ed =>
+                        !(ed.to.nodeId === port.nodeId && ed.to.port === port.port)
+                    );
+                    newEdges.push({
+                        id: genId('e'),
+                        from: st.dragWire.from,
+                        to: { nodeId: port.nodeId, port: port.port },
+                    });
+                    setEdges(newEdges);
+                }
+            }
+            // Clear overlay
+            const ov = overlayRef.current;
+            if (ov) { const octx = ov.getContext('2d'); octx.clearRect(0, 0, ov.width, ov.height); }
+        }
+        st.mode = 'idle';
+        st.dragNode = null;
+        st.dragWire = null;
+    };
+
+    // Keyboard handler (single source, via window listener)
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedNode) {
+                    pushHistory();
+                    setNodes(prev => prev.filter(n => n.id !== selectedNode));
+                    setEdges(prev => prev.filter(ed => ed.from.nodeId !== selectedNode && ed.to.nodeId !== selectedNode));
+                    setSelectedNode(null);
+                } else if (selectedEdge) {
+                    pushHistory();
+                    setEdges(prev => prev.filter(ed => ed.id !== selectedEdge));
+                    setSelectedEdge(null);
+                }
+            }
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [selectedNode, selectedEdge]);
+
+    // Attach wheel listener with {passive:false} so preventDefault works
+    useEffect(() => {
+        const el = overlayRef.current;
+        if (!el) return;
+        const handler = (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            setViewport(v => {
+                const nz = Math.max(0.25, Math.min(3.0, v.zoom * delta));
+                const rect = canvasRef.current.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                return { x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom), zoom: nz };
+            });
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, []);
+
+    // Add node from palette
+    const addNode = (type, posX, posY) => {
+        pushHistory();
+        const reg = registry[type];
+        if (!reg) return;
+        const cx = posX != null ? posX : (-viewport.x + 300) / viewport.zoom;
+        const cy = posY != null ? posY : (-viewport.y + 200) / viewport.zoom;
+        setNodes(prev => [...prev, {
+            id: genId('n'), type, x: cx + Math.random() * 40, y: cy + Math.random() * 40,
+            params: Object.fromEntries(Object.entries(reg.params || {}).map(([k, v]) => [k, v.default])),
+        }]);
+    };
+
+    // Update node param
+    const updateParam = (nodeId, key, value) => {
+        setNodes(prev => prev.map(n =>
+            n.id === nodeId ? { ...n, params: { ...n.params, [key]: value } } : n
+        ));
+    };
+
+    // Save workflow
+    const saveWorkflow = async () => {
+        if (!expression) { showToast('请先构建有效的工作流', 'error'); return; }
+        try {
+            const graph = { nodes, edges, viewport };
+            if (editingId) {
+                await api.put(`/api/factors/workflow/${editingId}`, {
+                    name: factorName, graph, factor_type: factorType, category: 'workflow',
+                });
+                showToast('工作流已更新', 'success');
+            } else {
+                const res = await api.post('/api/factors/workflow/save', {
+                    name: factorName, graph, factor_type: factorType, category: 'workflow',
+                });
+                setEditingId(res.id);
+                showToast('工作流已保存', 'success');
+            }
+            loadSavedFactors();
+        } catch (e) { showToast(e.detail || '保存失败', 'error'); }
+    };
+
+    // Load saved workflow
+    const loadWorkflow = async (factorId) => {
+        try {
+            const res = await api.get(`/api/factors/${factorId}/graph`);
+            if (res.graph_json) {
+                setNodes(res.graph_json.nodes || []);
+                setEdges(res.graph_json.edges || []);
+                setViewport(res.graph_json.viewport || { x: 0, y: 0, zoom: 1.0 });
+                setFactorName(res.name);
+                setFactorType(res.factor_type || 'technical');
+                setEditingId(factorId);
+                showToast('已加载: ' + res.name, 'success');
+            }
+        } catch (e) { showToast('加载失败', 'error'); }
+    };
+
+    // Load template
+    const loadTemplate = (idx) => {
+        const tpl = templates[idx];
+        if (!tpl) return;
+        pushHistory();
+        setNodes(tpl.graph.nodes || []);
+        setEdges(tpl.graph.edges || []);
+        setViewport(tpl.graph.viewport || { x: 0, y: 0, zoom: 1.0 });
+        setFactorName(tpl.name);
+        setEditingId(null);
+        showToast('已加载模板: ' + tpl.name, 'success');
+    };
+
+    // Preview factor values
+    const runPreview = async () => {
+        if (!expression) { showToast('请先构建有效工作流', 'error'); return; }
+        setPreviewLoading(true);
+        try {
+            const graph = { nodes, edges, viewport };
+            const res = await api.post('/api/factors/workflow/preview', {
+                graph, ts_code: previewCode, start_date: previewStart, end_date: previewEnd,
+            });
+            setPreviewData(res);
+        } catch (e) { showToast(e.detail || '预览失败', 'error'); }
+        setPreviewLoading(false);
+    };
+
+    // Run factor backtest
+    const runBacktest = async () => {
+        if (!expression) { showToast('请先构建有效工作流', 'error'); return; }
+        setBtLoading(true); setBtResult(null);
+        try {
+            const codes = btUniverse.split(',').map(s => s.trim()).filter(Boolean);
+            let res;
+            if (btMode === 'selection') {
+                res = await api.post('/api/factor_backtest/selection', {
+                    expression, universe: codes, start_date: btStart, end_date: btEnd,
+                    select_mode: btSelectMode, select_pct: btSelectPct,
+                    rebalance_days: btRebalDays, initial_cash: 1000000, benchmark: '000300.SH',
+                });
+            } else {
+                res = await api.post('/api/factor_backtest/technical', {
+                    expression, ts_codes: codes, start_date: btStart, end_date: btEnd,
+                    open_threshold: btOpenThresh, close_threshold: btCloseThresh,
+                    open_condition: btOpenCond, close_condition: btCloseCond, initial_cash: 1000000,
+                });
+            }
+            if (res.task_id) {
+                setBtTaskId(res.task_id);
+                pollBacktest(res.task_id);
+            }
+        } catch (e) { showToast(e.detail || '回测提交失败', 'error'); setBtLoading(false); }
+    };
+
+    const pollBacktest = (taskId) => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(async () => {
+            try {
+                const r = await api.get('/api/factor_backtest/result/' + taskId);
+                if (r.status === 'completed') {
+                    clearInterval(pollRef.current); pollRef.current = null;
+                    setBtResult(r.result); setBtLoading(false);
+                    showToast('回测完成');
+                } else if (r.status === 'failed') {
+                    clearInterval(pollRef.current); pollRef.current = null;
+                    showToast(r.error || '回测失败', 'error'); setBtLoading(false);
+                }
+            } catch { clearInterval(pollRef.current); pollRef.current = null; setBtLoading(false); }
+        }, 2000);
+    };
+
+    // Cleanup poll interval on unmount
+    useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
+
+    // ===== JSX Return =====
+    const selNode = nodes.find(n => n.id === selectedNode);
+    const selNodeReg = selNode ? registry[selNode.type] : null;
+
+    return (
+        <div className="wf-page">
+            {/* Toolbar */}
+            <div className="wf-toolbar">
+                <input value={factorName} onChange={e => setFactorName(e.target.value)}
+                    style={{width:140,padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}} />
+                <select value={factorType} onChange={e => setFactorType(e.target.value)}
+                    style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
+                    <option value="technical">技术因子</option>
+                    <option value="selection">选股因子</option>
+                </select>
+                <button className="btn btn-sm" onClick={saveWorkflow}>{editingId ? '更新' : '保存'}</button>
+                <select onChange={e => { if (e.target.value) loadTemplate(parseInt(e.target.value)); e.target.value=''; }}
+                    style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
+                    <option value="">加载模板...</option>
+                    {templates.map((t,i) => <option key={i} value={i}>{t.name}</option>)}
+                </select>
+                <select onChange={e => { if (e.target.value) loadWorkflow(parseInt(e.target.value)); e.target.value=''; }}
+                    style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
+                    <option value="">加载已保存...</option>
+                    {savedFactors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+                <button className="btn btn-sm" onClick={() => { setNodes([]); setEdges([]); setEditingId(null); setFactorName('新因子'); setBtResult(null); setPreviewData(null); }}>清空</button>
+                <span style={{marginLeft:'auto',fontSize:12,color:compileErrors.length?'#f87171':'#86efac'}}>
+                    {compileErrors.length ? compileErrors[0] : (expression ? '✓ 编译成功' : '')}
+                </span>
+            </div>
+
+            <div className="wf-body">
+                {/* Left: Node Palette */}
+                <div className="wf-palette">
+                    {WF_CATEGORIES.filter(c => c.key !== 'output').map(cat => {
+                        const catNodes = Object.entries(registry).filter(([k,v]) => v.category === cat.key);
+                        if (!catNodes.length) return null;
+                        const collapsed = collapsedCats[cat.key];
+                        return (
+                            <div key={cat.key} style={{marginBottom:4}}>
+                                <div onClick={() => setCollapsedCats(p => ({...p, [cat.key]: !p[cat.key]}))}
+                                    style={{cursor:'pointer',padding:'4px 6px',fontWeight:600,fontSize:12,color:cat.color,display:'flex',alignItems:'center',gap:4}}>
+                                    <span style={{transform:collapsed?'rotate(-90deg)':'',transition:'0.15s'}}>▼</span> {cat.label}
+                                </div>
+                                {!collapsed && catNodes.map(([type, reg]) => (
+                                    <div key={type} draggable
+                                        onDragStart={e => e.dataTransfer.setData('nodeType', type)}
+                                        style={{padding:'3px 8px 3px 16px',fontSize:11,cursor:'grab',color:'#ccc',borderLeft:`3px solid ${cat.color}`,marginBottom:1}}>
+                                        {reg.label}
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })}
+                    {/* Output node button */}
+                    <div style={{marginTop:8,padding:'4px 6px'}}>
+                        <button className="btn btn-sm" style={{width:'100%',fontSize:11}}
+                            onClick={() => addNode('output', 600, 200)}>+ 输出节点</button>
+                    </div>
+                </div>
+
+                {/* Center: Canvas */}
+                <div className="wf-canvas-wrap" ref={wrapRef}
+                    onDrop={e => { e.preventDefault(); const t = e.dataTransfer.getData('nodeType'); if (!t) return; const rect = wrapRef.current.getBoundingClientRect(); const cx = (e.clientX - rect.left - viewport.x) / viewport.zoom; const cy = (e.clientY - rect.top - viewport.y) / viewport.zoom; addNode(t, cx, cy); }}
+                    onDragOver={e => e.preventDefault()}>
+                    <canvas ref={canvasRef} style={{position:'absolute',top:0,left:0}} />
+                    <canvas ref={overlayRef} style={{position:'absolute',top:0,left:0}}
+                        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}
+                        onContextMenu={e => e.preventDefault()} tabIndex={0} />
+                </div>
+
+                {/* Right: Inspector */}
+                <div className="wf-inspector">
+                    {selNode && selNodeReg ? (
+                        <div>
+                            <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:catColors[selNodeReg.category]||'#eee'}}>
+                                {selNodeReg.label}
+                            </div>
+                            <div style={{fontSize:11,color:'#999',marginBottom:8}}>类型: {selNode.type}</div>
+                            {Object.keys(selNodeReg.params || {}).map(p => (
+                                <div key={p} style={{marginBottom:6}}>
+                                    <label style={{fontSize:11,color:'#aaa'}}>{p}</label>
+                                    <input type="number" value={selNode.params[p] ?? ''} onChange={e => updateParam(selNode.id, p, parseFloat(e.target.value) || 0)}
+                                        style={{width:'100%',padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:12}} />
+                                </div>
+                            ))}
+                            <button className="btn btn-sm" style={{marginTop:8,fontSize:11,background:'#dc2626'}}
+                                onClick={() => { pushHistory(); setNodes(ns => ns.filter(n => n.id !== selNode.id)); setEdges(es => es.filter(e => e.from.nodeId !== selNode.id && e.to.nodeId !== selNode.id)); setSelectedNode(null); }}>
+                                删除节点
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{color:'#666',fontSize:12,textAlign:'center',marginTop:20}}>点击节点查看属性</div>
+                    )}
+                </div>
+            </div>
+
+            {/* Expression Bar */}
+            <div className="wf-expr-bar">
+                <span style={{color:'#888',marginRight:8}}>表达式:</span>
+                <code style={{color:compileErrors.length?'#f87171':'#86efac',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {expression || '(空)'}
+                </code>
+            </div>
+
+            {/* Preview & Backtest Panel */}
+            <div className="wf-backtest-panel">
+                {/* Preview Section */}
+                <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>因子预览</div>
+                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginBottom:6}}>
+                        <input value={previewCode} onChange={e => setPreviewCode(e.target.value)} placeholder="股票代码"
+                            style={{width:100,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        <input value={previewStart} onChange={e => setPreviewStart(e.target.value)} placeholder="开始日期"
+                            style={{width:80,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        <span style={{color:'#666'}}>~</span>
+                        <input value={previewEnd} onChange={e => setPreviewEnd(e.target.value)} placeholder="结束日期"
+                            style={{width:80,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        <button className="btn btn-sm" onClick={runPreview} disabled={previewLoading} style={{fontSize:11}}>
+                            {previewLoading ? '计算中...' : '预览'}
+                        </button>
+                    </div>
+                    {previewData && previewData.data && previewData.data.length > 0 && (
+                        <div style={{height:120,background:'#1a1a2e',borderRadius:4,padding:4,position:'relative'}}>
+                            <PreviewMiniChart data={previewData.data} />
+                        </div>
+                    )}
+                </div>
+
+                {/* Backtest Section */}
+                <div style={{flex:1,minWidth:0,borderLeft:'1px solid #333',paddingLeft:12}}>
+                    <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>因子回测</div>
+                    <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4}}>
+                        <select value={btMode} onChange={e => setBtMode(e.target.value)}
+                            style={{padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}}>
+                            <option value="selection">选股回测</option>
+                            <option value="technical">技术回测</option>
+                        </select>
+                    </div>
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:4,fontSize:11}}>
+                        <input value={btUniverse} onChange={e => setBtUniverse(e.target.value)} placeholder="股票池"
+                            style={{flex:1,minWidth:120,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        <input value={btStart} onChange={e => setBtStart(e.target.value)} style={{width:72,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        <input value={btEnd} onChange={e => setBtEnd(e.target.value)} style={{width:72,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                    </div>
+                    {btMode === 'selection' ? (
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:4,fontSize:11}}>
+                            <select value={btSelectMode} onChange={e => setBtSelectMode(e.target.value)}
+                                style={{padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}}>
+                                <option value="top">做多Top</option><option value="bottom">做多Bottom</option>
+                            </select>
+                            <label style={{color:'#aaa'}}>比例</label>
+                            <input type="number" value={btSelectPct} onChange={e => setBtSelectPct(parseFloat(e.target.value)||0.1)} step={0.05} min={0.05} max={0.5}
+                                style={{width:50,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                            <label style={{color:'#aaa'}}>调仓(天)</label>
+                            <input type="number" value={btRebalDays} onChange={e => setBtRebalDays(parseInt(e.target.value)||5)} min={1} max={60}
+                                style={{width:40,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        </div>
+                    ) : (
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:4,fontSize:11}}>
+                            <label style={{color:'#aaa'}}>开仓</label>
+                            <select value={btOpenCond} onChange={e => setBtOpenCond(e.target.value)}
+                                style={{padding:'3px 4px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}}>
+                                <option value="gt">&gt;</option><option value="lt">&lt;</option>
+                            </select>
+                            <input type="number" value={btOpenThresh} onChange={e => setBtOpenThresh(parseFloat(e.target.value)||0)} step={0.1}
+                                style={{width:50,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                            <label style={{color:'#aaa'}}>平仓</label>
+                            <select value={btCloseCond} onChange={e => setBtCloseCond(e.target.value)}
+                                style={{padding:'3px 4px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}}>
+                                <option value="lt">&lt;</option><option value="gt">&gt;</option>
+                            </select>
+                            <input type="number" value={btCloseThresh} onChange={e => setBtCloseThresh(parseFloat(e.target.value)||0)} step={0.1}
+                                style={{width:50,padding:'3px 6px',borderRadius:3,border:'1px solid #555',background:'#1e1e1e',color:'#eee',fontSize:11}} />
+                        </div>
+                    )}
+                    <button className="btn btn-sm" onClick={runBacktest} disabled={btLoading} style={{fontSize:11}}>
+                        {btLoading ? '回测中...' : '运行回测'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Backtest Result */}
+            {btResult && btResult.metrics && (
+                <div style={{padding:'8px 12px',background:'#1a1a2e',borderTop:'1px solid #333'}}>
+                    <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12,marginBottom:6}}>
+                        {Object.entries(btResult.metrics).slice(0,10).map(([k,v]) => (
+                            <span key={k} style={{color:'#aaa'}}>{k}: <b style={{color: typeof v==='number'&&v<0?'#f87171':'#eee'}}>{typeof v==='number'?v.toFixed(4):v}</b></span>
+                        ))}
+                    </div>
+                    {btResult.equity_curve && btResult.equity_curve.length > 1 && (
+                        <div style={{height:140,background:'#111827',borderRadius:4,padding:4}}>
+                            <EquityCurveChart data={btResult.equity_curve} />
+                        </div>
+                    )}
+                    {btResult.trades && btResult.trades.length > 0 && (
+                        <details style={{marginTop:6,fontSize:11}}>
+                            <summary style={{cursor:'pointer',color:'#888'}}>交易记录 ({btResult.trades.length}笔)</summary>
+                            <div style={{maxHeight:120,overflowY:'auto',marginTop:4}}>
+                                <table style={{width:'100%',fontSize:10,borderCollapse:'collapse'}}>
+                                    <thead><tr style={{color:'#888'}}>
+                                        <th style={{textAlign:'left',padding:'2px 4px'}}>日期</th>
+                                        <th style={{textAlign:'left',padding:'2px 4px'}}>股票</th>
+                                        <th style={{textAlign:'left',padding:'2px 4px'}}>方向</th>
+                                        <th style={{textAlign:'right',padding:'2px 4px'}}>价格</th>
+                                        <th style={{textAlign:'right',padding:'2px 4px'}}>数量</th>
+                                    </tr></thead>
+                                    <tbody>{btResult.trades.slice(0,100).map((t,i) => (
+                                        <tr key={i} style={{color:'#ccc',borderTop:'1px solid #222'}}>
+                                            <td style={{padding:'2px 4px'}}>{t.date}</td>
+                                            <td style={{padding:'2px 4px'}}>{t.code||''}</td>
+                                            <td style={{padding:'2px 4px',color:t.action==='buy'?'#f87171':'#34d399'}}>{t.action}</td>
+                                            <td style={{textAlign:'right',padding:'2px 4px'}}>{t.price?.toFixed(2)}</td>
+                                            <td style={{textAlign:'right',padding:'2px 4px'}}>{t.amount||t.shares||''}</td>
+                                        </tr>
+                                    ))}</tbody>
+                                </table>
+                            </div>
+                        </details>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* PreviewMiniChart - simple SVG line chart for factor preview */
+function PreviewMiniChart({ data }) {
+    if (!data || data.length < 2) return null;
+    const vals = data.map(d => d.value);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const range = maxV - minV || 1;
+    const w = 300, h = 110;
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - ((d.value - minV) / range) * (h - 10) - 5;
+        return `${x},${y}`;
+    }).join(' ');
+    return (
+        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
+            <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth="1.5" />
+        </svg>
+    );
+}
+
+/* EquityCurveChart - SVG equity curve for backtest results */
+function EquityCurveChart({ data }) {
+    if (!data || data.length < 2) return null;
+    const vals = data.map(d => d.value);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const range = maxV - minV || 1;
+    const w = 600, h = 130;
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - ((d.value - minV) / range) * (h - 16) - 8;
+        return `${x},${y}`;
+    }).join(' ');
+    const fillPts = `0,${h} ${points} ${w},${h}`;
+    const startVal = vals[0], endVal = vals[vals.length - 1];
+    const color = endVal >= startVal ? '#34d399' : '#f87171';
+    return (
+        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
+            <polygon points={fillPts} fill={color} fillOpacity="0.1" />
+            <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" />
+            <text x="4" y="12" fill="#888" fontSize="10">{maxV.toFixed(0)}</text>
+            <text x="4" y={h-2} fill="#888" fontSize="10">{minV.toFixed(0)}</text>
+        </svg>
+    );
+}
+
 /* ===== Main App ===== */
 function App() {
     const [page, setPage] = useState('backtest');
     const [toast, setToast] = useState(null);
+    const [sysVersion, setSysVersion] = useState('');
     const showToast = (message, type) => setToast({ message, type: type || 'info' });
+
+    useEffect(() => {
+        api.get('/api/system/version').then(v => setSysVersion(v.version || '')).catch(() => {});
+    }, []);
 
     const navItems = [
         { key: 'backtest', label: '回测' },
         { key: 'strategy', label: '策略' },
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
+        { key: 'workflow', label: '因子工作流' },
         { key: 'news', label: '新闻' },
         { key: 'history', label: '历史' },
         { key: 'settings', label: '设置' },
@@ -2233,6 +3375,7 @@ function App() {
                 <div className="header-brand">
                     <h1>QTsys</h1>
                     <span>量化交易回测系统</span>
+                    {sysVersion && <span style={{fontSize:10,color:'var(--text-500)',marginLeft:4}}>v{sysVersion}</span>}
                 </div>
                 <nav className="nav">
                     {navItems.map(n => (
@@ -2249,9 +3392,10 @@ function App() {
                 {page === 'backtest' && <BacktestPage showToast={showToast} />}
                 {page === 'market' && <MarketPage showToast={showToast} />}
                 {page === 'factor' && <FactorPage showToast={showToast} />}
+                {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}
                 {page === 'history' && <HistoryPage showToast={showToast} />}
-                {page === 'help' && <HelpPage />}
+                {page === 'help' && <HelpPage showToast={showToast} />}
             </main>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>

@@ -1,6 +1,9 @@
 """QTsys 配置文件"""
 import os
 
+VERSION = "2.0.0"
+REPO_URL = "https://github.com/AlanWPY/QTsys.git"
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 数据库

@@ -4,6 +4,42 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 from factor.factor_engine import FactorEngine
+from logging_config import get_logger
+
+logger = get_logger("qtsys.factor.genetic")
+
+
+class GPContext:
+    """GP预加载上下文 - 避免每次适应度评估重复加载数据"""
+
+    def __init__(self, cache, universe: list[str], start_date: str, end_date: str):
+        self.universe = universe
+        self.start_date = start_date
+        self.end_date = end_date
+        # 预加载所有股票数据: {ts_code: {closes, highs, lows, volumes, opens, fwd_ret_5}}
+        self.stock_data: dict[str, dict] = {}
+        self.all_dates: set = set()
+        self._preload(cache)
+
+    def _preload(self, cache):
+        """一次性加载所有股票的行情数据"""
+        logger.info(f"GPContext: 预加载 {len(self.universe)} 只股票数据...")
+        for ts_code in self.universe:
+            df = cache.get_daily(ts_code, self.start_date, self.end_date)
+            if df.empty or len(df) < 30:
+                continue
+            indexed = df.set_index("trade_date")
+            closes = indexed["close"]
+            highs = indexed["high"]
+            lows = indexed["low"]
+            volumes = indexed["vol"]
+            opens = indexed["open"] if "open" in indexed.columns else closes.shift(1)
+            self.stock_data[ts_code] = {
+                "closes": closes, "highs": highs,
+                "lows": lows, "volumes": volumes, "opens": opens,
+            }
+            self.all_dates.update(closes.dropna().index.tolist())
+        logger.info(f"GPContext: 已加载 {len(self.stock_data)} 只有效股票")
 
 
 # 表达式树节点
@@ -83,14 +119,72 @@ def _crossover(expr1, expr2):
     return expr1 if random.random() < 0.5 else expr2
 
 
-def _fitness(expr, engine, universe, start_date, end_date):
-    """适应度函数: 用IC绝对值作为适应度"""
+def _fitness(expr, engine, universe, start_date, end_date, gp_ctx: Optional[GPContext] = None):
+    """适应度函数: 用IC绝对值作为适应度
+
+    当提供gp_ctx时，使用预加载数据直接计算因子值，避免重复IO。
+    """
     try:
+        if gp_ctx is not None:
+            return _fitness_fast(expr, engine, gp_ctx)
         result = engine.evaluate(expr, universe, start_date, end_date, groups=5)
         if "error" in result:
             return -1.0
         ic_mean = abs(result["metrics"].get("ic_mean", 0))
         ic_ir = abs(result["metrics"].get("ic_ir", 0))
+        return ic_mean * 0.6 + min(ic_ir, 2.0) / 2.0 * 0.4
+    except Exception:
+        return -1.0
+
+
+def _fitness_fast(expr, engine, ctx: GPContext, forward_days: int = 5):
+    """使用预加载数据快速评估因子适应度"""
+    try:
+        stock_factors = {}
+        all_dates = set()
+
+        for ts_code, sd in ctx.stock_data.items():
+            fv = engine._eval_expression(
+                expr, sd["closes"], sd["highs"], sd["lows"],
+                sd["volumes"], sd["opens"],
+            )
+            if fv is None:
+                continue
+            fwd_ret = sd["closes"].pct_change(forward_days).shift(-forward_days)
+            stock_factors[ts_code] = {"factor": fv, "fwd_ret": fwd_ret}
+            all_dates.update(fv.dropna().index.tolist())
+
+        if len(stock_factors) < 3:
+            return -1.0
+
+        dates = sorted(all_dates)
+        ic_vals = []
+
+        for dt in dates:
+            fvals, frets = [], []
+            for ts_code, sd in stock_factors.items():
+                if dt in sd["factor"].index and dt in sd["fwd_ret"].index:
+                    fv = sd["factor"].loc[dt]
+                    fr = sd["fwd_ret"].loc[dt]
+                    if pd.notna(fv) and pd.notna(fr):
+                        fvals.append(fv)
+                        frets.append(fr)
+
+            if len(fvals) < 3:
+                continue
+
+            rank_f = pd.Series(fvals).rank().values
+            rank_r = pd.Series(frets).rank().values
+            ic = np.corrcoef(rank_f, rank_r)[0, 1]
+            if not np.isnan(ic):
+                ic_vals.append(ic)
+
+        if not ic_vals:
+            return -1.0
+
+        ic_mean = abs(float(np.mean(ic_vals)))
+        ic_std = float(np.std(ic_vals, ddof=1)) if len(ic_vals) > 1 else 1.0
+        ic_ir = ic_mean / ic_std if ic_std > 0 else 0.0
         return ic_mean * 0.6 + min(ic_ir, 2.0) / 2.0 * 0.4
     except Exception:
         return -1.0
@@ -106,15 +200,22 @@ def run_gp(
     top_n: int = 5,
 ) -> list[dict]:
     """运行遗传算法因子挖掘"""
+    # 预加载数据上下文，所有适应度评估共享
+    gp_ctx = GPContext(engine.cache, universe, start_date, end_date)
+    if not gp_ctx.stock_data:
+        logger.warning("GPContext无有效股票数据，回退到逐次加载模式")
+        gp_ctx = None
+
     # 初始种群
     population = [_random_expr(0, 3) for _ in range(pop_size)]
     best_results = []
 
     for gen in range(generations):
+        logger.info(f"GP第{gen+1}/{generations}代, 种群{len(population)}")
         # 评估适应度
         scored = []
         for expr in population:
-            fit = _fitness(expr, engine, universe, start_date, end_date)
+            fit = _fitness(expr, engine, universe, start_date, end_date, gp_ctx)
             if fit > 0:
                 scored.append((expr, fit))
 

@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 from factor.builtin_factors import BUILTIN_FACTORS
+from logging_config import get_logger
+
+logger = get_logger("qtsys.factor.engine")
 
 
 class FactorEngine:
@@ -27,6 +30,9 @@ class FactorEngine:
         volumes = indexed["vol"]
         opens = indexed["open"] if "open" in indexed.columns else closes.shift(1)
 
+        # 加载财务指标数据
+        basic_data = self._load_daily_basic(ts_code, start_date, end_date, indexed.index)
+
         # 内置因子
         if expression.startswith("builtin:"):
             name = expression[8:]
@@ -37,39 +43,109 @@ class FactorEngine:
 
         # 自定义表达式因子
         return self._eval_expression(
-            expression, closes, highs, lows, volumes, opens
+            expression, closes, highs, lows, volumes, opens, basic_data
         )
 
-    def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None):
+    def _load_daily_basic(self, ts_code, start_date, end_date, trade_index):
+        """加载每日指标数据并对齐交易日"""
+        result = {}
+        try:
+            basic_df = self.cache.get_daily_basic(ts_code, start_date, end_date)
+            if basic_df.empty:
+                return result
+            basic_indexed = basic_df.set_index("trade_date")
+            # forward-fill对齐交易日
+            basic_aligned = basic_indexed.reindex(trade_index).ffill()
+            for col in ["pe", "pe_ttm", "pb", "ps", "ps_ttm",
+                        "total_mv", "circ_mv", "turnover_rate", "turnover_rate_f"]:
+                if col in basic_aligned.columns:
+                    result[col] = basic_aligned[col].astype(float)
+        except Exception:
+            logger.warning(f"加载{ts_code}财务指标失败")
+        return result
+
+    def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None, basic_data=None):
         """安全执行用户自定义因子表达式"""
         def _ts_rank_func(x):
-            """numpy实现的ts_rank, raw=True模式下x是numpy数组"""
             n = len(x)
-            # 计算最后一个元素的排名百分比
             last = x[-1]
             rank = np.sum(x <= last)
             return rank / n
 
+        def _ts_decay(s, window):
+            """线性衰减加权均值"""
+            weights = np.arange(1, window + 1, dtype=float)
+            weights = weights / weights.sum()
+            return s.rolling(window).apply(lambda x: np.dot(x, weights), raw=True)
+
+        def _ewm_func(s, span):
+            return s.ewm(span=span).mean()
+
+        def _cs_zscore(s):
+            m, st = s.mean(), s.std()
+            return (s - m) / st if st > 0 else s * 0
+
+        def _cs_percentile(s):
+            return s.rank(pct=True)
+
+        def _cs_demean(s):
+            return s - s.mean()
+
+        def _clip_func(s, lower, upper):
+            return s.clip(lower=lower, upper=upper)
+
+        def _power_func(s, exp):
+            return np.power(s, exp)
+
+        def _ternary(cond, true_val, false_val):
+            return pd.Series(np.where(cond, true_val, false_val), index=closes.index)
+
         safe_ns = {
+            # 价格数据
             "close": closes, "high": highs, "low": lows,
             "vol": volumes, "volume": volumes,
             "open": opens if opens is not None else closes.shift(1),
             "returns": closes.pct_change(),
+            # 基础数学
             "np": np, "pd": pd,
             "abs": np.abs, "log": np.log, "sqrt": np.sqrt,
+            "power": _power_func, "neg": lambda s: -s,
             "max": np.maximum, "min": np.minimum,
+            "clip": _clip_func,
+            # 时序运算
             "mean": lambda s, n: s.rolling(n).mean(),
             "std": lambda s, n: s.rolling(n).std(),
             "sum": lambda s, n: s.rolling(n).sum(),
             "rank": lambda s: s.rank(pct=True),
             "delay": lambda s, n: s.shift(n),
             "delta": lambda s, n: s.diff(n),
+            "pctchange": lambda s, n: s.pct_change(n),
             "corr": lambda a, b, n: a.rolling(n).corr(b),
             "cov": lambda a, b, n: a.rolling(n).cov(b),
             "ts_max": lambda s, n: s.rolling(n).max(),
             "ts_min": lambda s, n: s.rolling(n).min(),
             "ts_rank": lambda s, n: s.rolling(n).apply(_ts_rank_func, raw=True),
+            "ts_decay": _ts_decay,
+            "ewm": _ewm_func,
+            # 截面运算
+            "cs_zscore": _cs_zscore,
+            "cs_percentile": _cs_percentile,
+            "cs_demean": _cs_demean,
+            "cs_rank": lambda s: s.rank(pct=True),
+            # 条件逻辑
+            "ternary": _ternary,
         }
+
+        # 注入财务指标
+        if basic_data:
+            empty = pd.Series(0.0, index=closes.index)
+            safe_ns["pe"] = basic_data.get("pe_ttm", basic_data.get("pe", empty))
+            safe_ns["pb"] = basic_data.get("pb", empty)
+            safe_ns["ps"] = basic_data.get("ps_ttm", basic_data.get("ps", empty))
+            safe_ns["total_mv"] = basic_data.get("total_mv", empty)
+            safe_ns["circ_mv"] = basic_data.get("circ_mv", empty)
+            safe_ns["turnover_rate"] = basic_data.get("turnover_rate", empty)
+
         try:
             result = eval(expr, {"__builtins__": {}}, safe_ns)
             if isinstance(result, pd.Series):
@@ -78,9 +154,49 @@ class FactorEngine:
         except Exception:
             return None
 
+    def _neutralize(self, factor_df: pd.DataFrame, industry_col: str = "industry",
+                    mktcap_col: str = "total_mv") -> pd.DataFrame:
+        """因子中性化 - 截面回归去除行业和市值效应"""
+        result = factor_df.copy()
+        for dt in result.index.get_level_values(0).unique() if result.index.nlevels > 1 else [None]:
+            if dt is not None:
+                mask = result.index.get_level_values(0) == dt
+                sub = result.loc[mask]
+            else:
+                sub = result
+            if "factor" not in sub.columns:
+                continue
+            y = sub["factor"].values
+            if len(y) < 5:
+                continue
+            # 市值中性化
+            X_cols = []
+            if mktcap_col in sub.columns:
+                X_cols.append(sub[mktcap_col].fillna(0).values.reshape(-1, 1))
+            # 行业哑变量
+            if industry_col in sub.columns:
+                dummies = pd.get_dummies(sub[industry_col], drop_first=True)
+                if not dummies.empty:
+                    X_cols.append(dummies.values)
+            if not X_cols:
+                continue
+            X = np.hstack(X_cols)
+            X = np.column_stack([np.ones(len(X)), X])
+            try:
+                beta = np.linalg.lstsq(X, y, rcond=None)[0]
+                residual = y - X @ beta
+                if dt is not None:
+                    result.loc[mask, "factor"] = residual
+                else:
+                    result["factor"] = residual
+            except Exception:
+                pass
+        return result
+
     def evaluate(
         self, expression: str, universe: list[str],
         start_date: str, end_date: str, groups: int = 5,
+        forward_days: int = 5,
     ) -> dict:
         """评价因子: 计算IC/IR/分组收益/多空曲线/换手率"""
         # 1. 收集所有股票的因子值和未来收益
@@ -98,19 +214,22 @@ class FactorEngine:
             volumes = indexed["vol"]
             opens = indexed["open"] if "open" in indexed.columns else closes.shift(1)
 
+            # 加载财务指标
+            basic_data = self._load_daily_basic(ts_code, start_date, end_date, indexed.index)
+
             if expression.startswith("builtin:"):
                 name = expression[8:]
                 if name not in BUILTIN_FACTORS:
                     return {"error": f"未知内置因子: {name}"}
                 fv = BUILTIN_FACTORS[name]["func"](closes, highs, lows, volumes)
             else:
-                fv = self._eval_expression(expression, closes, highs, lows, volumes, opens)
+                fv = self._eval_expression(expression, closes, highs, lows, volumes, opens, basic_data)
 
             if fv is None:
                 continue
 
-            # 未来5日收益作为因子预测目标
-            fwd_ret = closes.pct_change(5).shift(-5)
+            # 未来N日收益作为因子预测目标
+            fwd_ret = closes.pct_change(forward_days).shift(-forward_days)
             stock_data[ts_code] = {"factor": fv, "fwd_ret": fwd_ret}
             all_dates.update(fv.dropna().index.tolist())
 

@@ -7,6 +7,9 @@ from engine.context import Order, OrderSide, OrderStatus, Position
 from engine.broker import Broker
 from engine.metrics import calc_metrics
 from data.data_cache import DataCache
+from logging_config import get_logger
+
+logger = get_logger("qtsys.engine.backtest")
 
 
 class BacktestEngine:
@@ -17,6 +20,8 @@ class BacktestEngine:
         commission_rate: float = 0.0003,
         stamp_tax_rate: float = 0.001,
         slippage: float = 0.002,
+        max_position_pct: float = 0.25,
+        max_drawdown_limit: float = 0.0,
     ):
         self.cache = cache
         self.initial_cash = initial_cash
@@ -30,6 +35,7 @@ class BacktestEngine:
         self.current_date: str = ""
         self.current_data: dict[str, pd.DataFrame] = {}
         self.trade_dates: list[str] = []
+        self._date_to_idx: dict[str, int] = {}  # O(1) date->index lookup
         self.all_data: dict[str, pd.DataFrame] = {}
         # O(1) date-indexed lookup: {ts_code: {date_str: {col: val, ...}}}
         self.date_index: dict[str, dict[str, dict]] = {}
@@ -39,6 +45,11 @@ class BacktestEngine:
         # 止损止盈配置: {ts_code: pct}
         self.stop_loss: dict[str, float] = {}
         self.take_profit: dict[str, float] = {}
+        # 组合级风控
+        self.max_position_pct = max_position_pct  # 单股最大仓位
+        self.max_drawdown_limit = max_drawdown_limit  # 最大回撤熔断 (0=不启用)
+        self._peak_value = initial_cash
+        self._risk_breached = False
 
     @property
     def portfolio_value(self) -> float:
@@ -87,17 +98,14 @@ class BacktestEngine:
                 self.order(ts_code, amount)
 
     def _get_prev_close(self, ts_code: str) -> Optional[float]:
-        """获取前一日收盘价(用于下单定价,避免前视偏差)"""
+        """获取前一日收盘价(用于下单定价,避免前视偏差) - O(1)查找"""
         if ts_code not in self.date_index:
             return None
         idx = self.date_index[ts_code]
-        # 找当前日期在trade_dates中的位置,取前一天
-        try:
-            pos = self.trade_dates.index(self.current_date)
-        except ValueError:
+        pos = self._date_to_idx.get(self.current_date)
+        if pos is None:
             return None
         if pos <= 0:
-            # 第一天没有前一日数据,用pre_close
             row = idx.get(self.current_date)
             return float(row["pre_close"]) if row and "pre_close" in row else None
         prev_date = self.trade_dates[pos - 1]
@@ -113,14 +121,11 @@ class BacktestEngine:
         return None
 
     def get_history(self, ts_code: str, count: int = 10, field: str = "close") -> pd.Series:
-        """获取历史数据 - 使用date_index加速"""
+        """获取历史数据 - O(1)日期查找"""
         if ts_code not in self.all_data:
             return pd.Series(dtype=float)
-        df = self.all_data[ts_code]
-        # 利用已排序的trade_dates快速截取
-        try:
-            cur_idx = self.trade_dates.index(self.current_date)
-        except ValueError:
+        cur_idx = self._date_to_idx.get(self.current_date)
+        if cur_idx is None:
             return pd.Series(dtype=float)
         # 取当前日期及之前的交易日
         relevant_dates = self.trade_dates[max(0, cur_idx - count + 1):cur_idx + 1]
@@ -133,12 +138,18 @@ class BacktestEngine:
         return pd.Series(values, dtype=float).reset_index(drop=True)
 
     def _execute_orders(self):
-        """执行待处理订单 - 使用date_index O(1)查找"""
+        """执行待处理订单 - 含仓位上限检查"""
         for order in self.pending_orders:
             ts_code = order.ts_code
             if ts_code not in self.date_index:
                 order.status = OrderStatus.CANCELLED
                 order.reason = "无行情数据"
+                continue
+
+            # 回撤熔断: 已触发则拒绝买入
+            if self._risk_breached and order.side == OrderSide.BUY:
+                order.status = OrderStatus.CANCELLED
+                order.reason = "回撤熔断,禁止买入"
                 continue
 
             row = self.date_index[ts_code].get(self.current_date)
@@ -181,6 +192,22 @@ class BacktestEngine:
 
             exec_price = self.broker.apply_slippage(open_price, order.side)
             exec_price = max(low, min(high, exec_price))
+
+            # 仓位上限检查 (买入时)
+            if order.side == OrderSide.BUY and self.max_position_pct > 0:
+                pv = self.portfolio_value
+                existing = self.positions.get(ts_code)
+                existing_val = existing.market_value if existing and existing.amount > 0 else 0.0
+                new_val = actual_amount * exec_price + existing_val
+                max_val = pv * self.max_position_pct
+                if new_val > max_val:
+                    allowed = max(0, max_val - existing_val)
+                    actual_amount = int(allowed / exec_price)
+                    actual_amount = (actual_amount // 100) * 100
+                    if actual_amount <= 0:
+                        order.status = OrderStatus.CANCELLED
+                        order.reason = f"超出单股仓位上限{self.max_position_pct*100:.0f}%"
+                        continue
 
             commission = self.broker.calc_commission(actual_amount, exec_price)
             tax = self.broker.calc_tax(actual_amount, exec_price, order.side)
@@ -269,6 +296,21 @@ class BacktestEngine:
                 self.log(f"止盈触发: {ts_code} 盈利{pct*100:.1f}%")
                 self.order(ts_code, -pos.available)
 
+    def _check_portfolio_risk(self):
+        """组合级风控 - 回撤超限时自动清仓"""
+        if self.max_drawdown_limit <= 0:
+            return
+        pv = self.portfolio_value
+        if pv > self._peak_value:
+            self._peak_value = pv
+        drawdown = (self._peak_value - pv) / self._peak_value
+        if drawdown >= self.max_drawdown_limit and not self._risk_breached:
+            self._risk_breached = True
+            self.log(f"回撤熔断触发: 回撤{drawdown*100:.1f}% >= 限制{self.max_drawdown_limit*100:.0f}%, 清仓")
+            for ts_code, pos in list(self.positions.items()):
+                if pos.amount > 0 and pos.available > 0:
+                    self.order(ts_code, -pos.available)
+
     def log(self, msg: str):
         self.log_messages.append(f"[{self.current_date}] {msg}")
 
@@ -288,6 +330,9 @@ class BacktestEngine:
         self.trade_dates = self.cache.get_trade_cal(start_date, end_date)
         if not self.trade_dates:
             return {"error": "无法获取交易日历"}
+
+        # 构建O(1) date->index映射
+        self._date_to_idx = {d: i for i, d in enumerate(self.trade_dates)}
 
         # 预加载所有股票数据 + 建立O(1)日期索引
         for ts_code in universe:
@@ -326,6 +371,9 @@ class BacktestEngine:
 
             # 止损止盈检查(在策略逻辑之前)
             self._check_stop_loss_take_profit()
+
+            # 组合级风控检查
+            self._check_portfolio_risk()
 
             # 调用策略(此时持仓价格为前一日收盘价,无前视偏差)
             try:

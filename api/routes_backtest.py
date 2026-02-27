@@ -25,6 +25,8 @@ class BacktestRequest(BaseModel):
     end_date: str
     initial_cash: float = 1_000_000.0
     benchmark: str = "000300.SH"
+    max_position_pct: float = 0.25      # 单股最大仓位
+    max_drawdown_limit: float = 0.0     # 回撤熔断 (0=不启用)
 
 
 @router.post("/run")
@@ -56,6 +58,8 @@ async def run_backtest(req: BacktestRequest, db: AsyncSession = Depends(get_db))
         commission_rate=settings.commission_rate,
         stamp_tax_rate=settings.stamp_tax_rate,
         slippage=settings.slippage,
+        max_position_pct=req.max_position_pct,
+        max_drawdown_limit=req.max_drawdown_limit,
     )
     engine.universe = req.universe
 
@@ -195,6 +199,61 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
     )
 
     return {"results": results}
+
+
+# ===== Walk-Forward滚动验证 =====
+
+class WalkForwardRequest(BaseModel):
+    strategy_id: int
+    universe: list[str]
+    start_date: str
+    end_date: str
+    param_grid: dict[str, list[Any]]
+    train_days: int = 252
+    test_days: int = 63
+    initial_cash: float = 1_000_000.0
+    benchmark: str = "000300.SH"
+
+
+@router.post("/walk_forward")
+async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depends(get_db)):
+    """Walk-Forward滚动验证 - 检测策略过拟合"""
+    result = await db.execute(select(Settings).where(Settings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings or not settings.tushare_token:
+        raise HTTPException(status_code=400, detail="请先配置Tushare Token")
+
+    result = await db.execute(select(Strategy).where(Strategy.id == req.strategy_id))
+    strategy = result.scalar_one_or_none()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="策略不存在")
+
+    from engine.optimizer import walk_forward
+
+    client = TushareClient(settings.tushare_token)
+    cache = DataCache(client)
+
+    wf_result = await asyncio.to_thread(
+        walk_forward,
+        strategy_code=strategy.code,
+        param_grid=req.param_grid,
+        universe=req.universe,
+        full_start=req.start_date,
+        full_end=req.end_date,
+        cache=cache,
+        train_days=req.train_days,
+        test_days=req.test_days,
+        initial_cash=req.initial_cash,
+        commission_rate=settings.commission_rate,
+        stamp_tax_rate=settings.stamp_tax_rate,
+        slippage=settings.slippage,
+        benchmark=req.benchmark,
+    )
+
+    if "error" in wf_result:
+        raise HTTPException(status_code=400, detail=wf_result["error"])
+
+    return wf_result
 
 
 # ===== 回测对比 =====

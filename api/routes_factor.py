@@ -28,6 +28,7 @@ class FactorEvalRequest(BaseModel):
     start_date: str
     end_date: str
     groups: int = 5
+    forward_days: int = 5  # 收益预测周期: 1/5/10/20日
 
 
 class GPMineRequest(BaseModel):
@@ -131,6 +132,7 @@ async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get
     eval_result = await asyncio.to_thread(
         engine.evaluate, factor.expression,
         req.universe, req.start_date, req.end_date, req.groups,
+        req.forward_days,
     )
 
     if "error" in eval_result:
@@ -290,3 +292,251 @@ async def export_factor_result(result_id: int, db: AsyncSession = Depends(get_db
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ===== 工作流 API =====
+
+class WorkflowCompileRequest(BaseModel):
+    graph: dict
+
+class WorkflowPreviewRequest(BaseModel):
+    graph: dict
+    ts_code: str
+    start_date: str
+    end_date: str
+
+class WorkflowSaveRequest(BaseModel):
+    name: str
+    description: str = ""
+    graph: dict
+    factor_type: str = "technical"
+    category: str = "workflow"
+
+
+@router.post("/workflow/compile")
+async def compile_workflow(req: WorkflowCompileRequest):
+    """编译工作流图为表达式"""
+    from factor.graph_compiler import compile_graph
+    result = compile_graph(req.graph)
+    return result
+
+
+@router.post("/workflow/preview")
+async def preview_workflow(req: WorkflowPreviewRequest, db: AsyncSession = Depends(get_db)):
+    """单股票因子值预览"""
+    from factor.graph_compiler import compile_graph
+    compiled = compile_graph(req.graph)
+    if compiled["errors"]:
+        raise HTTPException(status_code=400, detail=compiled["errors"][0])
+
+    settings_r = await db.execute(select(Settings).where(Settings.id == 1))
+    settings = settings_r.scalar_one_or_none()
+    if not settings or not settings.tushare_token:
+        raise HTTPException(status_code=400, detail="请先配置Tushare Token")
+
+    from data.tushare_client import TushareClient
+    from data.data_cache import DataCache
+    from factor.factor_engine import FactorEngine
+
+    client = TushareClient(settings.tushare_token)
+    cache = DataCache(client)
+    engine = FactorEngine(cache)
+
+    fv = await asyncio.to_thread(
+        engine.compute_factor_values,
+        compiled["expression"], req.ts_code,
+        req.start_date, req.end_date,
+    )
+    if fv is None:
+        raise HTTPException(status_code=400, detail="因子计算失败")
+
+    data = []
+    for dt, val in fv.dropna().items():
+        date_str = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)
+        data.append({"date": date_str, "value": round(float(val), 6)})
+
+    return {"expression": compiled["expression"], "data": data}
+
+
+@router.post("/workflow/save")
+async def save_workflow(req: WorkflowSaveRequest, db: AsyncSession = Depends(get_db)):
+    """编译并保存工作流因子"""
+    from factor.graph_compiler import compile_graph
+    compiled = compile_graph(req.graph)
+    if compiled["errors"]:
+        raise HTTPException(status_code=400, detail=compiled["errors"][0])
+
+    f = Factor(
+        name=req.name, description=req.description,
+        expression=compiled["expression"],
+        category=req.category, source="workflow",
+        graph_json=req.graph, factor_type=req.factor_type,
+    )
+    db.add(f)
+    await db.commit()
+    await db.refresh(f)
+    return {"id": f.id, "name": f.name, "expression": compiled["expression"]}
+
+
+@router.put("/workflow/{factor_id}")
+async def update_workflow(factor_id: int, req: WorkflowSaveRequest, db: AsyncSession = Depends(get_db)):
+    """更新工作流因子"""
+    from factor.graph_compiler import compile_graph
+    result = await db.execute(select(Factor).where(Factor.id == factor_id))
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="因子不存在")
+
+    compiled = compile_graph(req.graph)
+    if compiled["errors"]:
+        raise HTTPException(status_code=400, detail=compiled["errors"][0])
+
+    f.name = req.name
+    f.description = req.description
+    f.expression = compiled["expression"]
+    f.graph_json = req.graph
+    f.factor_type = req.factor_type
+    f.category = req.category
+    await db.commit()
+    return {"id": f.id, "expression": compiled["expression"]}
+
+
+@router.get("/{factor_id}/graph")
+async def get_factor_graph(factor_id: int, db: AsyncSession = Depends(get_db)):
+    """加载工作流JSON"""
+    result = await db.execute(select(Factor).where(Factor.id == factor_id))
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="因子不存在")
+    return {
+        "id": f.id, "name": f.name,
+        "expression": f.expression,
+        "graph_json": f.graph_json,
+        "factor_type": getattr(f, 'factor_type', 'technical'),
+    }
+
+
+@router.get("/workflow/templates")
+async def get_workflow_templates():
+    """内置工作流模板"""
+    from factor.graph_compiler import NODE_REGISTRY, CATEGORY_COLORS
+    templates = [
+        {
+            "name": "动量因子",
+            "description": "close / delay(close, 20) - 1",
+            "graph": _make_template_momentum(),
+        },
+        {
+            "name": "波动率因子",
+            "description": "std(returns, 20)",
+            "graph": _make_template_volatility(),
+        },
+        {
+            "name": "价值因子",
+            "description": "1 / pe",
+            "graph": _make_template_value(),
+        },
+        {
+            "name": "反转因子",
+            "description": "-1 * (close / delay(close, 5) - 1)",
+            "graph": _make_template_reversal(),
+        },
+        {
+            "name": "量价背离",
+            "description": "corr(close, volume, 10)",
+            "graph": _make_template_vol_price(),
+        },
+    ]
+    node_registry = {
+        k: {"inputs": v["inputs"], "outputs": v["outputs"],
+             "params": v["params"], "category": v["category"], "label": v["label"]}
+        for k, v in NODE_REGISTRY.items()
+    }
+    return {"templates": templates, "node_registry": node_registry, "category_colors": CATEGORY_COLORS}
+
+
+def _make_template_momentum():
+    """动量因子模板: close / delay(close, 20) - 1"""
+    return {
+        "nodes": [
+            {"id": "n1", "type": "input_close", "x": 50, "y": 100, "params": {}},
+            {"id": "n2", "type": "ts_delay", "x": 250, "y": 200, "params": {"periods": 20}},
+            {"id": "n3", "type": "math_div", "x": 450, "y": 150, "params": {}},
+            {"id": "n4", "type": "input_constant", "x": 250, "y": 350, "params": {"value": 1.0}},
+            {"id": "n5", "type": "math_sub", "x": 650, "y": 200, "params": {}},
+            {"id": "n6", "type": "output", "x": 850, "y": 200, "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n2", "port": "series"}},
+            {"id": "e2", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n3", "port": "a"}},
+            {"id": "e3", "from": {"nodeId": "n2", "port": "out"}, "to": {"nodeId": "n3", "port": "b"}},
+            {"id": "e4", "from": {"nodeId": "n3", "port": "out"}, "to": {"nodeId": "n5", "port": "a"}},
+            {"id": "e5", "from": {"nodeId": "n4", "port": "out"}, "to": {"nodeId": "n5", "port": "b"}},
+            {"id": "e6", "from": {"nodeId": "n5", "port": "out"}, "to": {"nodeId": "n6", "port": "in"}},
+        ],
+        "viewport": {"x": 0, "y": 0, "zoom": 1.0},
+    }
+
+
+def _make_template_value():
+    return {
+        "nodes": [
+            {"id": "n1", "type": "input_constant", "x": 50, "y": 100, "params": {"value": 1.0}},
+            {"id": "n2", "type": "input_pe", "x": 50, "y": 250, "params": {}},
+            {"id": "n3", "type": "math_div", "x": 300, "y": 150, "params": {}},
+            {"id": "n4", "type": "output", "x": 550, "y": 150, "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n3", "port": "a"}},
+            {"id": "e2", "from": {"nodeId": "n2", "port": "out"}, "to": {"nodeId": "n3", "port": "b"}},
+            {"id": "e3", "from": {"nodeId": "n3", "port": "out"}, "to": {"nodeId": "n4", "port": "in"}},
+        ],
+        "viewport": {"x": 0, "y": 0, "zoom": 1.0},
+    }
+
+
+def _make_template_reversal():
+    return {
+        "nodes": [
+            {"id": "n1", "type": "input_close", "x": 50, "y": 150, "params": {}},
+            {"id": "n2", "type": "ts_pctchange", "x": 300, "y": 150, "params": {"periods": 5}},
+            {"id": "n3", "type": "math_neg", "x": 550, "y": 150, "params": {}},
+            {"id": "n4", "type": "output", "x": 750, "y": 150, "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n2", "port": "series"}},
+            {"id": "e2", "from": {"nodeId": "n2", "port": "out"}, "to": {"nodeId": "n3", "port": "in"}},
+            {"id": "e3", "from": {"nodeId": "n3", "port": "out"}, "to": {"nodeId": "n4", "port": "in"}},
+        ],
+        "viewport": {"x": 0, "y": 0, "zoom": 1.0},
+    }
+
+def _make_template_volatility():
+    return {
+        "nodes": [
+            {"id": "n1", "type": "input_returns", "x": 50, "y": 150, "params": {}},
+            {"id": "n2", "type": "ts_std", "x": 300, "y": 150, "params": {"window": 20}},
+            {"id": "n3", "type": "output", "x": 550, "y": 150, "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n2", "port": "series"}},
+            {"id": "e2", "from": {"nodeId": "n2", "port": "out"}, "to": {"nodeId": "n3", "port": "in"}},
+        ],
+        "viewport": {"x": 0, "y": 0, "zoom": 1.0},
+    }
+
+def _make_template_vol_price():
+    return {
+        "nodes": [
+            {"id": "n1", "type": "input_close", "x": 50, "y": 100, "params": {}},
+            {"id": "n2", "type": "input_volume", "x": 50, "y": 250, "params": {}},
+            {"id": "n3", "type": "ts_corr", "x": 300, "y": 150, "params": {"window": 10}},
+            {"id": "n4", "type": "output", "x": 550, "y": 150, "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "port": "out"}, "to": {"nodeId": "n3", "port": "a"}},
+            {"id": "e2", "from": {"nodeId": "n2", "port": "out"}, "to": {"nodeId": "n3", "port": "b"}},
+            {"id": "e3", "from": {"nodeId": "n3", "port": "out"}, "to": {"nodeId": "n4", "port": "in"}},
+        ],
+        "viewport": {"x": 0, "y": 0, "zoom": 1.0},
+    }

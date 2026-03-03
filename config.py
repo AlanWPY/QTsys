@@ -21,6 +21,11 @@ DEFAULT_STAMP_TAX = 0.001   # 千一印花税(卖出)
 DEFAULT_SLIPPAGE = 0.002    # 滑点 0.2%
 DEFAULT_VOLUME_LIMIT = 0.25 # 成交量限制25%
 
+# MySQL URL 构建
+def build_mysql_url(host, port, user, password, database, async_mode=True):
+    driver = "mysql+aiomysql" if async_mode else "mysql+pymysql"
+    return f"{driver}://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4"
+
 # 服务器
 HOST = "0.0.0.0"
 PORT = 8000

@@ -16,9 +16,51 @@ TTL_HISTORICAL = 24 * 3600  # 历史数据: 24小时
 TTL_INTRADAY = 300           # 当日数据: 5分钟
 
 
+def make_mysql_conn(settings):
+    """从 Settings 对象创建 PyMySQL 连接，失败返回 None"""
+    if not getattr(settings, "use_mysql", 0) or not getattr(settings, "mysql_host", ""):
+        return None
+    try:
+        import pymysql
+        return pymysql.connect(
+            host=settings.mysql_host, port=settings.mysql_port or 3306,
+            user=settings.mysql_user, password=settings.mysql_password or "",
+            database=settings.mysql_database or "qtsys",
+            connect_timeout=5, charset="utf8mb4",
+        )
+    except Exception:
+        return None
+
+
 class DataCache:
-    def __init__(self, client: TushareClient):
+    def __init__(self, client: TushareClient, mysql_conn=None):
         self.client = client
+        self.mysql = mysql_conn
+
+    def _mysql_read(self, table: str, ts_code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """从 MySQL L2 缓存读取"""
+        if not self.mysql:
+            return None
+        try:
+            sql = f"SELECT * FROM {table} WHERE ts_code=%s AND trade_date>=%s AND trade_date<=%s ORDER BY trade_date"
+            df = pd.read_sql(sql, self.mysql, params=(ts_code, start_date, end_date))
+            return df if not df.empty else None
+        except Exception:
+            return None
+
+    def _mysql_write(self, table: str, df: pd.DataFrame, cols: list):
+        """写入 MySQL L2 缓存 (REPLACE INTO)"""
+        if not self.mysql or df.empty:
+            return
+        try:
+            cur = self.mysql.cursor()
+            placeholders = ",".join(["%s"] * len(cols))
+            sql = f"REPLACE INTO {table} ({','.join(cols)}) VALUES ({placeholders})"
+            rows = [tuple(r[c] if c in r.index else None for c in cols) for _, r in df.iterrows()]
+            cur.executemany(sql, rows)
+            self.mysql.commit()
+        except Exception as e:
+            logger.warning(f"MySQL写入{table}失败: {e}")
 
     def _cache_path(self, key: str) -> str:
         h = hashlib.md5(key.encode()).hexdigest()
@@ -69,15 +111,25 @@ class DataCache:
         return df
 
     def get_daily(self, ts_code: str, start_date: str, end_date: str, adj: str = "qfq") -> pd.DataFrame:
-        """获取日线数据 - 支持增量更新"""
+        """获取日线数据 - L1 pickle → L2 MySQL → Tushare API"""
         from datetime import datetime
         today = datetime.now().strftime("%Y%m%d")
         is_today = end_date >= today
 
         key = f"daily_{ts_code}_{start_date}_{end_date}_{adj}"
+        # L1: pickle
         cached = self._load(key, is_today=is_today)
         if cached is not None:
             return cached
+
+        # L2: MySQL
+        mysql_df = self._mysql_read("qtsys_daily_quotes", ts_code, start_date, end_date)
+        if mysql_df is not None and len(mysql_df) > 0:
+            if adj == "qfq":
+                mysql_df = self._apply_adj(mysql_df, ts_code, start_date, end_date)
+            mysql_df = self._validate(mysql_df, ts_code)
+            self._save(key, mysql_df)
+            return mysql_df
 
         # 尝试增量更新: 加载不带end_date的基础缓存
         base_key = f"daily_{ts_code}_{start_date}"
@@ -92,7 +144,6 @@ class DataCache:
                         last_str = last_date.strftime("%Y%m%d")
                     else:
                         last_str = str(last_date)[:10].replace("-", "")
-                    # 仅拉取增量
                     if last_str < end_date:
                         incr = self.client.get_daily(ts_code, last_str, end_date)
                         if not incr.empty:
@@ -109,11 +160,15 @@ class DataCache:
 
         if df.empty:
             return df
+
+        # 写入 MySQL L2 (原始数据，不含复权)
+        self._mysql_write("qtsys_daily_quotes", df,
+            ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"])
+
         if adj == "qfq":
             df = self._apply_adj(df, ts_code, start_date, end_date)
         df = self._validate(df, ts_code)
         self._save(key, df)
-        # 同时保存基础缓存用于增量更新
         self._save(base_key, df)
         return df
 
@@ -148,7 +203,7 @@ class DataCache:
         return dates
 
     def get_daily_basic(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """获取每日指标数据(PE/PB/PS/市值/换手率等)"""
+        """获取每日指标数据 - L1 pickle → L2 MySQL → API"""
         from datetime import datetime
         today = datetime.now().strftime("%Y%m%d")
         is_today = end_date >= today
@@ -158,6 +213,11 @@ class DataCache:
         if cached is not None:
             return cached
 
+        mysql_df = self._mysql_read("qtsys_daily_basic", ts_code, start_date, end_date)
+        if mysql_df is not None:
+            self._save(key, mysql_df)
+            return mysql_df
+
         df = self.client.get_daily_basic(ts_code, start_date, end_date)
         if df.empty:
             return df
@@ -165,6 +225,8 @@ class DataCache:
             df["trade_date"] = pd.to_datetime(df["trade_date"])
         df = df.sort_values("trade_date").reset_index(drop=True)
         self._save(key, df)
+        self._mysql_write("qtsys_daily_basic", df,
+            ["ts_code", "trade_date", "pe", "pb", "ps", "total_mv", "circ_mv", "turnover_rate"])
         return df
 
     def get_index_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -172,8 +234,14 @@ class DataCache:
         cached = self._load(key)
         if cached is not None:
             return cached
+        mysql_df = self._mysql_read("qtsys_index_daily", ts_code, start_date, end_date)
+        if mysql_df is not None:
+            self._save(key, mysql_df)
+            return mysql_df
         df = self.client.get_index_daily(ts_code, start_date, end_date)
         self._save(key, df)
+        self._mysql_write("qtsys_index_daily", df,
+            ["ts_code", "trade_date", "open", "high", "low", "close", "vol"])
         return df
 
     def clear_cache(self):

@@ -22,7 +22,8 @@ async def get_cache(db: AsyncSession) -> DataCache:
     if not settings or not settings.tushare_token:
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
     client = TushareClient(settings.tushare_token)
-    return DataCache(client)
+    from data.data_cache import make_mysql_conn
+    return DataCache(client, mysql_conn=make_mysql_conn(settings))
 
 
 @router.get("/daily")

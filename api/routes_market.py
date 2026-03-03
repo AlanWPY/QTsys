@@ -39,7 +39,8 @@ async def _get_cache(db: AsyncSession) -> DataCache:
     settings = result.scalar_one_or_none()
     if not settings or not settings.tushare_token:
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
-    return DataCache(TushareClient(settings.tushare_token))
+    from data.data_cache import make_mysql_conn
+    return DataCache(TushareClient(settings.tushare_token), mysql_conn=make_mysql_conn(settings))
 
 
 async def _get_client(db: AsyncSession) -> TushareClient:
@@ -102,6 +103,10 @@ class PatternMatchRequest(BaseModel):
     curve: list[float]
     top_n: int = 6
     search_codes: list[str] = []
+    start_date: str = ""      # 搜索起始日期 YYYYMMDD, 空则自动
+    end_date: str = ""        # 搜索结束日期 YYYYMMDD, 空则今天
+    mode: str = "pool"        # "pool" 匹配股票池, "single" 匹配单一股票
+    target_code: str = ""     # mode=single时的目标股票代码
 
 
 # ===== 形态匹配算法 (向量化优化) =====
@@ -190,13 +195,20 @@ async def pattern_match(req: PatternMatchRequest, db: AsyncSession = Depends(get
         raise HTTPException(status_code=400, detail="曲线点数太少")
 
     user_curve = np.array(req.curve, dtype=float)
-    codes = req.search_codes if req.search_codes else POPULAR_STOCKS
     cache = await _get_cache(db)
     client = await _get_client(db)
     name_map = _get_name_map(client)
 
-    end = datetime.date.today().strftime("%Y%m%d")
-    start = (datetime.date.today() - datetime.timedelta(days=400)).strftime("%Y%m%d")
+    end = req.end_date if req.end_date else datetime.date.today().strftime("%Y%m%d")
+    if req.start_date:
+        start = req.start_date
+    else:
+        start = (datetime.datetime.strptime(end, "%Y%m%d") - datetime.timedelta(days=400)).strftime("%Y%m%d")
+
+    if req.mode == "single" and req.target_code:
+        codes = [req.target_code]
+    else:
+        codes = req.search_codes if req.search_codes else POPULAR_STOCKS
 
     # 线程池并发匹配
     args_list = [(code, cache, start, end, user_curve) for code in codes]

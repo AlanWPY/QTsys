@@ -2750,6 +2750,11 @@ function DrawingCanvas({ showToast }) {
     const [matches, setMatches] = useState([]);
     const [pointCount, setPointCount] = useState(0);
     const wrapRef = useRef(null);
+    const [matchMode, setMatchMode] = useState('pool');
+    const [targetCode, setTargetCode] = useState('');
+    const [searchCodes, setSearchCodes] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     const drawGrid = (ctx, w, h) => {
         ctx.strokeStyle = '#252a3a'; ctx.lineWidth = 0.5;
@@ -2814,6 +2819,7 @@ function DrawingCanvas({ showToast }) {
     const doMatch = async () => {
         const pts = pointsRef.current;
         if (pts.length < 10) { showToast('请绘制更长的曲线', 'error'); return; }
+        if (matchMode === 'single' && !targetCode.trim()) { showToast('请输入目标股票代码', 'error'); return; }
         const ys = pts.map(p => p.y);
         const mn = Math.min(...ys), mx = Math.max(...ys);
         const range = mx - mn || 1;
@@ -2823,7 +2829,15 @@ function DrawingCanvas({ showToast }) {
         for (let i = 0; i < curve.length; i += step) sampled.push(curve[i]);
         setMatching(true);
         try {
-            const r = await api.post('/api/market/pattern_match', { curve: sampled, top_n: 6 });
+            const body = { curve: sampled, top_n: 6, mode: matchMode };
+            if (startDate) body.start_date = startDate.replace(/-/g, '');
+            if (endDate) body.end_date = endDate.replace(/-/g, '');
+            if (matchMode === 'single') {
+                body.target_code = targetCode.trim();
+            } else if (searchCodes.trim()) {
+                body.search_codes = searchCodes.split(/[,，\s]+/).filter(Boolean);
+            }
+            const r = await api.post('/api/market/pattern_match', body);
             setMatches(r.matches || []);
             if ((r.matches || []).length === 0) showToast('未找到相似走势', 'info');
         } catch(e) { showToast(e.detail || '匹配失败', 'error'); }
@@ -2833,6 +2847,22 @@ function DrawingCanvas({ showToast }) {
     return (
         <div className="draw-panel">
             <div className="draw-panel-title">形态匹配 - 画线找相似走势</div>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',marginBottom:10,fontSize:13}}>
+                <label style={{display:'flex',alignItems:'center',gap:4}}>
+                    <input type="radio" name="matchMode" checked={matchMode==='pool'} onChange={()=>setMatchMode('pool')} /> 匹配股票池
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:4}}>
+                    <input type="radio" name="matchMode" checked={matchMode==='single'} onChange={()=>setMatchMode('single')} /> 匹配单一股票
+                </label>
+                {matchMode === 'single' ? (
+                    <input className="input" style={{width:130}} placeholder="股票代码 如600519.SH" value={targetCode} onChange={e=>setTargetCode(e.target.value)} />
+                ) : (
+                    <input className="input" style={{width:220}} placeholder="自定义股票池(逗号分隔,留空用默认)" value={searchCodes} onChange={e=>setSearchCodes(e.target.value)} />
+                )}
+                <input type="date" className="input" style={{width:140}} value={startDate} onChange={e=>setStartDate(e.target.value)} title="起始日期(留空自动)" />
+                <span style={{color:'#888'}}>~</span>
+                <input type="date" className="input" style={{width:140}} value={endDate} onChange={e=>setEndDate(e.target.value)} title="结束日期(留空为今天)" />
+            </div>
             <div className="draw-canvas-wrap" ref={wrapRef}>
                 <canvas ref={canvasRef} className="draw-canvas"
                     onMouseDown={startDraw} onMouseMove={moveDraw}

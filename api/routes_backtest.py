@@ -51,7 +51,8 @@ async def run_backtest(req: BacktestRequest, db: AsyncSession = Depends(get_db))
 
     # 创建回测引擎
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
     engine = BacktestEngine(
         cache=cache,
         initial_cash=req.initial_cash,
@@ -181,7 +182,8 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
     from engine.optimizer import grid_search
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
 
     results = await asyncio.to_thread(
         grid_search,
@@ -231,7 +233,8 @@ async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depe
     from engine.optimizer import walk_forward
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
 
     wf_result = await asyncio.to_thread(
         walk_forward,

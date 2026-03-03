@@ -1,6 +1,6 @@
 """数据库 ORM 模型"""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON, UniqueConstraint
 from database.connection import Base
 
 
@@ -16,6 +16,12 @@ class Settings(Base):
     llm_api_key = Column(String(200), default="")
     llm_base_url = Column(String(500), default="")
     llm_model = Column(String(100), default="")
+    mysql_host = Column(String(200), default="")
+    mysql_port = Column(Integer, default=3306)
+    mysql_user = Column(String(100), default="")
+    mysql_password = Column(String(200), default="")
+    mysql_database = Column(String(100), default="qtsys")
+    use_mysql = Column(Integer, default=0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
@@ -113,3 +119,52 @@ class NewsArticle(Base):
     keywords_hit = Column(JSON, default=list)
     sentiment_reason = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DailyQuote(Base):
+    __tablename__ = "qtsys_daily_quotes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts_code = Column(String(20), nullable=False)
+    trade_date = Column(String(10), nullable=False)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    vol = Column(Float)
+    amount = Column(Float)
+    pct_chg = Column(Float)
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date"),)
+
+
+class DailyBasic(Base):
+    __tablename__ = "qtsys_daily_basic"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts_code = Column(String(20), nullable=False)
+    trade_date = Column(String(10), nullable=False)
+    pe = Column(Float)
+    pb = Column(Float)
+    ps = Column(Float)
+    total_mv = Column(Float)
+    circ_mv = Column(Float)
+    turnover_rate = Column(Float)
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date"),)
+
+
+class IndexDaily(Base):
+    __tablename__ = "qtsys_index_daily"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts_code = Column(String(20), nullable=False)
+    trade_date = Column(String(10), nullable=False)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    vol = Column(Float)
+    __table_args__ = (UniqueConstraint("ts_code", "trade_date"),)
+
+
+class TradeCalendar(Base):
+    __tablename__ = "qtsys_trade_calendar"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cal_date = Column(String(10), nullable=False, unique=True)
+    is_open = Column(Integer, default=1)

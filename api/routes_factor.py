@@ -126,7 +126,8 @@ async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get
     from factor.factor_engine import FactorEngine
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
     engine = FactorEngine(cache)
 
     eval_result = await asyncio.to_thread(
@@ -171,7 +172,8 @@ async def mine_gp(req: GPMineRequest, db: AsyncSession = Depends(get_db)):
     from factor.genetic import run_gp
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
     engine = FactorEngine(cache)
 
     results = await asyncio.to_thread(
@@ -339,7 +341,8 @@ async def preview_workflow(req: WorkflowPreviewRequest, db: AsyncSession = Depen
     from factor.factor_engine import FactorEngine
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
     engine = FactorEngine(cache)
 
     fv = await asyncio.to_thread(

@@ -27,7 +27,8 @@ async def check_quality(req: QualityCheckRequest, db: AsyncSession = Depends(get
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
 
     client = TushareClient(settings.tushare_token)
-    cache = DataCache(client)
+    from data.data_cache import make_mysql_conn
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
 
     from data.quality import check_data_quality, check_survivorship_bias
 

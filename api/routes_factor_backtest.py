@@ -35,12 +35,12 @@ class TechnicalBacktestRequest(BaseModel):
     initial_cash: float = 1_000_000
 
 
-def _get_engine_and_cache(token: str):
+def _get_engine_and_cache(token: str, settings=None):
     from data.tushare_client import TushareClient
-    from data.data_cache import DataCache
+    from data.data_cache import DataCache, make_mysql_conn
     from factor.factor_engine import FactorEngine
     client = TushareClient(token)
-    cache = DataCache(client)
+    cache = DataCache(client, mysql_conn=make_mysql_conn(settings) if settings else None)
     engine = FactorEngine(cache)
     return cache, engine
 
@@ -54,7 +54,7 @@ async def selection_backtest(req: SelectionBacktestRequest, db: AsyncSession = D
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
 
     from factor.factor_backtest import run_selection_backtest
-    cache, engine = _get_engine_and_cache(settings.tushare_token)
+    cache, engine = _get_engine_and_cache(settings.tushare_token, settings)
 
     tm = TaskManager.get_instance()
     task_id = tm.submit(
@@ -77,7 +77,7 @@ async def technical_backtest(req: TechnicalBacktestRequest, db: AsyncSession = D
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
 
     from factor.factor_backtest import run_technical_backtest
-    cache, engine = _get_engine_and_cache(settings.tushare_token)
+    cache, engine = _get_engine_and_cache(settings.tushare_token, settings)
 
     tm = TaskManager.get_instance()
     task_id = tm.submit(

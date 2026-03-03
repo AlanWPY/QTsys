@@ -86,6 +86,28 @@ async def lifespan(app: FastAPI):
     logger.info(f"QTsys v{VERSION} 启动中...")
     await init_db()
     logger.info("数据库初始化完成")
+
+    # MySQL 自动检测
+    try:
+        from database.connection import get_session_factory, switch_to_mysql
+        from config import build_mysql_url
+        async with get_session_factory()() as db:
+            from sqlalchemy import select
+            from database.models import Settings
+            result = await db.execute(select(Settings).where(Settings.id == 1))
+            settings = result.scalar_one_or_none()
+            if settings and settings.use_mysql and settings.mysql_host and settings.mysql_user:
+                url = build_mysql_url(
+                    settings.mysql_host, settings.mysql_port,
+                    settings.mysql_user, settings.mysql_password,
+                    settings.mysql_database,
+                )
+                switch_to_mysql(url)
+                await init_db()
+                logger.info("已自动切换到 MySQL")
+    except Exception:
+        logger.warning("MySQL 自动连接失败, 回退 SQLite")
+
     _news_refresh_task = asyncio.create_task(_auto_refresh_news())
     yield
     if _news_refresh_task:

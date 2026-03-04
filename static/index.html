@@ -385,8 +385,9 @@ function CodeEditor({ value, onChange }) {
 
 /* ===== Settings Page ===== */
 function SettingsPage({ showToast }) {
-    const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '' });
+    const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '', mysql_host: '', mysql_port: 3306, mysql_user: '', mysql_password: '', mysql_database: 'qtsys', use_mysql: 0 });
     const [loading, setLoading] = useState(false);
+    const [mysqlTesting, setMysqlTesting] = useState(false);
     useEffect(() => { api.get('/api/settings').then(setS).catch(() => {}); }, []);
 
     const save = async () => {
@@ -398,6 +399,25 @@ function SettingsPage({ showToast }) {
     const validate = async () => {
         try { const r = await api.post('/api/data/validate_token'); showToast(r.valid ? 'Token验证成功' : 'Token无效', r.valid ? 'success' : 'error'); }
         catch (e) { showToast(e.detail || '验证失败', 'error'); }
+    };
+    const testMysql = async () => {
+        if (!s.mysql_host || !s.mysql_user) { showToast('请填写MySQL主机和用户名', 'error'); return; }
+        setMysqlTesting(true);
+        try {
+            const r = await api.post('/api/settings/test_mysql', { host: s.mysql_host, port: s.mysql_port, user: s.mysql_user, password: s.mysql_password, database: s.mysql_database });
+            showToast(r.message, r.success ? 'success' : 'error');
+        } catch (e) { showToast('测试失败', 'error'); }
+        setMysqlTesting(false);
+    };
+    const activateMysql = async () => {
+        if (!s.mysql_host || !s.mysql_user) { showToast('请先保存MySQL配置', 'error'); return; }
+        setLoading(true);
+        try {
+            const r = await api.post('/api/settings/activate_mysql');
+            showToast(r.message, r.success ? 'success' : 'error');
+            if (r.success) { setS({...s, use_mysql: 1}); }
+        } catch (e) { showToast('激活失败', 'error'); }
+        setLoading(false);
     };
     const F = (label, key, type, step) => (
         <div className="field">
@@ -430,6 +450,27 @@ function SettingsPage({ showToast }) {
                 <div className="grid-2">
                     {F('API地址', 'llm_base_url')}
                     {F('模型名称', 'llm_model')}
+                </div>
+            </div>
+            <div className="card space-y">
+                <div className="card-title">MySQL 数据库配置</div>
+                <p className="text-xs text-muted" style={{marginBottom:8}}>启用后，行情数据和新闻将存储到MySQL，不再使用本地文件</p>
+                <div className="grid-2">
+                    {F('主机地址', 'mysql_host')}
+                    {F('端口', 'mysql_port', 'number')}
+                    {F('用户名', 'mysql_user')}
+                    {F('密码', 'mysql_password', 'password')}
+                    {F('数据库名', 'mysql_database')}
+                </div>
+                <div className="flex gap-sm">
+                    <button className="btn btn-secondary" onClick={testMysql} disabled={mysqlTesting}>
+                        {mysqlTesting ? '测试中...' : '测试连接'}
+                    </button>
+                    {s.use_mysql ? (
+                        <span className="text-profit text-sm" style={{lineHeight:'32px'}}>✓ MySQL 已启用</span>
+                    ) : (
+                        <button className="btn btn-secondary" onClick={activateMysql} disabled={loading}>激活 MySQL</button>
+                    )}
                 </div>
             </div>
             <button className="btn btn-primary" onClick={save} disabled={loading}>

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 虚拟环境
+.dbmanager_venv/
+venv/
+env/
+
+# 数据库和缓存
+qtsys.db
+*.db
+data/cache/*
+!data/cache/.gitkeep
+
+# 日志
+logs/*.log
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+*.spec
+
+# 用户凭据
+.qtsys_dbmanager.json

@@ -519,6 +519,52 @@ A: LLM 因子挖掘和新闻深度分析为可选功能，需在系统设置中�
 **Q: 策略代码报错？**
 A: 策略在沙箱中执行，禁止导入 `os`、`sys`、`subprocess` 等系统模块。请确保策略仅使用 `context` API 和 `numpy`、`pandas` 等数据处理库。
 
+## Alpha191 因子系统
+
+### 完整的191个因子库
+
+系统已集成所有191个Alpha191短周期价量因子，支持：
+
+- ✅ **自动工作流生成**：输入1-191自动生成可视化节点图
+- ✅ **横向树状布局**：清晰展示因子计算逻辑
+- ✅ **一键回测**：直接预览和回测任意因子
+- ✅ **批量测试**：快速筛选高IC_IR因子
+
+### 使用方法
+
+1. 进入"因子工作流"页面
+2. 点击"加载模板" → "Alpha191因子"
+3. 输入因子编号（1-191）
+4. 查看自动生成的工作流图
+5. 点击"预览"或"运行回测"
+
+### 高级分析API
+
+```python
+# 批量测试
+POST /api/alpha191/batch_test
+
+# 因子相关性分析
+POST /api/advanced_analysis/correlation
+
+# 因子组合优化
+POST /api/advanced_analysis/combine
+
+# 因子衰减分析
+POST /api/advanced_analysis/decay
+
+# 行业中性化
+POST /api/advanced_analysis/neutralize
+
+# 因子归因分析
+POST /api/advanced_analysis/attribution
+```
+
+详细文档：
+- [快速使用指南](QUICK_START.md)
+- [高级分析指南](ADVANCED_ANALYSIS_GUIDE.md)
+- [完整报告](ALPHA191_COMPLETE_REPORT.md)
+
 ## 免责声明
 
 本系统仅供学习和研究使用，不构成任何投资建议。量化策略的历史回测表现不代表未来收益，投资有风险，入市需谨慎。

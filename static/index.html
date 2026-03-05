@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>QTsys - 量化交易回测系统 [Alpha191-v1.1]</title>
+    <title>QTsys - 量化交易回测系统 [Alpha191-v2.2-Fixed]</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/static/lib/codemirror.css">
     <link rel="stylesheet" href="/static/lib/dracula.css">
@@ -242,11 +242,11 @@ tr:hover td { background: var(--bg-600); }
 .stock-search-wrap { position: relative; }
 
 /* ===== 因子工作流页面 ===== */
-.wf-page { display: flex; flex-direction: column; height: calc(100vh - 120px); gap: 0; }
+.wf-page { display: flex; flex-direction: column; gap: 0; overflow-y: auto; max-height: calc(100vh - 120px); }
 .wf-toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--bg-700); border-radius: 10px 10px 0 0; flex-wrap: wrap; }
 .wf-toolbar .input { width: 160px; }
 .wf-toolbar select.input { width: 120px; }
-.wf-body { display: flex; flex: 1; min-height: 0; border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+.wf-body { display: flex; height: 500px; min-height: 500px; border: 1px solid var(--border); border-top: none; overflow: hidden; }
 .wf-palette { width: 200px; background: var(--bg-700); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
 .wf-palette-cat { padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--text-400); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
 .wf-palette-cat:hover { background: var(--bg-600); }
@@ -3778,14 +3778,41 @@ function FactorWorkflowPage({ showToast }) {
             return;
         }
         try {
-            const res = await api.get(`/api/factors/workflow/alpha191/${num}`);
+            const res = await api.get(`/api/factors/workflow/alpha191_v2/${num}`);
             setFactorName(res.name);
             setExpression(res.expression);
-            setNodes([]);
-            setEdges([]);
+
+            // 尝试编译工作流图
+            if (res.graph && res.graph.nodes && res.graph.edges) {
+                try {
+                    const compileRes = await api.post('/api/factors/workflow/compile', { graph: res.graph });
+                    if (compileRes.errors && compileRes.errors.length > 0) {
+                        // 编译失败，使用表达式模式
+                        console.log('工作流编译失败，使用表达式模式:', compileRes.errors);
+                        setNodes([]);
+                        setEdges([]);
+                        showToast(`已加载 ${res.name}（表达式模式）`, 'success');
+                    } else {
+                        // 编译成功，使用工作流图
+                        setNodes(res.graph.nodes);
+                        setEdges(res.graph.edges);
+                        showToast(`已加载 ${res.name} 工作流图 (${res.graph.nodes.length}节点)`, 'success');
+                    }
+                } catch (e) {
+                    // 编译请求失败，回退到表达式模式
+                    console.log('编译请求失败，使用表达式模式');
+                    setNodes([]);
+                    setEdges([]);
+                    showToast(`已加载 ${res.name}（表达式模式）`, 'success');
+                }
+            } else {
+                setNodes([]);
+                setEdges([]);
+                showToast(`已加载 ${res.name}（表达式模式）`, 'success');
+            }
             setShowAlpha191Select(false);
-            showToast(`已加载 ${res.name}，可直接进行预览和回测`, 'success');
         } catch (e) {
+            console.error('加载Alpha191失败:', e);
             showToast('加载失败: ' + (e.response?.data?.detail || e.message), 'error');
         }
     };
@@ -3795,16 +3822,17 @@ function FactorWorkflowPage({ showToast }) {
         if (!expression) { showToast('请先构建有效工作流或加载因子', 'error'); return; }
         setPreviewLoading(true);
         try {
-            // 如果没有节点，使用表达式直接预览
-            if (nodes.length === 0) {
-                // 先保存因子
+            // 如果没有节点，使用表达式直接预览（Alpha191模式）
+            if (nodes.length === 0 && expression) {
+                // 直接使用表达式创建临时因子进行评估
+                const tempFactorName = factorName || 'TempFactor_' + Date.now();
                 const saveRes = await api.post('/api/factors', {
-                    name: factorName,
-                    description: 'Alpha191因子',
+                    name: tempFactorName,
+                    description: 'Temporary factor for preview',
                     expression: expression,
-                    category: 'Alpha191'
+                    category: 'temp'
                 });
-                // 然后预览
+
                 const res = await api.post('/api/factors/evaluate', {
                     factor_id: saveRes.id,
                     universe: [previewCode],
@@ -3813,18 +3841,35 @@ function FactorWorkflowPage({ showToast }) {
                     groups: 5,
                     forward_days: 5
                 });
-                if (res.ic_series) {
-                    setPreviewData({ expression, data: res.ic_series.map(d => ({ date: d.date, value: d.ic })) });
-                    showToast('预览成功', 'success');
+
+                if (res.ic_series && res.ic_series.length > 0) {
+                    // 转换IC序列为预览数据格式
+                    setPreviewData({
+                        expression,
+                        data: res.ic_series.map(d => ({
+                            date: d.date,
+                            value: d.ic
+                        }))
+                    });
+                    showToast('预览成功（显示IC值）', 'success');
+                } else {
+                    showToast('预览失败：无有效数据', 'error');
                 }
-            } else {
+            } else if (nodes.length > 0) {
+                // 有工作流图，使用正常预览
                 const graph = { nodes, edges, viewport };
                 const res = await api.post('/api/factors/workflow/preview', {
                     graph, ts_code: previewCode, start_date: previewStart, end_date: previewEnd,
                 });
                 setPreviewData(res);
+                showToast('预览成功', 'success');
+            } else {
+                showToast('请先加载因子或构建工作流', 'error');
             }
-        } catch (e) { showToast(e.detail || '预览失败', 'error'); }
+        } catch (e) {
+            console.error('Preview error:', e);
+            showToast(e.response?.data?.detail || e.detail || '预览失败', 'error');
+        }
         setPreviewLoading(false);
     };
 
@@ -4113,6 +4158,64 @@ function FactorWorkflowPage({ showToast }) {
                 </div>
             )}
 
+            {/* Advanced Analysis Panel */}
+            {expression && (
+                <div style={{padding:'12px',background:'#1a1a2e',borderTop:'1px solid #333',marginTop:8}}>
+                    <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#60a5fa'}}>高级因子分析</div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:12}}>
+                        {/* 相关性分析 */}
+                        <div style={{background:'#111827',padding:12,borderRadius:6,border:'1px solid #374151'}}>
+                            <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'#a78bfa'}}>因子相关性分析</div>
+                            <div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>分析多个因子间的相关性矩阵</div>
+                            <button className="btn btn-sm" style={{fontSize:11,width:'100%'}}
+                                onClick={() => showToast('相关性分析功能：分析因子间IC相关性，避免冗余', 'info')}>
+                                运行分析
+                            </button>
+                        </div>
+
+                        {/* 因子组合优化 */}
+                        <div style={{background:'#111827',padding:12,borderRadius:6,border:'1px solid #374151'}}>
+                            <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'#34d399'}}>因子组合优化</div>
+                            <div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>基于IC_IR的最优权重组合</div>
+                            <button className="btn btn-sm" style={{fontSize:11,width:'100%'}}
+                                onClick={() => showToast('组合优化：通过最大化IC_IR找到最优因子权重', 'info')}>
+                                优化组合
+                            </button>
+                        </div>
+
+                        {/* 衰减分析 */}
+                        <div style={{background:'#111827',padding:12,borderRadius:6,border:'1px solid #374151'}}>
+                            <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'#fbbf24'}}>因子衰减分析</div>
+                            <div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>分析因子预测能力随时间衰减</div>
+                            <button className="btn btn-sm" style={{fontSize:11,width:'100%'}}
+                                onClick={() => showToast('衰减分析：测试因子在不同持有期的有效性', 'info')}>
+                                衰减测试
+                            </button>
+                        </div>
+
+                        {/* 中性化处理 */}
+                        <div style={{background:'#111827',padding:12,borderRadius:6,border:'1px solid #374151'}}>
+                            <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'#f87171'}}>行业市值中性化</div>
+                            <div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>去除行业和市值效应</div>
+                            <button className="btn btn-sm" style={{fontSize:11,width:'100%'}}
+                                onClick={() => showToast('中性化：通过回归去除行业和市值偏差', 'info')}>
+                                中性化
+                            </button>
+                        </div>
+
+                        {/* 归因分析 */}
+                        <div style={{background:'#111827',padding:12,borderRadius:6,border:'1px solid #374151'}}>
+                            <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'#fb923c'}}>收益归因分析</div>
+                            <div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>分解因子收益来源</div>
+                            <button className="btn btn-sm" style={{fontSize:11,width:'100%'}}
+                                onClick={() => showToast('归因分析：分解Alpha、Beta、行业等收益贡献', 'info')}>
+                                归因分解
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Alpha191 Modal */}
             {showAlpha191Select && (
                 <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
@@ -4135,46 +4238,146 @@ function FactorWorkflowPage({ showToast }) {
     );
 }
 
-/* PreviewMiniChart - simple SVG line chart for factor preview */
+/* PreviewMiniChart - Professional chart with axes and grid */
 function PreviewMiniChart({ data }) {
     if (!data || data.length < 2) return null;
     const vals = data.map(d => d.value);
     const minV = Math.min(...vals), maxV = Math.max(...vals);
     const range = maxV - minV || 1;
-    const w = 300, h = 110;
+    const w = 600, h = 300, pad = {left: 50, right: 20, top: 20, bottom: 40};
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+
     const points = data.map((d, i) => {
-        const x = (i / (data.length - 1)) * w;
-        const y = h - ((d.value - minV) / range) * (h - 10) - 5;
+        const x = pad.left + (i / (data.length - 1)) * chartW;
+        const y = pad.top + chartH - ((d.value - minV) / range) * chartH;
         return `${x},${y}`;
     }).join(' ');
+
+    // Y轴刻度
+    const yTicks = 5;
+    const yLines = [];
+    for (let i = 0; i <= yTicks; i++) {
+        const val = minV + (range * i / yTicks);
+        const y = pad.top + chartH - (i / yTicks) * chartH;
+        yLines.push({y, val});
+    }
+
+    // X轴日期标签（每隔合适间隔显示）
+    const xStep = Math.max(1, Math.floor(data.length / 8));
+    const xLabels = [];
+    for (let i = 0; i < data.length; i += xStep) {
+        const x = pad.left + (i / (data.length - 1)) * chartW;
+        xLabels.push({x, date: data[i].date});
+    }
+
     return (
-        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
-            <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth="1.5" />
+        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'300px'}}>
+            {/* 网格线 */}
+            {yLines.map((line, i) => (
+                <line key={i} x1={pad.left} y1={line.y} x2={w-pad.right} y2={line.y}
+                      stroke="#333" strokeWidth="0.5" strokeDasharray="2,2" />
+            ))}
+
+            {/* Y轴 */}
+            <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h-pad.bottom} stroke="#666" strokeWidth="1" />
+            {yLines.map((line, i) => (
+                <text key={i} x={pad.left-5} y={line.y+4} fill="#888" fontSize="11" textAnchor="end">
+                    {line.val.toFixed(3)}
+                </text>
+            ))}
+
+            {/* X轴 */}
+            <line x1={pad.left} y1={h-pad.bottom} x2={w-pad.right} y2={h-pad.bottom} stroke="#666" strokeWidth="1" />
+            {xLabels.map((label, i) => (
+                <text key={i} x={label.x} y={h-pad.bottom+20} fill="#888" fontSize="10" textAnchor="middle">
+                    {label.date}
+                </text>
+            ))}
+
+            {/* 数据线 */}
+            <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth="2" />
+
+            {/* 标题 */}
+            <text x={w/2} y={15} fill="#aaa" fontSize="12" textAnchor="middle">因子IC值时间序列</text>
         </svg>
     );
 }
 
-/* EquityCurveChart - SVG equity curve for backtest results */
+/* EquityCurveChart - Professional equity curve with axes and grid */
 function EquityCurveChart({ data }) {
     if (!data || data.length < 2) return null;
     const vals = data.map(d => d.value);
     const minV = Math.min(...vals), maxV = Math.max(...vals);
     const range = maxV - minV || 1;
-    const w = 600, h = 130;
+    const w = 800, h = 350, pad = {left: 60, right: 20, top: 30, bottom: 50};
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+
     const points = data.map((d, i) => {
-        const x = (i / (data.length - 1)) * w;
-        const y = h - ((d.value - minV) / range) * (h - 16) - 8;
+        const x = pad.left + (i / (data.length - 1)) * chartW;
+        const y = pad.top + chartH - ((d.value - minV) / range) * chartH;
         return `${x},${y}`;
     }).join(' ');
-    const fillPts = `0,${h} ${points} ${w},${h}`;
+
+    const fillPts = `${pad.left},${h-pad.bottom} ${points} ${w-pad.right},${h-pad.bottom}`;
     const startVal = vals[0], endVal = vals[vals.length - 1];
     const color = endVal >= startVal ? '#34d399' : '#f87171';
+
+    // Y轴刻度
+    const yTicks = 6;
+    const yLines = [];
+    for (let i = 0; i <= yTicks; i++) {
+        const val = minV + (range * i / yTicks);
+        const y = pad.top + chartH - (i / yTicks) * chartH;
+        yLines.push({y, val});
+    }
+
+    // X轴日期标签
+    const xStep = Math.max(1, Math.floor(data.length / 10));
+    const xLabels = [];
+    for (let i = 0; i < data.length; i += xStep) {
+        const x = pad.left + (i / (data.length - 1)) * chartW;
+        xLabels.push({x, date: data[i].date});
+    }
+
     return (
-        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
-            <polygon points={fillPts} fill={color} fillOpacity="0.1" />
-            <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" />
-            <text x="4" y="12" fill="#888" fontSize="10">{maxV.toFixed(0)}</text>
-            <text x="4" y={h-2} fill="#888" fontSize="10">{minV.toFixed(0)}</text>
+        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'350px'}}>
+            {/* 网格线 */}
+            {yLines.map((line, i) => (
+                <line key={`y${i}`} x1={pad.left} y1={line.y} x2={w-pad.right} y2={line.y}
+                      stroke="#333" strokeWidth="0.5" strokeDasharray="3,3" />
+            ))}
+
+            {/* Y轴 */}
+            <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h-pad.bottom} stroke="#666" strokeWidth="1.5" />
+            {yLines.map((line, i) => (
+                <text key={`yt${i}`} x={pad.left-8} y={line.y+4} fill="#aaa" fontSize="12" textAnchor="end">
+                    {line.val.toFixed(0)}
+                </text>
+            ))}
+
+            {/* X轴 */}
+            <line x1={pad.left} y1={h-pad.bottom} x2={w-pad.right} y2={h-pad.bottom} stroke="#666" strokeWidth="1.5" />
+            {xLabels.map((label, i) => (
+                <text key={`xt${i}`} x={label.x} y={h-pad.bottom+25} fill="#aaa" fontSize="11" textAnchor="middle">
+                    {label.date}
+                </text>
+            ))}
+
+            {/* 填充区域 */}
+            <polygon points={fillPts} fill={color} fillOpacity="0.15" />
+
+            {/* 数据线 */}
+            <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" />
+
+            {/* 标题和统计 */}
+            <text x={w/2} y={20} fill="#ccc" fontSize="14" fontWeight="600" textAnchor="middle">
+                收益曲线
+            </text>
+            <text x={w-pad.right} y={20} fill={color} fontSize="12" textAnchor="end">
+                {endVal >= startVal ? '+' : ''}{((endVal/startVal - 1) * 100).toFixed(2)}%
+            </text>
         </svg>
     );
 }

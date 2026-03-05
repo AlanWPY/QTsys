@@ -11,6 +11,8 @@ from typing import Optional
 from database.connection import get_db
 from database.models import Settings, Factor, FactorResult
 from factor.builtin_factors import BUILTIN_FACTORS
+from factor.alpha191_templates import get_alpha191_formula
+from factor.expression_to_graph import ExpressionToGraph
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
 
@@ -459,24 +461,61 @@ async def get_workflow_templates():
     return {"templates": templates, "node_registry": node_registry, "category_colors": CATEGORY_COLORS}
 
 
-@router.get("/workflow/alpha191/{number}")
-async def get_alpha191_template(number: int):
-    """获取 Alpha191 因子模板"""
+@router.get("/workflow/alpha191_v2/{number}")
+async def get_alpha191_template_v2(number: int):
+    """获取 Alpha191 因子模板 V2（带工作流图）"""
     if number < 1 or number > 191:
         raise HTTPException(status_code=400, detail="编号必须在 1-191 之间")
 
-    from factor.alpha191_templates import get_alpha191_formula
     formula = get_alpha191_formula(number)
-
     if not formula:
         raise HTTPException(status_code=404, detail=f"Alpha#{number} 暂未实现")
+
+    parser = ExpressionToGraph()
+    graph = parser.parse(formula)
 
     return {
         "name": f"Alpha#{number}",
         "description": f"Alpha191 第{number}号因子",
         "expression": formula,
         "category": "Alpha191",
+        "graph": graph
     }
+
+
+@router.get("/workflow/alpha191/{number}")
+async def get_alpha191_template(number: int):
+    """获取 Alpha191 因子模板（自动生成工作流图）"""
+    import logging
+    logger = logging.getLogger("qtsys.api")
+
+    logger.info(f"=== Alpha191 API called with number={number} ===")
+
+    if number < 1 or number > 191:
+        raise HTTPException(status_code=400, detail="编号必须在 1-191 之间")
+
+    formula = get_alpha191_formula(number)
+    logger.info(f"Formula: {formula[:50]}")
+
+    if not formula:
+        raise HTTPException(status_code=404, detail=f"Alpha#{number} 暂未实现")
+
+    parser = ExpressionToGraph()
+    graph = parser.parse(formula)
+    logger.info(f"Graph generated: {len(graph['nodes'])} nodes, {len(graph['edges'])} edges")
+
+    result = {
+        "name": f"Alpha#{number}",
+        "description": f"Alpha191 第{number}号因子",
+        "expression": formula,
+        "category": "Alpha191",
+        "graph": graph
+    }
+
+    logger.info(f"Result keys: {list(result.keys())}")
+    logger.info(f"Has graph: {'graph' in result}")
+
+    return result
 
 
 def _make_template_momentum():

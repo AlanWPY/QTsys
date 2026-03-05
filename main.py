@@ -21,6 +21,8 @@ from api.routes_data import router as data_router
 from api.routes_strategy import router as strategy_router
 from api.routes_backtest import router as backtest_router
 from api.routes_factor import router as factor_router
+from api.routes_alpha191 import router as alpha191_router
+from api.routes_advanced_analysis import router as advanced_analysis_router
 from api.routes_news import router as news_router
 from api.routes_market import router as market_router
 from api.routes_ws import router as ws_router
@@ -122,6 +124,8 @@ app.include_router(data_router)
 app.include_router(strategy_router)
 app.include_router(backtest_router)
 app.include_router(factor_router)
+app.include_router(alpha191_router)
+app.include_router(advanced_analysis_router)
 app.include_router(news_router)
 app.include_router(market_router)
 app.include_router(ws_router)
@@ -164,9 +168,5 @@ async def trigger_update():
 
 
 if __name__ == "__main__":
-    # 启动前自动检查更新（仅直接运行时执行，reload子进程不执行）
-    from updater import auto_update_on_startup
-    auto_update_on_startup()
-
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

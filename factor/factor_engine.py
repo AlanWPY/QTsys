@@ -44,7 +44,7 @@ class FactorEngine:
 
         # 自定义表达式因子
         return self._eval_expression(
-            expression, closes, highs, lows, volumes, opens, basic_data
+            expression, closes, highs, lows, volumes, opens, basic_data, amounts
         )
 
     def _load_daily_basic(self, ts_code, start_date, end_date, trade_index):
@@ -65,7 +65,7 @@ class FactorEngine:
             logger.warning(f"加载{ts_code}财务指标失败")
         return result
 
-    def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None, basic_data=None):
+    def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None, basic_data=None, amounts=None):
         """安全执行用户自定义因子表达式"""
         def _ts_rank_func(x):
             n = len(x)
@@ -171,7 +171,9 @@ class FactorEngine:
             return pd.Series(np.where(cond, true_val, false_val), index=closes.index)
 
         # Compute derived data sources
-        vwap = amounts / volumes if amounts is not None else closes
+        if amounts is None:
+            amounts = volumes * closes
+        vwap = amounts / volumes if volumes is not None else closes
         dtm = pd.Series(np.where(opens <= opens.shift(1), 0, np.maximum(highs - opens, opens - opens.shift(1))), index=opens.index)
         dbm = pd.Series(np.where(opens >= opens.shift(1), 0, np.maximum(opens - lows, opens - opens.shift(1))), index=opens.index)
         tr = pd.Series(np.maximum(np.maximum(highs - lows, np.abs(highs - closes.shift(1))), np.abs(lows - closes.shift(1))), index=closes.index)

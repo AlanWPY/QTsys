@@ -29,6 +29,7 @@ class FactorEngine:
         lows = indexed["low"]
         volumes = indexed["vol"]
         opens = indexed["open"] if "open" in indexed.columns else closes.shift(1)
+        amounts = indexed["amount"] if "amount" in indexed.columns else volumes * closes
 
         # 加载财务指标数据
         basic_data = self._load_daily_basic(ts_code, start_date, end_date, indexed.index)
@@ -100,18 +101,99 @@ class FactorEngine:
         def _ternary(cond, true_val, false_val):
             return pd.Series(np.where(cond, true_val, false_val), index=closes.index)
 
+        def _ts_argmax(s, window):
+            return s.rolling(window).apply(lambda x: x.argmax(), raw=True)
+
+        def _ts_argmin(s, window):
+            return s.rolling(window).apply(lambda x: x.argmin(), raw=True)
+
+        def _ts_product(s, window):
+            return s.rolling(window).apply(lambda x: np.prod(x), raw=True)
+
+        def _highday(s, window):
+            return s.rolling(window).apply(lambda x: window - 1 - x.argmax(), raw=True)
+
+        def _lowday(s, window):
+            return s.rolling(window).apply(lambda x: window - 1 - x.argmin(), raw=True)
+
+        def _wma(s, window):
+            weights = np.arange(1, window + 1)
+            return s.rolling(window).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+
+        def _decaylinear(s, window):
+            weights = np.arange(window, 0, -1)
+            return s.rolling(window).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+
+        def _sma(s, window, weight):
+            result = s.copy()
+            alpha = weight / window
+            for i in range(1, len(s)):
+                if pd.notna(s.iloc[i]) and pd.notna(result.iloc[i-1]):
+                    result.iloc[i] = alpha * s.iloc[i] + (1 - alpha) * result.iloc[i-1]
+            return result
+
+        def _regbeta(x, y, window):
+            def calc_beta(x_arr, y_arr):
+                if len(x_arr) < 2: return np.nan
+                cov = np.cov(x_arr, y_arr)[0, 1]
+                var = np.var(x_arr)
+                return cov / var if var > 0 else np.nan
+            result = []
+            for i in range(len(x)):
+                if i < window - 1:
+                    result.append(np.nan)
+                else:
+                    result.append(calc_beta(x.iloc[i-window+1:i+1].values, y.iloc[i-window+1:i+1].values))
+            return pd.Series(result, index=x.index)
+
+        def _regresi(x, y, window):
+            beta = _regbeta(x, y, window)
+            alpha = y.rolling(window).mean() - beta * x.rolling(window).mean()
+            return y - (alpha + beta * x)
+
+        def _signedpower(s, exp):
+            return np.sign(s) * np.power(np.abs(s), exp)
+
+        def _scale(s):
+            s_abs_sum = np.abs(s).sum()
+            return s / s_abs_sum if s_abs_sum > 0 else s * 0
+
+        def _indneutralize(s):
+            return s - s.mean()
+
+        def _sequence(length):
+            return pd.Series(range(1, length + 1))
+
+        def _sumif(s, condition, window):
+            return (s * condition).rolling(window).sum()
+
+        def _where(cond, true_val, false_val):
+            return pd.Series(np.where(cond, true_val, false_val), index=closes.index)
+
+        # Compute derived data sources
+        vwap = amounts / volumes if amounts is not None else closes
+        dtm = pd.Series(np.where(opens <= opens.shift(1), 0, np.maximum(highs - opens, opens - opens.shift(1))), index=opens.index)
+        dbm = pd.Series(np.where(opens >= opens.shift(1), 0, np.maximum(opens - lows, opens - opens.shift(1))), index=opens.index)
+        tr = pd.Series(np.maximum(np.maximum(highs - lows, np.abs(highs - closes.shift(1))), np.abs(lows - closes.shift(1))), index=closes.index)
+        hd = highs - highs.shift(1)
+        ld = lows.shift(1) - lows
+
         safe_ns = {
             # 价格数据
             "close": closes, "high": highs, "low": lows,
             "vol": volumes, "volume": volumes,
             "open": opens if opens is not None else closes.shift(1),
             "returns": closes.pct_change(),
+            "vwap": vwap, "amount": amounts,
+            "dtm": dtm, "dbm": dbm, "tr": tr, "hd": hd, "ld": ld,
             # 基础数学
             "np": np, "pd": pd,
             "abs": np.abs, "log": np.log, "sqrt": np.sqrt,
             "power": _power_func, "neg": lambda s: -s,
             "max": np.maximum, "min": np.minimum,
             "clip": _clip_func,
+            "signedpower": _signedpower, "sign": np.sign,
+            "floor": np.floor, "ceil": np.ceil, "round_val": np.round,
             # 时序运算
             "mean": lambda s, n: s.rolling(n).mean(),
             "std": lambda s, n: s.rolling(n).std(),
@@ -127,13 +209,22 @@ class FactorEngine:
             "ts_rank": lambda s, n: s.rolling(n).apply(_ts_rank_func, raw=True),
             "ts_decay": _ts_decay,
             "ewm": _ewm_func,
+            "ts_argmax": _ts_argmax, "ts_argmin": _ts_argmin,
+            "ts_product": _ts_product,
+            "highday": _highday, "lowday": _lowday,
+            "wma": _wma, "decaylinear": _decaylinear, "sma": _sma,
+            # 统计回归
+            "regbeta": _regbeta, "regresi": _regresi,
+            "sequence": _sequence, "sumif": _sumif,
             # 截面运算
             "cs_zscore": _cs_zscore,
             "cs_percentile": _cs_percentile,
             "cs_demean": _cs_demean,
             "cs_rank": lambda s: s.rank(pct=True),
+            "scale": _scale, "indneutralize": _indneutralize,
+            "advm": lambda s, n: s.rolling(n).mean(),
             # 条件逻辑
-            "ternary": _ternary,
+            "ternary": _ternary, "where": _where,
         }
 
         # 注入财务指标

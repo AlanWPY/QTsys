@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QTsys - 量化交易回测系统</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>QTsys - 量化交易回测系统 [Alpha191-v1.1]</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/static/lib/codemirror.css">
     <link rel="stylesheet" href="/static/lib/dracula.css">
@@ -3291,6 +3294,8 @@ function FactorWorkflowPage({ showToast }) {
     const [btTaskId, setBtTaskId] = useState(null);
     const [btResult, setBtResult] = useState(null);
     const [btLoading, setBtLoading] = useState(false);
+    const [showAlpha191Select, setShowAlpha191Select] = useState(false);
+    const [alpha191Num, setAlpha191Num] = useState(1);
 
     // Canvas refs
     const canvasRef = useRef(null);
@@ -3766,16 +3771,59 @@ function FactorWorkflowPage({ showToast }) {
         showToast('已加载模板: ' + tpl.name, 'success');
     };
 
+    const loadAlpha191 = async () => {
+        const num = parseInt(alpha191Num);
+        if (num < 1 || num > 191) {
+            showToast('请输入1-191之间的数字', 'error');
+            return;
+        }
+        try {
+            const res = await api.get(`/api/factors/workflow/alpha191/${num}`);
+            setFactorName(res.name);
+            setExpression(res.expression);
+            setNodes([]);
+            setEdges([]);
+            setShowAlpha191Select(false);
+            showToast(`已加载 ${res.name}，可直接进行预览和回测`, 'success');
+        } catch (e) {
+            showToast('加载失败: ' + (e.response?.data?.detail || e.message), 'error');
+        }
+    };
+
     // Preview factor values
     const runPreview = async () => {
-        if (!expression) { showToast('请先构建有效工作流', 'error'); return; }
+        if (!expression) { showToast('请先构建有效工作流或加载因子', 'error'); return; }
         setPreviewLoading(true);
         try {
-            const graph = { nodes, edges, viewport };
-            const res = await api.post('/api/factors/workflow/preview', {
-                graph, ts_code: previewCode, start_date: previewStart, end_date: previewEnd,
-            });
-            setPreviewData(res);
+            // 如果没有节点，使用表达式直接预览
+            if (nodes.length === 0) {
+                // 先保存因子
+                const saveRes = await api.post('/api/factors', {
+                    name: factorName,
+                    description: 'Alpha191因子',
+                    expression: expression,
+                    category: 'Alpha191'
+                });
+                // 然后预览
+                const res = await api.post('/api/factors/evaluate', {
+                    factor_id: saveRes.id,
+                    universe: [previewCode],
+                    start_date: previewStart,
+                    end_date: previewEnd,
+                    groups: 5,
+                    forward_days: 5
+                });
+                if (res.ic_series) {
+                    setPreviewData({ expression, data: res.ic_series.map(d => ({ date: d.date, value: d.ic })) });
+                    showToast('预览成功', 'success');
+                }
+            } else {
+                const graph = { nodes, edges, viewport };
+                const res = await api.post('/api/factors/workflow/preview', {
+                    graph, ts_code: previewCode, start_date: previewStart, end_date: previewEnd,
+                });
+                setPreviewData(res);
+            }
         } catch (e) { showToast(e.detail || '预览失败', 'error'); }
         setPreviewLoading(false);
     };
@@ -3843,10 +3891,18 @@ function FactorWorkflowPage({ showToast }) {
                     <option value="selection">选股因子</option>
                 </select>
                 <button className="btn btn-sm" onClick={saveWorkflow}>{editingId ? '更新' : '保存'}</button>
-                <select onChange={e => { if (e.target.value) loadTemplate(parseInt(e.target.value)); e.target.value=''; }}
-                    style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
+                <select onChange={e => {
+                    const val = e.target.value;
+                    if (val === 'alpha191') {
+                        setShowAlpha191Select(true);
+                    } else if (val) {
+                        loadTemplate(parseInt(val));
+                    }
+                    e.target.value='';
+                }} style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
                     <option value="">加载模板...</option>
                     {templates.map((t,i) => <option key={i} value={i}>{t.name}</option>)}
+                    <option value="alpha191">Alpha191因子</option>
                 </select>
                 <select onChange={e => { if (e.target.value) loadWorkflow(parseInt(e.target.value)); e.target.value=''; }}
                     style={{padding:'4px 8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}}>
@@ -3907,6 +3963,12 @@ function FactorWorkflowPage({ showToast }) {
                                 {selNodeReg.label}
                             </div>
                             <div style={{fontSize:11,color:'#999',marginBottom:8}}>类型: {selNode.type}</div>
+                            {selNodeReg.tooltip && (
+                                <div style={{fontSize:11,color:'#aaa',marginBottom:12,padding:8,background:'#1e1e1e',borderRadius:4,borderLeft:'3px solid '+catColors[selNodeReg.category]}}>
+                                    <div style={{fontWeight:600,marginBottom:4}}>功能说明:</div>
+                                    {selNodeReg.tooltip}
+                                </div>
+                            )}
                             {Object.keys(selNodeReg.params || {}).map(p => (
                                 <div key={p} style={{marginBottom:6}}>
                                     <label style={{fontSize:11,color:'#aaa'}}>{p}</label>
@@ -4048,6 +4110,25 @@ function FactorWorkflowPage({ showToast }) {
                             </div>
                         </details>
                     )}
+                </div>
+            )}
+
+            {/* Alpha191 Modal */}
+            {showAlpha191Select && (
+                <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+                    <div style={{background:'var(--bg-700)',padding:24,borderRadius:8,minWidth:300}}>
+                        <h3 style={{marginTop:0}}>选择 Alpha191 因子</h3>
+                        <div style={{marginBottom:16}}>
+                            <label style={{display:'block',marginBottom:8}}>因子编号 (1-191):</label>
+                            <input type="number" min="1" max="191" value={alpha191Num}
+                                onChange={e => setAlpha191Num(e.target.value)}
+                                style={{width:'100%',padding:'8px',borderRadius:4,border:'1px solid #555',background:'#2a2a2a',color:'#eee'}} />
+                        </div>
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                            <button className="btn btn-sm" onClick={() => setShowAlpha191Select(false)}>取消</button>
+                            <button className="btn btn-sm btn-primary" onClick={loadAlpha191}>加载</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

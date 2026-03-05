@@ -452,10 +452,31 @@ async def get_workflow_templates():
     ]
     node_registry = {
         k: {"inputs": v["inputs"], "outputs": v["outputs"],
-             "params": v["params"], "category": v["category"], "label": v["label"]}
+             "params": v["params"], "category": v["category"], "label": v["label"],
+             "tooltip": v.get("tooltip", "")}
         for k, v in NODE_REGISTRY.items()
     }
     return {"templates": templates, "node_registry": node_registry, "category_colors": CATEGORY_COLORS}
+
+
+@router.get("/workflow/alpha191/{number}")
+async def get_alpha191_template(number: int):
+    """获取 Alpha191 因子模板"""
+    if number < 1 or number > 191:
+        raise HTTPException(status_code=400, detail="编号必须在 1-191 之间")
+
+    from factor.alpha191_templates import get_alpha191_formula
+    formula = get_alpha191_formula(number)
+
+    if not formula:
+        raise HTTPException(status_code=404, detail=f"Alpha#{number} 暂未实现")
+
+    return {
+        "name": f"Alpha#{number}",
+        "description": f"Alpha191 第{number}号因子",
+        "expression": formula,
+        "category": "Alpha191",
+    }
 
 
 def _make_template_momentum():

@@ -5,18 +5,18 @@ __pycache__/
 *.so
 .Python
 
-# 虚拟环境
+# Virtual environments
 .dbmanager_venv/
 venv/
 env/
 
-# 数据库和缓存
+# Databases and caches
 qtsys.db
 *.db
 data/cache/*
 !data/cache/.gitkeep
 
-# 日志
+# Logs
 logs/*.log
 *.log
 
@@ -27,14 +27,18 @@ logs/*.log
 *.swo
 *~
 
-# 系统文件
+# System files
 .DS_Store
 Thumbs.db
 
-# 临时文件
+# Temporary files
 *.tmp
 *.bak
 *.spec
-
-# 用户凭据
 .qtsys_dbmanager.json
+
+# Runtime artifacts
+runtime/
+tmp/*
+!tmp/.gitkeep
+static/debug/

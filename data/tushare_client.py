@@ -1,5 +1,7 @@
 """Tushare API 封装 - 带速率限制保护"""
 import time
+import threading
+import warnings
 import tushare as ts
 import pandas as pd
 from typing import Optional
@@ -7,40 +9,79 @@ from logging_config import get_logger
 
 logger = get_logger("qtsys.data.tushare")
 
+warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
+
 # Tushare速率限制: ~170次/分钟
 RATE_LIMIT_CALLS = 170
 RATE_LIMIT_WINDOW = 60  # 秒
 
 
 class TushareClient:
+    _rate_lock = threading.Lock()
+    _global_call_times: dict[str, list[float]] = {}
+
     def __init__(self, token: str):
         self.token = token
         self.pro = ts.pro_api(token)
-        self._call_times: list[float] = []
 
     def _rate_limit(self):
         """速率限制保护 - 滑动窗口"""
-        now = time.time()
-        self._call_times = [t for t in self._call_times if now - t < RATE_LIMIT_WINDOW]
-        if len(self._call_times) >= RATE_LIMIT_CALLS:
-            wait = RATE_LIMIT_WINDOW - (now - self._call_times[0]) + 0.5
-            if wait > 0:
-                logger.warning(f"Tushare速率限制, 等待{wait:.1f}s")
-                time.sleep(wait)
-        self._call_times.append(time.time())
+        wait = 0.0
+        with self._rate_lock:
+            now = time.time()
+            call_times = self._global_call_times.setdefault(self.token, [])
+            call_times[:] = [t for t in call_times if now - t < RATE_LIMIT_WINDOW]
+            if len(call_times) >= RATE_LIMIT_CALLS:
+                wait = RATE_LIMIT_WINDOW - (now - call_times[0]) + 0.5
+            if wait <= 0:
+                call_times.append(now)
 
-    def get_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """获取日线行情数据"""
+        if wait > 0:
+            logger.warning(f"Tushare速率限制, 等待{wait:.1f}s")
+            time.sleep(wait)
+            with self._rate_lock:
+                call_times = self._global_call_times.setdefault(self.token, [])
+                now = time.time()
+                call_times[:] = [t for t in call_times if now - t < RATE_LIMIT_WINDOW]
+                call_times.append(now)
+
+    def get_daily(self, ts_code: str, start_date: str, end_date: str, adj: Optional[str] = None) -> pd.DataFrame:
+        """获取日线行情数据，`adj` 可选 `qfq` 或 `hfq`。"""
         self._rate_limit()
         try:
-            df = self.pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            if adj:
+                try:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
+                        df = ts.pro_bar(
+                            api=self.pro,
+                            ts_code=ts_code,
+                            adj=adj,
+                            start_date=start_date,
+                            end_date=end_date,
+                            asset="E",
+                            freq="D",
+                        )
+                except TypeError:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
+                        df = ts.pro_bar(
+                            ts_code=ts_code,
+                            adj=adj,
+                            start_date=start_date,
+                            end_date=end_date,
+                            asset="E",
+                            freq="D",
+                        )
+            else:
+                df = self.pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
             if df is None or df.empty:
                 return pd.DataFrame()
             df = df.sort_values("trade_date").reset_index(drop=True)
             df["trade_date"] = pd.to_datetime(df["trade_date"])
             return df
         except Exception:
-            logger.exception(f"获取日线失败: {ts_code}")
+            logger.exception(f"获取日线行情失败: {ts_code}, adj={adj or 'none'}")
             return pd.DataFrame()
 
     def get_daily_basic(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -101,7 +142,9 @@ class TushareClient:
         """获取复权因子"""
         self._rate_limit()
         try:
-            df = self.pro.adj_factor(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
+                df = self.pro.adj_factor(ts_code=ts_code, start_date=start_date, end_date=end_date)
             if df is None or df.empty:
                 return pd.DataFrame()
             df = df.sort_values("trade_date").reset_index(drop=True)

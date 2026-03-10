@@ -14,6 +14,7 @@ from data.tushare_client import TushareClient
 from data.data_cache import DataCache
 from engine.backtest_engine import BacktestEngine
 from strategy.strategy_loader import load_strategy
+from services.backtest_service import run_backtest_workflow
 
 router = APIRouter(prefix="/api/backtest", tags=["backtest"])
 
@@ -31,81 +32,22 @@ class BacktestRequest(BaseModel):
 
 @router.post("/run")
 async def run_backtest(req: BacktestRequest, db: AsyncSession = Depends(get_db)):
-    # 获取设置
-    result = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = result.scalar_one_or_none()
-    if not settings or not settings.tushare_token:
-        raise HTTPException(status_code=400, detail="请先配置Tushare Token")
-
-    # 获取策略
-    result = await db.execute(select(Strategy).where(Strategy.id == req.strategy_id))
-    strategy = result.scalar_one_or_none()
-    if not strategy:
-        raise HTTPException(status_code=404, detail="策略不存在")
-
-    # 加载策略代码
     try:
-        init_func, handle_func = load_strategy(strategy.code)
+        return await run_backtest_workflow(
+            db,
+            strategy_id=req.strategy_id,
+            universe=req.universe,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            initial_cash=req.initial_cash,
+            benchmark=req.benchmark,
+            max_position_pct=req.max_position_pct,
+            max_drawdown_limit=req.max_drawdown_limit,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-    # 创建回测引擎
-    client = TushareClient(settings.tushare_token)
-    from data.data_cache import make_mysql_conn
-    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
-    engine = BacktestEngine(
-        cache=cache,
-        initial_cash=req.initial_cash,
-        commission_rate=settings.commission_rate,
-        stamp_tax_rate=settings.stamp_tax_rate,
-        slippage=settings.slippage,
-        max_position_pct=req.max_position_pct,
-        max_drawdown_limit=req.max_drawdown_limit,
-    )
-    engine.universe = req.universe
-
-    # 运行回测(在线程中执行避免阻塞事件循环)
-    result_data = await asyncio.to_thread(
-        engine.run,
-        universe=req.universe,
-        start_date=req.start_date,
-        end_date=req.end_date,
-        initialize_func=init_func,
-        handle_data_func=handle_func,
-        benchmark=req.benchmark,
-    )
-
-    if "error" in result_data:
-        raise HTTPException(status_code=400, detail=result_data["error"])
-
-    # 保存结果
-    bt_result = BacktestResult(
-        strategy_id=strategy.id,
-        strategy_name=strategy.name,
-        start_date=req.start_date,
-        end_date=req.end_date,
-        universe=",".join(req.universe),
-        initial_cash=req.initial_cash,
-        final_value=result_data["final_value"],
-        metrics=result_data["metrics"],
-        equity_curve=result_data["equity_curve"],
-        trades=result_data["trades"],
-        daily_returns=result_data["daily_returns"],
-        benchmark_curve=result_data.get("benchmark_curve", []),
-    )
-    db.add(bt_result)
-    await db.commit()
-    await db.refresh(bt_result)
-
-    return {
-        "id": bt_result.id,
-        "metrics": result_data["metrics"],
-        "equity_curve": result_data["equity_curve"],
-        "trades": result_data["trades"],
-        "logs": result_data.get("logs", []),
-        "final_value": result_data["final_value"],
-        "benchmark_curve": result_data.get("benchmark_curve", []),
-    }
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/history")

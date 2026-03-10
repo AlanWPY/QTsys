@@ -121,6 +121,19 @@ class NewsArticle(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class StockPool(Base):
+    __tablename__ = "stock_pools"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text, default="")
+    pool_type = Column(String(20), default="custom")
+    index_code = Column(String(20), default="")
+    stock_items = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class DailyQuote(Base):
     __tablename__ = "qtsys_daily_quotes"
     id = Column(Integer, primary_key=True, autoincrement=True)

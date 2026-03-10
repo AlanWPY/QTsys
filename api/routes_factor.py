@@ -13,6 +13,7 @@ from database.models import Settings, Factor, FactorResult
 from factor.builtin_factors import BUILTIN_FACTORS
 from factor.alpha191_templates import get_alpha191_formula
 from factor.expression_to_graph import ExpressionToGraph
+from services.factor_service import evaluate_factor_workflow, mine_gp_workflow
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
 
@@ -113,6 +114,21 @@ async def init_builtin_factors(db: AsyncSession = Depends(get_db)):
 @router.post("/evaluate")
 async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get_db)):
     """评价因子效果"""
+    try:
+        return await evaluate_factor_workflow(
+            db,
+            factor_id=req.factor_id,
+            universe=req.universe,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            groups=req.groups,
+            forward_days=req.forward_days,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     result = await db.execute(select(Factor).where(Factor.id == req.factor_id))
     factor = result.scalar_one_or_none()
     if not factor:
@@ -163,6 +179,18 @@ async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get
 @router.post("/mine/gp")
 async def mine_gp(req: GPMineRequest, db: AsyncSession = Depends(get_db)):
     """遗传算法因子挖掘"""
+    try:
+        return await mine_gp_workflow(
+            db,
+            universe=req.universe,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            pop_size=req.pop_size,
+            generations=req.generations,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     settings_r = await db.execute(select(Settings).where(Settings.id == 1))
     settings = settings_r.scalar_one_or_none()
     if not settings or not settings.tushare_token:

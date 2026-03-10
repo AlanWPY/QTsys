@@ -1,4 +1,5 @@
 """因子评价引擎 - IC/IR/分组收益/多空曲线"""
+import re
 import numpy as np
 import pandas as pd
 from typing import Optional
@@ -6,6 +7,11 @@ from factor.builtin_factors import BUILTIN_FACTORS
 from logging_config import get_logger
 
 logger = get_logger("qtsys.factor.engine")
+
+FORBIDDEN_EXPR_TOKENS = [
+    "__", "import", "eval", "exec", "open(", "compile(",
+    "os.", "sys.", "subprocess", "socket", "http", "urllib", "requests",
+]
 
 
 class FactorEngine:
@@ -67,6 +73,15 @@ class FactorEngine:
 
     def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None, basic_data=None, amounts=None):
         """安全执行用户自定义因子表达式"""
+        expr_text = str(expr)
+        expr_lower = expr_text.lower()
+        if any(token in expr_lower for token in FORBIDDEN_EXPR_TOKENS):
+            logger.warning("unsafe factor expression rejected")
+            return None
+        if re.search(r"__\w+__", expr_text):
+            logger.warning("dunder access rejected in factor expression")
+            return None
+
         def _ts_rank_func(x):
             n = len(x)
             last = x[-1]

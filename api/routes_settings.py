@@ -5,8 +5,13 @@ from sqlalchemy import select, text
 from pydantic import BaseModel
 from typing import Optional
 from database.connection import get_db
-from database.models import Settings
 from logging_config import get_logger
+from services.settings_service import (
+    activate_mysql_cache,
+    apply_settings_update,
+    get_or_create_settings,
+    serialize_settings,
+)
 
 logger = get_logger("qtsys.settings")
 
@@ -31,66 +36,38 @@ class SettingsSchema(BaseModel):
 
 
 class SettingsResponse(BaseModel):
-    tushare_token: str = ""
     default_cash: float = 1_000_000.0
     commission_rate: float = 0.0003
     stamp_tax_rate: float = 0.001
     slippage: float = 0.002
-    llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
     mysql_host: str = ""
     mysql_port: int = 3306
     mysql_user: str = ""
-    mysql_password: str = ""
     mysql_database: str = "qtsys"
     use_mysql: int = 0
-
-
-async def get_or_create_settings(db: AsyncSession) -> Settings:
-    result = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = result.scalar_one_or_none()
-    if not settings:
-        settings = Settings(id=1)
-        db.add(settings)
-        await db.commit()
-        await db.refresh(settings)
-    return settings
-
-
-def _to_response(settings: Settings) -> SettingsResponse:
-    return SettingsResponse(
-        tushare_token=settings.tushare_token or "",
-        default_cash=settings.default_cash,
-        commission_rate=settings.commission_rate,
-        stamp_tax_rate=settings.stamp_tax_rate,
-        slippage=settings.slippage,
-        llm_api_key=settings.llm_api_key or "",
-        llm_base_url=settings.llm_base_url or "",
-        llm_model=settings.llm_model or "",
-        mysql_host=settings.mysql_host or "",
-        mysql_port=settings.mysql_port or 3306,
-        mysql_user=settings.mysql_user or "",
-        mysql_password=settings.mysql_password or "",
-        mysql_database=settings.mysql_database or "qtsys",
-        use_mysql=settings.use_mysql or 0,
-    )
+    tushare_token: str = ""
+    llm_api_key: str = ""
+    mysql_password: str = ""
+    has_tushare_token: bool = False
+    has_llm_api_key: bool = False
+    has_mysql_password: bool = False
 
 
 @router.get("", response_model=SettingsResponse)
 async def get_settings(db: AsyncSession = Depends(get_db)):
     settings = await get_or_create_settings(db)
-    return _to_response(settings)
+    return SettingsResponse(**serialize_settings(settings))
 
 
 @router.put("", response_model=SettingsResponse)
 async def update_settings(data: SettingsSchema, db: AsyncSession = Depends(get_db)):
     settings = await get_or_create_settings(db)
-    for field, value in data.model_dump(exclude_none=True).items():
-        setattr(settings, field, value)
+    apply_settings_update(settings, data.model_dump(exclude_none=True))
     await db.commit()
     await db.refresh(settings)
-    return _to_response(settings)
+    return SettingsResponse(**serialize_settings(settings))
 
 
 class MysqlTestRequest(BaseModel):
@@ -120,24 +97,16 @@ async def test_mysql(req: MysqlTestRequest):
 
 @router.post("/activate_mysql")
 async def activate_mysql(db: AsyncSession = Depends(get_db)):
-    """激活 MySQL: 切换引擎 + 初始化表"""
-    from config import build_mysql_url
-    from database.connection import switch_to_mysql, init_db
+    """激活 MySQL 缓存：初始化表结构并保存配置。"""
     settings = await get_or_create_settings(db)
     if not settings.mysql_host or not settings.mysql_user:
         return {"success": False, "message": "请先配置 MySQL 连接信息"}
-    url = build_mysql_url(
-        settings.mysql_host, settings.mysql_port,
-        settings.mysql_user, settings.mysql_password,
-        settings.mysql_database,
-    )
     try:
-        switch_to_mysql(url)
-        await init_db()
+        await activate_mysql_cache(settings)
         settings.use_mysql = 1
         await db.commit()
-        logger.info("MySQL 已激活并初始化表结构")
-        return {"success": True, "message": "MySQL 已激活"}
+        logger.info("MySQL 缓存已激活并初始化表结构")
+        return {"success": True, "message": "MySQL 缓存已激活"}
     except Exception as e:
-        logger.exception("激活 MySQL 失败")
+        logger.exception("激活 MySQL 缓存失败")
         return {"success": False, "message": str(e)}

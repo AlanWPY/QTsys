@@ -299,7 +299,497 @@ tr:hover td { background: var(--bg-600); }
 .quality-badge-warning { background: #713f12; color: #fbbf24; }
 .quality-badge-error { background: #450a0a; color: #f87171; }
 @media (max-width: 900px) { .risk-cards { grid-template-columns: repeat(2, 1fr); } .quality-summary { grid-template-columns: repeat(2, 1fr); } }
-    </style>
+    
+/* ===== 2026 Shell Refinement ===== */
+body {
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.20), transparent 30%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.16), transparent 26%),
+        linear-gradient(180deg, #07111f 0%, #0b1324 45%, #0a1020 100%);
+    background-attachment: fixed;
+}
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.08));
+    opacity: 0.34;
+}
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 55%, rgba(2, 6, 23, 0.36) 100%);
+}
+#root, .app, .main, .header, .card, .metric-card {
+    position: relative;
+    z-index: 1;
+}
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 72px;
+    height: auto;
+    padding: 14px 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: rgba(7, 14, 28, 0.82);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.38);
+    backdrop-filter: blur(18px);
+}
+.header-brand {
+    gap: 14px;
+}
+.header-brand h1 {
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #eef2ff;
+    text-shadow: 0 0 24px rgba(129, 140, 248, 0.22);
+}
+.header-brand span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(99, 102, 241, 0.16);
+    color: #94a3b8;
+}
+.nav {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: rgba(15, 23, 42, 0.68);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.nav-btn {
+    padding: 9px 15px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    color: #94a3b8;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.nav-btn:hover {
+    color: #e2e8f0;
+    background: rgba(30, 41, 59, 0.88);
+    border-color: rgba(148, 163, 184, 0.12);
+    transform: translateY(-1px);
+}
+.nav-btn.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.92), rgba(59, 130, 246, 0.88));
+    border-color: rgba(165, 180, 252, 0.32);
+    box-shadow: 0 10px 24px rgba(59, 130, 246, 0.22);
+}
+.main {
+    max-width: 1440px;
+    padding: 30px 24px 44px;
+}
+.card,
+.metric-card {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78));
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: 0 22px 44px rgba(2, 6, 23, 0.24);
+}
+.card:hover,
+.metric-card:hover {
+    border-color: rgba(99, 102, 241, 0.20);
+    box-shadow: 0 26px 52px rgba(2, 6, 23, 0.30);
+}
+.card-title {
+    letter-spacing: 0.01em;
+}
+.metric-card {
+    overflow: hidden;
+}
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0), rgba(99, 102, 241, 0.75), rgba(16, 185, 129, 0.75), rgba(16, 185, 129, 0));
+    opacity: 0.92;
+}
+.metric-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+}
+.metric-value {
+    color: #f8fafc;
+}
+.input {
+    background: rgba(15, 23, 42, 0.80);
+    border-color: rgba(148, 163, 184, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.input:hover {
+    border-color: rgba(148, 163, 184, 0.24);
+}
+.input:focus {
+    border-color: rgba(99, 102, 241, 0.70);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+.btn {
+    min-height: 38px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 12px;
+}
+.btn-primary {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    box-shadow: 0 12px 24px rgba(59, 130, 246, 0.20);
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, #7477f7, #4f8ef8);
+}
+.btn-secondary {
+    background: rgba(30, 41, 59, 0.78);
+    color: #dbeafe;
+}
+.btn-secondary:hover {
+    background: rgba(51, 65, 85, 0.88);
+}
+.btn-link {
+    color: #93c5fd;
+}
+.btn-link:hover {
+    color: #bfdbfe;
+}
+.label {
+    color: #94a3b8;
+    letter-spacing: 0.04em;
+}
+.table-wrap,
+.table-container {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+}
+.toast {
+    backdrop-filter: blur(14px);
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.35);
+}
+@media (max-width: 1100px) {
+    .header {
+        justify-content: center;
+    }
+    .nav {
+        width: 100%;
+        justify-content: center;
+    }
+    .main {
+        padding-top: 24px;
+    }
+}
+@media (max-width: 720px) {
+    .header {
+        padding: 12px 14px;
+    }
+    .main {
+        padding: 18px 14px 28px;
+    }
+    .nav {
+        justify-content: flex-start;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    .nav-btn {
+        white-space: nowrap;
+    }
+    .grid-2, .grid-3, .grid-4, .grid-6 {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+.factor-board-shell { display: flex; flex-direction: column; gap: 20px; }
+.factor-board-hero { display: grid; grid-template-columns: 1.45fr 0.95fr; gap: 18px; align-items: stretch; }
+.factor-board-hero > :nth-child(3) { grid-column: 1 / -1; }
+.factor-board-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.factor-board-overview-card {
+    position: relative;
+    overflow: hidden;
+    padding: 18px 18px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: linear-gradient(180deg, rgba(15,23,42,0.92), rgba(15,23,42,0.74));
+    box-shadow: 0 18px 38px rgba(2, 6, 23, 0.22);
+}
+.factor-board-overview-card::after {
+    content: '';
+    position: absolute;
+    inset: auto -10% -30% auto;
+    width: 120px;
+    height: 120px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(59,130,246,0.18), transparent 70%);
+    pointer-events: none;
+}
+.factor-board-overview-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.factor-board-overview-value { color: #f8fafc; font-size: 24px; font-weight: 800; line-height: 1.15; }
+.factor-board-overview-value.small { font-size: 18px; }
+.factor-board-overview-meta { color: #94a3b8; font-size: 12px; margin-top: 8px; line-height: 1.6; }
+.factor-board-workbench { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 18px; align-items: start; }
+.factor-board-workbench > .factor-board-panel { min-width: 0; }
+.factor-board-quickgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.factor-board-mini-card {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.10);
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.46), rgba(15, 23, 42, 0.72));
+}
+.factor-board-mini-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.factor-board-mini-value { color: #f8fafc; font-size: 17px; font-weight: 700; line-height: 1.35; }
+.factor-board-mini-value.small { font-size: 14px; }
+.factor-board-mini-meta { color: #94a3b8; font-size: 12px; margin-top: 6px; line-height: 1.6; }
+.factor-board-glass {
+    position: relative;
+    overflow: hidden;
+    padding: 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.78));
+    box-shadow: 0 28px 60px rgba(2, 6, 23, 0.28);
+}
+.factor-board-glass::before {
+    content: '';
+    position: absolute;
+    inset: -30% auto auto -10%;
+    width: 220px;
+    height: 220px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.26), transparent 70%);
+    pointer-events: none;
+}
+.factor-board-title { font-size: 28px; font-weight: 700; color: #f8fafc; letter-spacing: 0.02em; margin-bottom: 10px; }
+.factor-board-copy { color: #94a3b8; line-height: 1.7; max-width: 720px; }
+.factor-board-pillrow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.factor-board-pill {
+    display: inline-flex; align-items: center; min-height: 30px; padding: 0 12px; border-radius: 999px;
+    border: 1px solid rgba(99, 102, 241, 0.18); background: rgba(15, 23, 42, 0.72); color: #cbd5e1; font-size: 12px;
+}
+.factor-board-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.factor-board-panel { display: flex; flex-direction: column; gap: 14px; }
+.factor-board-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.factor-board-toolbar-left, .factor-board-toolbar-right { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.factor-board-kv { display: flex; flex-direction: column; gap: 4px; min-width: 128px; }
+.factor-board-kv-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.factor-board-kv-value { color: #f8fafc; font-size: 15px; font-weight: 600; }
+.factor-board-status {
+    display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.12); background: rgba(15, 23, 42, 0.68); color: #cbd5e1;
+}
+.factor-board-dot { width: 10px; height: 10px; border-radius: 999px; background: #64748b; box-shadow: 0 0 0 6px rgba(100, 116, 139, 0.16); }
+.factor-board-dot.running { background: #22c55e; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.18); }
+.factor-board-progress { height: 8px; border-radius: 999px; background: rgba(30, 41, 59, 0.92); overflow: hidden; }
+.factor-board-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6366f1, #22c55e); }
+.factor-board-stage-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.factor-board-stage-card {
+    padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(148,163,184,0.10);
+    background: linear-gradient(180deg, rgba(2,6,23,0.34), rgba(15,23,42,0.72));
+}
+.factor-board-stage-card.active { border-color: rgba(96,165,250,0.28); box-shadow: 0 18px 32px rgba(37,99,235,0.12); }
+.factor-board-stage-card.done { border-color: rgba(34,197,94,0.24); }
+.factor-board-stage-title { color: #e2e8f0; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.factor-board-stage-meta { color: #94a3b8; font-size: 12px; line-height: 1.6; }
+.factor-board-stage-value { color: #f8fafc; font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.factor-board-process-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; }
+.factor-board-process-card {
+    min-height: 0; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(148,163,184,0.10);
+    background: linear-gradient(180deg, rgba(2,6,23,0.30), rgba(15,23,42,0.70));
+}
+.factor-board-process-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.factor-board-log-panel {
+    max-height: 240px; overflow: auto; padding-right: 4px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.factor-board-log-line {
+    padding: 10px 12px; border-radius: 12px; background: rgba(15,23,42,0.78);
+    border: 1px solid rgba(148,163,184,0.08); color: #cbd5e1; font-size: 12px; line-height: 1.55;
+    font-family: Consolas, Monaco, monospace;
+}
+.factor-board-chip-list { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+.factor-board-results-wrap { overflow: auto; max-height: min(78vh, 1200px); border-radius: 18px; border: 1px solid rgba(148, 163, 184, 0.10); background: rgba(2, 6, 23, 0.26); }
+.factor-board-table { width: 100%; min-width: 1080px; border-collapse: separate; border-spacing: 0; }
+.factor-board-table th, .factor-board-table td { padding: 12px 14px; border-bottom: 1px solid rgba(148, 163, 184, 0.08); text-align: left; }
+.factor-board-table thead th { position: sticky; top: 0; z-index: 2; background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(10px); }
+.factor-board-table th:first-child, .factor-board-table td:first-child { position: sticky; left: 0; z-index: 1; }
+.factor-board-table thead th:first-child { z-index: 4; }
+.factor-board-table th:last-child, .factor-board-table td:last-child { position: sticky; right: 0; z-index: 1; }
+.factor-board-table thead th:last-child { z-index: 4; }
+.factor-board-table tbody td:first-child, .factor-board-table tbody td:last-child { background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(10px); }
+.factor-board-table th { color: #94a3b8; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.factor-board-table td { color: #e2e8f0; font-size: 13px; vertical-align: middle; }
+.factor-board-table tbody tr { transition: background 0.18s ease, transform 0.18s ease; }
+.factor-board-table tbody tr:hover { background: rgba(30, 41, 59, 0.56); }
+.factor-board-table tbody tr:hover td:first-child, .factor-board-table tbody tr:hover td:last-child { background: rgba(30, 41, 59, 0.92); }
+.factor-board-row-positive td:first-child { box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.72); }
+.factor-board-row-negative td:first-child { box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.72); }
+.factor-board-link { color: #c7d2fe; cursor: pointer; font-weight: 700; }
+.factor-board-link:hover { color: #eef2ff; text-decoration: underline; }
+.factor-board-fav-btn {
+    width: 30px; height: 30px; border: 1px solid rgba(148,163,184,0.12); border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.72); color: #94a3b8; cursor: pointer;
+    transition: all 0.18s ease; flex: 0 0 auto;
+}
+.factor-board-fav-btn:hover { color: #fde68a; border-color: rgba(250,204,21,0.26); transform: translateY(-1px); }
+.factor-board-fav-btn.active { color: #fbbf24; background: rgba(120,53,15,0.28); border-color: rgba(250,204,21,0.30); box-shadow: 0 10px 24px rgba(120,53,15,0.18); }
+.factor-board-filterbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.factor-board-filterchip {
+    min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.12);
+    background: rgba(15,23,42,0.78); color: #cbd5e1; cursor: pointer; transition: all .18s ease;
+}
+.factor-board-filterchip:hover { border-color: rgba(96,165,250,0.24); color: #eff6ff; }
+.factor-board-filterchip.active { background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.18)); color: #dbeafe; border-color: rgba(96,165,250,0.34); }
+.factor-board-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 10px; border-radius: 999px; font-weight: 700; font-size: 12px; letter-spacing: 0.02em; border: 1px solid transparent; }
+.factor-board-badge.positive { color: #bbf7d0; background: rgba(20, 83, 45, 0.42); border-color: rgba(34, 197, 94, 0.24); }
+.factor-board-badge.negative { color: #fecaca; background: rgba(127, 29, 29, 0.40); border-color: rgba(239, 68, 68, 0.24); }
+.factor-board-factor-cell { display: flex; align-items: center; gap: 10px; }
+.factor-board-factor-meta { display: flex; flex-direction: column; gap: 4px; }
+.factor-board-row-action { text-align: right; }
+.factor-board-detail-btn { min-width: 88px; }
+.factor-board-formula-title { color: #e2e8f0; font-weight: 700; margin-bottom: 8px; }
+.factor-board-desc-box { padding: 14px 16px; border-radius: 16px; background: rgba(15, 23, 42, 0.66); border: 1px solid rgba(148, 163, 184, 0.10); line-height: 1.75; color: #dbeafe; }
+.factor-board-empty { padding: 40px 20px; color: #94a3b8; text-align: center; }
+.factor-board-results-tip {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
+    border: 1px solid rgba(96, 165, 250, 0.18); background: rgba(15, 23, 42, 0.72); color: #cbd5e1; font-size: 12px;
+}
+.factor-board-modal {
+    position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+    padding: 28px; background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(10px);
+}
+.factor-board-modal-card {
+    width: min(1180px, 100%); max-height: calc(100vh - 56px); overflow: auto; border-radius: 24px; padding: 22px;
+    border: 1px solid rgba(148, 163, 184, 0.14); background: linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.88));
+    box-shadow: 0 32px 80px rgba(2,6,23,0.42);
+}
+.factor-board-modal-head { display: flex; gap: 14px; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.factor-board-modal-title { font-size: 24px; font-weight: 700; color: #f8fafc; }
+.factor-board-modal-copy { color: #94a3b8; margin-top: 6px; }
+.factor-board-modal-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 18px; }
+.factor-board-modal-stack { display: flex; flex-direction: column; gap: 18px; }
+.factor-board-research-panel {
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(148,163,184,0.12);
+    background: linear-gradient(180deg, rgba(2,6,23,0.56), rgba(15,23,42,0.82));
+}
+.factor-board-research-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.factor-board-research-kicker { color: #60a5fa; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.factor-board-research-title { color: #f8fafc; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.factor-board-research-copy { color: #94a3b8; line-height: 1.7; margin-top: 8px; }
+.factor-board-research-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.factor-board-research-item {
+    padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(148,163,184,0.10);
+    background: rgba(15,23,42,0.58);
+}
+.factor-board-research-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.factor-board-research-value { color: #f8fafc; font-size: 15px; font-weight: 700; line-height: 1.45; }
+.factor-board-tagrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.factor-board-tag {
+    display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px;
+    border: 1px solid rgba(148,163,184,0.12); background: rgba(30,41,59,0.72); color: #cbd5e1; font-size: 12px;
+}
+.factor-board-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.factor-board-formula-meta { color: #94a3b8; font-size: 12px; }
+.factor-board-holdings-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.factor-board-holdings-stat {
+    padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(148,163,184,0.10); background: rgba(2,6,23,0.42);
+}
+.factor-board-holdings-stat .label { display: block; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.factor-board-holdings-stat .value { color: #f8fafc; font-size: 15px; font-weight: 700; }
+.factor-board-chart-wrap { padding: 16px; border-radius: 18px; border: 1px solid rgba(148,163,184,0.12); background: rgba(15,23,42,0.66); }
+.factor-board-chart-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.factor-board-chip {
+    min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.12);
+    background: rgba(30,41,59,0.72); color: #cbd5e1; cursor: pointer;
+}
+.factor-board-chip.active { background: linear-gradient(135deg, rgba(99,102,241,0.92), rgba(59,130,246,0.88)); color: #fff; border-color: rgba(165,180,252,0.3); }
+.factor-board-chart-shell { display: flex; flex-direction: column; gap: 14px; }
+.factor-board-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.factor-board-chart-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+.factor-board-chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.factor-board-chart-viewtabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.factor-board-chart-kpi {
+    min-width: 118px; padding: 10px 12px; border-radius: 14px;
+    border: 1px solid rgba(148,163,184,0.12); background: rgba(2,6,23,0.42);
+}
+.factor-board-chart-kpi .label { display: block; color: #64748b; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.factor-board-chart-kpi .value { color: #f8fafc; font-size: 14px; font-weight: 700; }
+.factor-board-range-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.factor-board-range-chip {
+    min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.12);
+    background: rgba(15,23,42,0.78); color: #cbd5e1; cursor: pointer; transition: all .18s ease;
+}
+.factor-board-range-chip:hover { border-color: rgba(96,165,250,0.26); color: #eff6ff; }
+.factor-board-range-chip.active { background: rgba(59,130,246,0.18); color: #dbeafe; border-color: rgba(96,165,250,0.34); }
+.factor-board-chart-svg { width: 100%; height: 360px; display: block; }
+.factor-board-chart-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+.factor-board-legend-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px;
+    border: 1px solid rgba(148,163,184,0.10); background: rgba(15,23,42,0.56); cursor: pointer; transition: all .18s ease;
+}
+.factor-board-legend-item:hover { transform: translateY(-1px); border-color: rgba(96,165,250,0.24); }
+.factor-board-legend-item.active { border-color: rgba(99,102,241,0.34); background: rgba(30,41,59,0.84); box-shadow: 0 14px 32px rgba(15,23,42,0.22); }
+.factor-board-legend-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.factor-board-legend-swatch { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+.factor-board-legend-name { color: #e2e8f0; font-weight: 700; }
+.factor-board-legend-return { font-size: 12px; font-weight: 700; }
+.factor-board-legend-return.positive { color: #86efac; }
+.factor-board-legend-return.negative { color: #fca5a5; }
+.factor-board-chart-note { color: #94a3b8; font-size: 12px; line-height: 1.65; }
+.factor-board-chart-focus { color: #e2e8f0; font-weight: 700; }
+.factor-board-chart-kpi .value.spread-positive { color: #86efac; }
+.factor-board-chart-kpi .value.spread-negative { color: #fca5a5; }
+.factor-board-legend-item.spread { cursor: default; border-style: dashed; }
+.factor-board-legend-item.spread:hover { transform: none; }
+.factor-board-legend-name.subtle { color: #cbd5e1; }
+.factor-board-legend-swatch.spread { background: linear-gradient(90deg, #f8fafc, #94a3b8); }
+.factor-board-chart-baseline { fill: #94a3b8; font-size: 11px; }
+.factor-board-code {
+    margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, Monaco, monospace;
+    font-size: 12px; line-height: 1.7; color: #dbeafe; padding: 14px; border-radius: 16px; background: rgba(2,6,23,0.72);
+    border: 1px solid rgba(148,163,184,0.12);
+}
+.factor-board-list { display: flex; flex-direction: column; gap: 10px; }
+.factor-board-list-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px;
+    border: 1px solid rgba(148,163,184,0.08); background: rgba(15,23,42,0.62);
+}
+.factor-board-subtle { color: #94a3b8; font-size: 12px; }
+@media (max-width: 1180px) {
+    .factor-board-hero, .factor-board-modal-grid, .factor-board-workbench, .factor-board-process-grid { grid-template-columns: 1fr; }
+    .factor-board-overview, .factor-board-stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .factor-board-grid, .factor-board-quickgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .factor-board-research-grid, .factor-board-holdings-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+    .factor-board-overview, .factor-board-grid, .factor-board-quickgrid, .factor-board-stage-grid { grid-template-columns: 1fr; }
+    .factor-board-research-grid, .factor-board-holdings-summary { grid-template-columns: 1fr; }
+    .factor-board-modal { padding: 12px; }
+    .factor-board-modal-card { padding: 16px; border-radius: 18px; }
+    .factor-board-results-wrap { max-height: none; }
+    .factor-board-table th, .factor-board-table td { padding: 10px 8px; font-size: 12px; }
+}
+
+</style>
 </head>
 <body>
     <div id="root"><div style="color:#fff;padding:40px;font-family:sans-serif">Loading...</div></div>
@@ -388,15 +878,30 @@ function CodeEditor({ value, onChange }) {
 
 /* ===== Settings Page ===== */
 function SettingsPage({ showToast }) {
-    const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '', mysql_host: '', mysql_port: 3306, mysql_user: '', mysql_password: '', mysql_database: 'qtsys', use_mysql: 0 });
+    const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '', mysql_host: '', mysql_port: 3306, mysql_user: '', mysql_password: '', mysql_database: 'qtsys', use_mysql: 0, has_tushare_token: false, has_llm_api_key: false, has_mysql_password: false });
     const [loading, setLoading] = useState(false);
     const [mysqlTesting, setMysqlTesting] = useState(false);
-    useEffect(() => { api.get('/api/settings').then(setS).catch(() => {}); }, []);
+
+    const mergeSettingsResponse = (prev, next) => ({
+        ...prev,
+        ...next,
+        tushare_token: next.has_tushare_token ? (prev.tushare_token || '') : '',
+        llm_api_key: next.has_llm_api_key ? (prev.llm_api_key || '') : '',
+        mysql_password: next.has_mysql_password ? (prev.mysql_password || '') : '',
+    });
+
+    useEffect(() => {
+        api.get('/api/settings').then(data => setS(prev => mergeSettingsResponse(prev, data))).catch(() => {});
+    }, []);
 
     const save = async () => {
         setLoading(true);
-        try { const r = await api.put('/api/settings', s); setS(r); showToast('设置已保存', 'success'); }
-        catch (e) { showToast('保存失败', 'error'); }
+        try {
+            const r = await api.put('/api/settings', s);
+            setS(prev => mergeSettingsResponse(prev, r));
+            showToast('设置已保存', 'success');
+        }
+        catch (e) { showToast(e.detail || '保存失败', 'error'); }
         setLoading(false);
     };
     const validate = async () => {
@@ -422,10 +927,10 @@ function SettingsPage({ showToast }) {
         } catch (e) { showToast('激活失败', 'error'); }
         setLoading(false);
     };
-    const F = (label, key, type, step) => (
+    const F = (label, key, type, step, placeholder='') => (
         <div className="field">
             <label className="label">{label}</label>
-            <input className="input" type={type||'text'} step={step} value={s[key]||''}
+            <input className="input" type={type||'text'} step={step} placeholder={placeholder} value={s[key]||''}
                 onChange={e => setS({...s, [key]: type==='number' ? parseFloat(e.target.value)||0 : e.target.value})} />
         </div>
     );
@@ -434,7 +939,8 @@ function SettingsPage({ showToast }) {
             <h2 style={{fontSize:20,fontWeight:600}}>系统设置</h2>
             <div className="card space-y">
                 <div className="card-title">数据源配置</div>
-                {F('Tushare Token', 'tushare_token')}
+                {F('Tushare Token', 'tushare_token', 'password', undefined, s.has_tushare_token ? '已保存，留空则保持当前 Token 不变' : '请输入 Tushare Token')}
+                {s.has_tushare_token && <div className="text-xs text-muted">当前 Token 已保存；如需更换，直接输入新 Token 后保存。</div>}
                 <button className="btn-link mt-2" onClick={validate}>验证Token</button>
             </div>
             <div className="card space-y">
@@ -4238,147 +4744,982 @@ function FactorWorkflowPage({ showToast }) {
     );
 }
 
-/* PreviewMiniChart - Professional chart with axes and grid */
-function PreviewMiniChart({ data }) {
-    if (!data || data.length < 2) return null;
-    const vals = data.map(d => d.value);
-    const minV = Math.min(...vals), maxV = Math.max(...vals);
-    const range = maxV - minV || 1;
-    const w = 600, h = 300, pad = {left: 50, right: 20, top: 20, bottom: 40};
+function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey, onRangeChange, rangeOptions, spreadSeries, spreadReturnPct }) {
+    const [viewMode, setViewMode] = useState('all');
+    const usableSeries = Array.isArray(series) ? series.filter(item => Array.isArray(item.points) && item.points.length > 1) : [];
+    const usableSpread = Array.isArray(spreadSeries) && spreadSeries.length > 1 ? spreadSeries : [];
+    if (!usableSeries.length) return null;
+
+    const activeSeries = usableSeries.find(item => String(item.quantile) === String(selectedQuantile)) || usableSeries[0];
+    const drawSeries = viewMode === 'focus' ? [activeSeries] : (viewMode === 'spread' ? [] : usableSeries);
+    const drawSpread = usableSpread.length > 1 && (viewMode === 'all' || viewMode === 'spread');
+    const allDates = Array.from(new Set([
+        ...usableSeries.flatMap(item => item.points.map(point => String(point.date || ''))),
+        ...usableSpread.map(point => String(point.date || '')),
+    ])).sort();
+    const dateIndexMap = Object.fromEntries(allDates.map((date, index) => [date, index]));
+    const allValues = [
+        ...drawSeries.flatMap(item => item.points.map(point => Number(point.value) || 0)),
+        ...(drawSpread ? usableSpread.map(point => Number(point.value) || 0) : []),
+        1,
+    ];
+    const rawMin = Math.min(...allValues);
+    const rawMax = Math.max(...allValues);
+    const padding = Math.max((rawMax - rawMin) * 0.08, 0.02);
+    const minV = rawMin - padding;
+    const maxV = rawMax + padding;
+    const valueRange = maxV - minV || 1;
+    const w = 860, h = 390, pad = { left: 58, right: 54, top: 26, bottom: 48 };
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
 
-    const points = data.map((d, i) => {
-        const x = pad.left + (i / (data.length - 1)) * chartW;
-        const y = pad.top + chartH - ((d.value - minV) / range) * chartH;
-        return `${x},${y}`;
-    }).join(' ');
+    const formatAxisDate = (value) => {
+        const text = String(value || '');
+        if (text.length === 8 && !text.includes('-')) return `${text.slice(4, 6)}-${text.slice(6, 8)}`;
+        if (text.length >= 10 && text.includes('-')) return text.slice(5, 10);
+        return text;
+    };
+    const yScale = (value) => pad.top + chartH - ((value - minV) / valueRange) * chartH;
+    const xScale = (date) => {
+        const idx = dateIndexMap[String(date)] || 0;
+        return pad.left + ((allDates.length <= 1 ? 0 : idx / (allDates.length - 1)) * chartW);
+    };
 
-    // Y轴刻度
-    const yTicks = 5;
-    const yLines = [];
-    for (let i = 0; i <= yTicks; i++) {
-        const val = minV + (range * i / yTicks);
-        const y = pad.top + chartH - (i / yTicks) * chartH;
-        yLines.push({y, val});
-    }
+    const yTicks = Array.from({ length: 5 }, (_, index) => {
+        const ratio = index / 4;
+        const value = maxV - ratio * valueRange;
+        return { value, y: pad.top + ratio * chartH };
+    });
+    const xTicks = Array.from({ length: Math.min(6, allDates.length) }, (_, index) => {
+        const idx = allDates.length <= 1 ? 0 : Math.round((index / Math.max(1, Math.min(5, allDates.length - 1))) * (allDates.length - 1));
+        const date = allDates[idx];
+        return { date, x: xScale(date) };
+    }).filter((item, index, arr) => index === arr.findIndex(other => other.date === item.date));
 
-    // X轴日期标签（每隔合适间隔显示）
-    const xStep = Math.max(1, Math.floor(data.length / 8));
-    const xLabels = [];
-    for (let i = 0; i < data.length; i += xStep) {
-        const x = pad.left + (i / (data.length - 1)) * chartW;
-        xLabels.push({x, date: data[i].date});
-    }
+    const selectedReturn = Number(activeSeries.returnPct || 0);
+    const spreadReturn = Number(spreadReturnPct || 0);
+    const dateStart = allDates[0] ? formatAxisDate(allDates[0]) : '-';
+    const dateEnd = allDates[allDates.length - 1] ? formatAxisDate(allDates[allDates.length - 1]) : '-';
+    const spreadPoints = usableSpread.map(point => `${xScale(point.date)},${yScale(point.value)}`).join(' ');
+    const spreadLast = usableSpread.length ? usableSpread[usableSpread.length - 1] : null;
+    const activePolyline = activeSeries.points.map(point => `${xScale(point.date)},${yScale(point.value)}`).join(' ');
+    const activeArea = activeSeries.points.length
+        ? `${xScale(activeSeries.points[0].date)},${h - pad.bottom} ${activePolyline} ${xScale(activeSeries.points[activeSeries.points.length - 1].date)},${h - pad.bottom}`
+        : '';
+    const baselineY = yScale(1);
+    const noteText = viewMode === 'focus'
+        ? '\u805a\u7126\u89c6\u56fe\u4ec5\u7a81\u51fa\u5f53\u524d\u9009\u4e2d\u5206\u4f4d\uff0c\u5e76\u4ee51.00\u4f5c\u4e3a\u57fa\u51c6\u51c0\u503c\u7ebf\u3002'
+        : (viewMode === 'spread'
+            ? '\u591a\u7a7a\u89c6\u56fe\u5355\u72ec\u89c2\u5bdf\u6700\u9ad8\u5206\u4f4d\u4e0e\u6700\u4f4e\u5206\u4f4d\u4e4b\u95f4\u7684\u7ec4\u5408\u6536\u76ca\u5dee\u3002'
+            : '\u5168\u666f\u89c6\u56fe\u540c\u65f6\u5c55\u793a\u6240\u6709\u5206\u4f4d\u7ec4\u5408\uff0c\u767d\u8272\u865a\u7ebf\u4ee3\u8868\u591a\u7a7a\u4ef7\u5dee\u3002');
 
     return (
-        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'300px'}}>
-            {/* 网格线 */}
-            {yLines.map((line, i) => (
-                <line key={i} x1={pad.left} y1={line.y} x2={w-pad.right} y2={line.y}
-                      stroke="#333" strokeWidth="0.5" strokeDasharray="2,2" />
-            ))}
-
-            {/* Y轴 */}
-            <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h-pad.bottom} stroke="#666" strokeWidth="1" />
-            {yLines.map((line, i) => (
-                <text key={i} x={pad.left-5} y={line.y+4} fill="#888" fontSize="11" textAnchor="end">
-                    {line.val.toFixed(3)}
-                </text>
-            ))}
-
-            {/* X轴 */}
-            <line x1={pad.left} y1={h-pad.bottom} x2={w-pad.right} y2={h-pad.bottom} stroke="#666" strokeWidth="1" />
-            {xLabels.map((label, i) => (
-                <text key={i} x={label.x} y={h-pad.bottom+20} fill="#888" fontSize="10" textAnchor="middle">
-                    {label.date}
-                </text>
-            ))}
-
-            {/* 数据线 */}
-            <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth="2" />
-
-            {/* 标题 */}
-            <text x={w/2} y={15} fill="#aaa" fontSize="12" textAnchor="middle">因子IC值时间序列</text>
-        </svg>
+        <div className="factor-board-chart-shell">
+            <div className="factor-board-chart-head">
+                <div className="factor-board-chart-meta">
+                    <div className="factor-board-chart-kpi">
+                        <span className="label">{'\u533a\u95f4'}</span>
+                        <span className="value">{dateStart}{' ~ '}{dateEnd}</span>
+                    </div>
+                    <div className="factor-board-chart-kpi">
+                        <span className="label">{'\u5206\u4f4d\u6570'}</span>
+                        <span className="value">{usableSeries.length}</span>
+                    </div>
+                    <div className="factor-board-chart-kpi">
+                        <span className="label">{'\u5f53\u524d\u805a\u7126'}</span>
+                        <span className={'value ' + (selectedReturn >= 0 ? 'text-profit' : 'text-loss')}>Q{activeSeries.quantile} {selectedReturn >= 0 ? '+' : ''}{selectedReturn.toFixed(2)}%</span>
+                    </div>
+                    <div className="factor-board-chart-kpi">
+                        <span className="label">{'\u591a\u7a7a\u4ef7\u5dee'}</span>
+                        <span className={'value ' + (spreadReturn >= 0 ? 'spread-positive' : 'spread-negative')}>{spreadReturn >= 0 ? '+' : ''}{spreadReturn.toFixed(2)}%</span>
+                    </div>
+                </div>
+                <div className="factor-board-range-tabs">
+                    {(rangeOptions || []).map(item => (
+                        <button key={item.key} className={'factor-board-range-chip' + (rangeKey === item.key ? ' active' : '')} onClick={() => onRangeChange(item.key)}>{item.label}</button>
+                    ))}
+                </div>
+            </div>
+            <div className="factor-board-chart-toolbar">
+                <div className="factor-board-chart-viewtabs">
+                    <button className={'factor-board-range-chip' + (viewMode === 'all' ? ' active' : '')} onClick={() => setViewMode('all')}>{'\u5168\u666f\u5206\u4f4d'}</button>
+                    <button className={'factor-board-range-chip' + (viewMode === 'focus' ? ' active' : '')} onClick={() => setViewMode('focus')}>{'\u805a\u7126\u5206\u4f4d'}</button>
+                    <button className={'factor-board-range-chip' + (viewMode === 'spread' ? ' active' : '')} onClick={() => setViewMode('spread')}>{'\u591a\u7a7a\u4ef7\u5dee'}</button>
+                </div>
+                <div className="factor-board-subtle">{'\u5355\u51fb\u4e0b\u65b9 Q \u6807\u7b7e\u53ef\u5207\u6362\u805a\u7126\u5206\u4f4d'}</div>
+            </div>
+            <div className="factor-board-chart-tabs">
+                {usableSeries.map(item => (
+                    <button key={item.quantile} className={'factor-board-chip' + (String(selectedQuantile) === String(item.quantile) ? ' active' : '')} onClick={() => onSelectQuantile(item.quantile)}>Q{item.quantile}</button>
+                ))}
+            </div>
+            <svg viewBox={`0 0 ${w} ${h}`} className="factor-board-chart-svg">
+                <defs>
+                    <linearGradient id="factorBoardActiveGlow" x1="0" x2="1" y1="0" y2="0">
+                        <stop offset="0%" stopColor={activeSeries.color} stopOpacity="0.34" />
+                        <stop offset="100%" stopColor={activeSeries.color} stopOpacity="0.08" />
+                    </linearGradient>
+                    <linearGradient id="factorBoardActiveArea" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor={activeSeries.color} stopOpacity="0.24" />
+                        <stop offset="100%" stopColor={activeSeries.color} stopOpacity="0.01" />
+                    </linearGradient>
+                </defs>
+                {yTicks.map((tick, index) => (
+                    <g key={'y-' + index}>
+                        <line x1={pad.left} y1={tick.y} x2={w - pad.right} y2={tick.y} stroke="rgba(148,163,184,0.16)" strokeDasharray="4 6" />
+                        <text x={pad.left - 10} y={tick.y + 4} fill="#94a3b8" fontSize="11" textAnchor="end">{tick.value.toFixed(2)}</text>
+                    </g>
+                ))}
+                {xTicks.map((tick, index) => (
+                    <g key={'x-' + index}>
+                        <line x1={tick.x} y1={pad.top} x2={tick.x} y2={h - pad.bottom} stroke="rgba(51,65,85,0.22)" />
+                        <text x={tick.x} y={h - pad.bottom + 22} fill="#94a3b8" fontSize="11" textAnchor="middle">{formatAxisDate(tick.date)}</text>
+                    </g>
+                ))}
+                <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h - pad.bottom} stroke="rgba(148,163,184,0.28)" />
+                <line x1={pad.left} y1={h - pad.bottom} x2={w - pad.right} y2={h - pad.bottom} stroke="rgba(148,163,184,0.28)" />
+                <line x1={pad.left} y1={baselineY} x2={w - pad.right} y2={baselineY} stroke="rgba(148,163,184,0.40)" strokeDasharray="6 6" />
+                <text x={w - pad.right} y={baselineY - 8} textAnchor="end" className="factor-board-chart-baseline">{'\u57fa\u51c6 1.00'}</text>
+                {viewMode !== 'spread' && activeArea ? <polygon points={activeArea} fill="url(#factorBoardActiveArea)" /> : null}
+                {drawSeries.map(item => {
+                    const points = item.points.map(point => `${xScale(point.date)},${yScale(point.value)}`).join(' ');
+                    const lastPoint = item.points[item.points.length - 1];
+                    const isActive = String(item.quantile) === String(activeSeries.quantile);
+                    const strokeWidth = isActive ? 3.2 : 1.6;
+                    const opacity = viewMode === 'focus' ? 1 : (isActive ? 1 : 0.48);
+                    return (
+                        <g key={item.quantile}>
+                            {isActive && (
+                                <polyline points={points} fill="none" stroke="url(#factorBoardActiveGlow)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+                            )}
+                            <polyline points={points} fill="none" stroke={item.color} strokeWidth={strokeWidth} strokeOpacity={opacity} strokeLinecap="round" strokeLinejoin="round" />
+                            {lastPoint && (
+                                <g>
+                                    <circle cx={xScale(lastPoint.date)} cy={yScale(lastPoint.value)} r={isActive ? 4.8 : 3.2} fill={item.color} fillOpacity={opacity} />
+                                    {isActive && (
+                                        <text x={Math.min(w - 6, xScale(lastPoint.date) + 10)} y={yScale(lastPoint.value) - 8} fill={item.color} fontSize="11" fontWeight="700">Q{item.quantile}</text>
+                                    )}
+                                </g>
+                            )}
+                        </g>
+                    );
+                })}
+                {drawSpread && (
+                    <g>
+                        <polyline points={spreadPoints} fill="none" stroke="rgba(248,250,252,0.92)" strokeWidth={viewMode === 'spread' ? '3' : '2.2'} strokeDasharray="8 6" strokeLinecap="round" strokeLinejoin="round" />
+                        {spreadLast && (
+                            <g>
+                                <circle cx={xScale(spreadLast.date)} cy={yScale(spreadLast.value)} r="4.2" fill="#f8fafc" />
+                                <text x={Math.min(w - 10, xScale(spreadLast.date) + 10)} y={yScale(spreadLast.value) + 14} fill="#f8fafc" fontSize="11" fontWeight="700">LS</text>
+                            </g>
+                        )}
+                    </g>
+                )}
+            </svg>
+            <div className="factor-board-chart-legend">
+                {usableSeries.map(item => (
+                    <button key={'legend-' + item.quantile} className={'factor-board-legend-item' + (String(selectedQuantile) === String(item.quantile) ? ' active' : '')} onClick={() => onSelectQuantile(item.quantile)}>
+                        <div className="factor-board-legend-main">
+                            <span className="factor-board-legend-swatch" style={{ background: item.color }}></span>
+                            <span className="factor-board-legend-name">Q{item.quantile}</span>
+                        </div>
+                        <span className={'factor-board-legend-return ' + (Number(item.returnPct || 0) >= 0 ? 'positive' : 'negative')}>
+                            {Number(item.returnPct || 0) >= 0 ? '+' : ''}{Number(item.returnPct || 0).toFixed(2)}%
+                        </span>
+                    </button>
+                ))}
+                {usableSpread.length > 1 && (
+                    <div className="factor-board-legend-item spread">
+                        <div className="factor-board-legend-main">
+                            <span className="factor-board-legend-swatch spread"></span>
+                            <span className="factor-board-legend-name subtle">{'\u591a\u7a7a\u4ef7\u5dee'}</span>
+                        </div>
+                        <span className={'factor-board-legend-return ' + (spreadReturn >= 0 ? 'positive' : 'negative')}>
+                            {spreadReturn >= 0 ? '+' : ''}{spreadReturn.toFixed(2)}%
+                        </span>
+                    </div>
+                )}
+            </div>
+            <div className="factor-board-chart-note">{noteText}</div>
+        </div>
     );
 }
+function FactorBoardPage({ showToast }) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const [dbConfig, setDbConfig] = useState({ host: 'localhost', port: 3306, user: 'root', password: '', database: 'qtsys', has_password: false });
+    const [status, setStatus] = useState({ running: false, progress: 0, total: 191, current_factor: '', message: '', backtest_days: 365, start_date: '', end_date: '', universe_type: 'system', universe_code: '000905.SH', universe_name: '中证500' });
+    const [analysisForm, setAnalysisForm] = useState({ backtest_days: 365, start_date: '', end_date: todayStr, universe_type: 'system', universe_code: '000905.SH', custom_pool_id: '' });
+    const [universeOptions, setUniverseOptions] = useState({ system_universes: [], custom_pools: [] });
+    const [poolForm, setPoolForm] = useState({ id: null, name: '', description: '', stock_items: [] });
+    const [stockKeyword, setStockKeyword] = useState('');
+    const [stockResults, setStockResults] = useState([]);
+    const [showStockResults, setShowStockResults] = useState(false);
+    const [poolSaving, setPoolSaving] = useState(false);
+    const [poolDeleting, setPoolDeleting] = useState(false);
+    const [showPoolManager, setShowPoolManager] = useState(false);
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [testing, setTesting] = useState(false);
+    const [starting, setStarting] = useState(false);
+    const [stopping, setStopping] = useState(false);
+    const [retrying, setRetrying] = useState(false);
+    const [search, setSearch] = useState('');
+    const [sortKey, setSortKey] = useState('spread_excess');
+    const [sortDir, setSortDir] = useState('desc');
+    const [resultPreset, setResultPreset] = useState('all');
+    const [favoriteFactors, setFavoriteFactors] = useState([]);
+    const [selectedFactor, setSelectedFactor] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detail, setDetail] = useState({ info: null, snapshot: null, details: [], selectedQuantile: '1', rangeKey: '1Y' });
+    const formHydratedRef = useRef(false);
 
-/* EquityCurveChart - Professional equity curve with axes and grid */
-function EquityCurveChart({ data }) {
-    if (!data || data.length < 2) return null;
-    const vals = data.map(d => d.value);
-    const minV = Math.min(...vals), maxV = Math.max(...vals);
-    const range = maxV - minV || 1;
-    const w = 800, h = 350, pad = {left: 60, right: 20, top: 30, bottom: 50};
-    const chartW = w - pad.left - pad.right;
-    const chartH = h - pad.top - pad.bottom;
+    const toApiDate = (value) => value ? String(value).replaceAll('-', '') : '';
+    const fromApiDate = (value) => value && String(value).length >= 8 ? `${String(value).slice(0,4)}-${String(value).slice(4,6)}-${String(value).slice(6,8)}` : '';
+    const loadConfig = useCallback(() => api.get('/api/factor_board/db_config').then(res => setDbConfig(res)).catch(() => {}), []);
+    const loadStatus = useCallback(() => api.get('/api/factor_board/analysis_status').then(res => {
+        setStatus(res);
+        setAnalysisForm(prev => {
+            if (!formHydratedRef.current || res.running) {
+                formHydratedRef.current = true;
+                return {
+                    ...prev,
+                    backtest_days: res.backtest_days || prev.backtest_days,
+                    start_date: fromApiDate(res.start_date) || prev.start_date,
+                    end_date: fromApiDate(res.end_date) || prev.end_date || todayStr,
+                    universe_type: res.universe_type || prev.universe_type,
+                    universe_code: res.universe_code || prev.universe_code,
+                    custom_pool_id: res.universe_type === 'custom' ? String(res.custom_pool_id || prev.custom_pool_id || '') : prev.custom_pool_id,
+                };
+            }
+            return prev;
+        });
+    }).catch(() => {}), [todayStr]);
+    const loadResults = useCallback(() => api.get('/api/factor_board/latest_results').then(res => setResults(Array.isArray(res) ? res : [])).catch(() => setResults([])), []);
+    const loadUniverses = useCallback(() => api.get('/api/factor_board/universe_options').then(res => setUniverseOptions(res || { system_universes: [], custom_pools: [] })).catch(() => setUniverseOptions({ system_universes: [], custom_pools: [] })), []);
 
-    const points = data.map((d, i) => {
-        const x = pad.left + (i / (data.length - 1)) * chartW;
-        const y = pad.top + chartH - ((d.value - minV) / range) * chartH;
-        return `${x},${y}`;
-    }).join(' ');
+    const refreshAll = useCallback(async (silent) => {
+        if (!silent) setLoading(true);
+        try {
+            await Promise.all([loadConfig(), loadStatus(), loadResults(), loadUniverses()]);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, [loadConfig, loadStatus, loadResults, loadUniverses]);
 
-    const fillPts = `${pad.left},${h-pad.bottom} ${points} ${w-pad.right},${h-pad.bottom}`;
-    const startVal = vals[0], endVal = vals[vals.length - 1];
-    const color = endVal >= startVal ? '#34d399' : '#f87171';
+    useEffect(() => { refreshAll(false); }, [refreshAll]);
 
-    // Y轴刻度
-    const yTicks = 6;
-    const yLines = [];
-    for (let i = 0; i <= yTicks; i++) {
-        const val = minV + (range * i / yTicks);
-        const y = pad.top + chartH - (i / yTicks) * chartH;
-        yLines.push({y, val});
+    useEffect(() => {
+        const timer = setInterval(() => {
+            loadStatus();
+            if (status.running) loadResults();
+        }, status.running ? 1800 : 5000);
+        return () => clearInterval(timer);
+    }, [status.running, loadStatus, loadResults]);
+
+    useEffect(() => {
+        if (status.analysis_batch) loadResults();
+    }, [status.analysis_batch, loadResults]);
+
+    useEffect(() => {
+        if (!status.running && status.analysis_batch) loadResults();
+    }, [status.running, status.phase, status.analysis_batch, loadResults]);
+
+    useEffect(() => {
+        if (!selectedFactor) return;
+        setDetailLoading(true);
+        Promise.all([
+            api.get('/api/factor_board/factor/' + encodeURIComponent(selectedFactor) + '/info'),
+            api.get('/api/factor_board/factor/' + encodeURIComponent(selectedFactor) + '/snapshot'),
+            api.get('/api/factor_board/factor/' + encodeURIComponent(selectedFactor) + '/details'),
+        ]).then(([info, snapshot, details]) => {
+            const quantiles = Array.from(new Set((details || []).map(item => String(item.quantile)))).sort((a, b) => Number(a) - Number(b));
+            setDetail({ info, snapshot, details: Array.isArray(details) ? details : [], selectedQuantile: quantiles[0] || '1', rangeKey: '1Y' });
+        }).catch((e) => {
+            showToast((e && e.detail) || '\u52a0\u8f7d\u56e0\u5b50\u8be6\u60c5\u5931\u8d25', 'error');
+            setDetail({ info: null, snapshot: null, details: [], selectedQuantile: '1', rangeKey: '1Y' });
+        }).finally(() => setDetailLoading(false));
+    }, [selectedFactor, showToast]);
+
+    useEffect(() => {
+        if (!stockKeyword || stockKeyword.trim().length < 1) { setStockResults([]); setShowStockResults(false); return; }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await api.get('/api/factor_board/stock_search?q=' + encodeURIComponent(stockKeyword.trim()));
+                setStockResults(Array.isArray(res) ? res : []);
+                setShowStockResults(true);
+            } catch (e) { setStockResults([]); }
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [stockKeyword]);
+
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('qtsys.factor_board.favorites') || '[]');
+            if (Array.isArray(saved)) setFavoriteFactors(saved.filter(Boolean));
+        } catch (e) {}
+    }, []);
+
+    useEffect(() => {
+        try { localStorage.setItem('qtsys.factor_board.favorites', JSON.stringify(favoriteFactors)); } catch (e) {}
+    }, [favoriteFactors]);
+
+    const detailRangeOptions = [
+        { key: '1M', label: '1M', days: 21 },
+        { key: '3M', label: '3M', days: 63 },
+        { key: '6M', label: '6M', days: 126 },
+        { key: '1Y', label: '1Y', days: 252 },
+        { key: 'ALL', label: 'ALL', days: null },
+    ];
+    const detailQuantiles = Array.from(new Set((detail.details || []).map(item => String(item.quantile)))).sort((a, b) => Number(a) - Number(b));
+    const detailDates = Array.from(new Set((detail.details || []).map(item => String(item.trade_date || '')))).filter(Boolean).sort();
+    const activeRange = detailRangeOptions.find(item => item.key === detail.rangeKey) || detailRangeOptions[3];
+    const visibleDates = activeRange.days ? detailDates.slice(-activeRange.days) : detailDates;
+    const visibleDateSet = new Set(visibleDates);
+    const quantilePalette = ['#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#22d3ee', '#fb7185', '#f97316', '#c084fc', '#38bdf8'];
+    const quantileChartSeries = detailQuantiles.map((quantile, index) => {
+        const points = (detail.details || [])
+            .filter(item => String(item.quantile) === String(quantile) && visibleDateSet.has(String(item.trade_date || '')))
+            .sort((a, b) => String(a.trade_date || '').localeCompare(String(b.trade_date || '')))
+            .map(item => ({
+                date: String(item.trade_date || ''),
+                value: safeNum(item.portfolio_value) || (1 + safeNum(item.cumulative_return)),
+            }));
+        const startValue = points.length ? points[0].value : 0;
+        const endValue = points.length ? points[points.length - 1].value : 0;
+        return {
+            quantile,
+            color: quantilePalette[index % quantilePalette.length],
+            points,
+            returnPct: startValue ? ((endValue / startValue) - 1) * 100 : 0,
+        };
+    }).filter(item => item.points.length > 0);
+    const bottomSeries = quantileChartSeries.length ? quantileChartSeries[0] : null;
+    const topSeries = quantileChartSeries.length ? quantileChartSeries[quantileChartSeries.length - 1] : null;
+    const spreadSeries = topSeries && bottomSeries ? topSeries.points.map((point, index) => {
+        const bottomPoint = bottomSeries.points[index];
+        if (!bottomPoint || bottomPoint.date !== point.date) return null;
+        return { date: point.date, value: point.value - bottomPoint.value + 1 };
+    }).filter(Boolean) : [];
+    const chartHasData = quantileChartSeries.length > 0 && (quantileChartSeries.some(item => item.points.length > 1) || spreadSeries.length > 1);
+    const spreadReturnPct = spreadSeries.length > 1 ? ((spreadSeries[spreadSeries.length - 1].value / spreadSeries[0].value) - 1) * 100 : 0;
+    const holdingsGroups = detail.snapshot && detail.snapshot.holdings_by_quantile ? detail.snapshot.holdings_by_quantile : {};
+    const currentHoldings = holdingsGroups[String(detail.selectedQuantile)] || [];
+
+    const saveConfig = async () => {
+        setSaving(true);
+        try {
+            const res = await api.post('/api/factor_board/save_config', { ...dbConfig });
+            showToast(res.message || (res.success ? '\u914d\u7f6e\u5df2\u4fdd\u5b58' : '\u4fdd\u5b58\u5931\u8d25'), res.success ? 'success' : 'error');
+            if (res && res.success) await loadConfig();
+        } catch (e) {
+            showToast((e && e.detail) || '\u4fdd\u5b58\u914d\u7f6e\u5931\u8d25', 'error');
+        }
+        setSaving(false);
+    };
+    const testConfig = async () => {
+        setTesting(true);
+        try { const res = await api.post('/api/factor_board/test_connection', { ...dbConfig }); showToast(res.message || (res.success ? '连接成功' : '连接失败'), res.success ? 'success' : 'error'); }
+        catch (e) { showToast((e && e.detail) || '测试数据库连接失败', 'error'); }
+        setTesting(false);
+    };
+
+    const addStockToPool = (item) => {
+        if (!item || !item.ts_code) return;
+        if ((poolForm.stock_items || []).some(existing => existing.ts_code === item.ts_code)) { showToast('该股票已在自定义池中', 'error'); return; }
+        setPoolForm(prev => ({ ...prev, stock_items: [...(prev.stock_items || []), { ts_code: item.ts_code, name: item.name || '' }] }));
+        setStockKeyword(''); setStockResults([]); setShowStockResults(false);
+    };
+    const removeStockFromPool = (tsCode) => setPoolForm(prev => ({ ...prev, stock_items: (prev.stock_items || []).filter(item => item.ts_code !== tsCode) }));
+    const editPool = (pool) => { setPoolForm({ id: pool.id, name: pool.name || '', description: pool.description || '', stock_items: Array.isArray(pool.stock_items) ? pool.stock_items : [] }); setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(pool.id) })); };
+    const resetPoolForm = () => { setPoolForm({ id: null, name: '', description: '', stock_items: [] }); setStockKeyword(''); setStockResults([]); setShowStockResults(false); };
+
+    const savePool = async () => {
+        if (!poolForm.name.trim()) { showToast('\u8bf7\u8f93\u5165\u80a1\u7968\u6c60\u540d\u79f0', 'error'); return; }
+        if ((poolForm.stock_items || []).length === 0) { showToast('\u8bf7\u81f3\u5c11\u6dfb\u52a0\u4e00\u53ea\u80a1\u7968', 'error'); return; }
+        setPoolSaving(true);
+        try {
+            const payload = { name: poolForm.name.trim(), description: poolForm.description || '', stock_items: poolForm.stock_items || [] };
+            const res = poolForm.id ? await api.put('/api/factor_board/custom_pools/' + poolForm.id, payload) : await api.post('/api/factor_board/custom_pools', payload);
+            showToast(poolForm.id ? '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u5df2\u66f4\u65b0' : '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u5df2\u4fdd\u5b58', 'success');
+            await loadUniverses();
+            setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(res.id) }));
+            setPoolForm({ id: res.id, name: res.name || '', description: res.description || '', stock_items: Array.isArray(res.stock_items) ? res.stock_items : [] });
+        } catch (e) { showToast((e && e.detail) || '保存自定义股票池失败', 'error'); }
+        setPoolSaving(false);
+    };
+    const deletePool = async () => { if (!poolForm.id) return; setPoolDeleting(true); try { await api.remove('/api/factor_board/custom_pools/' + poolForm.id); showToast('自定义股票池已删除', 'success'); resetPoolForm(); await loadUniverses(); } catch (e) { showToast((e && e.detail) || '删除自定义股票池失败', 'error'); } setPoolDeleting(false); };
+
+    const startAnalysis = async () => {
+        setStarting(true);
+        try {
+            const systemPool = (universeOptions.system_universes || []).find(item => item.code === analysisForm.universe_code);
+            const customPool = (universeOptions.custom_pools || []).find(item => String(item.id) === String(analysisForm.custom_pool_id || ''));
+            const payload = {
+                backtest_days: Number(analysisForm.backtest_days || 365),
+                start_date: toApiDate(analysisForm.start_date) || null,
+                end_date: toApiDate(analysisForm.end_date) || null,
+                universe_type: analysisForm.universe_type,
+                universe_code: analysisForm.universe_type === 'system' ? analysisForm.universe_code : '',
+                universe_name: analysisForm.universe_type === 'system' ? ((systemPool && systemPool.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((customPool && customPool.name) || ''),
+                custom_pool_id: analysisForm.universe_type === 'custom' ? Number(analysisForm.custom_pool_id || 0) || null : null,
+                benchmark_code: analysisForm.universe_type === 'system' ? analysisForm.universe_code : '',
+            };
+            const res = await api.post('/api/factor_board/start_analysis', payload);
+            showToast(res.message || '\u5206\u6790\u4efb\u52a1\u5df2\u542f\u52a8', 'success'); refreshAll(true);
+        } catch (e) { showToast((e && e.detail) || '\u542f\u52a8\u5206\u6790\u5931\u8d25', 'error'); }
+        setStarting(false);
+    };
+    const stopAnalysis = async () => {
+        setStopping(true);
+        try {
+            const res = await api.post('/api/factor_board/stop_analysis', {});
+            showToast((res && res.message) || '\u5df2\u53d1\u9001\u505c\u6b62\u8bf7\u6c42', 'success');
+            await loadStatus();
+        } catch (e) {
+            showToast((e && e.detail) || '\u505c\u6b62\u5206\u6790\u5931\u8d25', 'error');
+        }
+        setStopping(false);
+    };
+    const retryFailedFactors = async () => {
+        setRetrying(true);
+        try {
+            const res = await api.post('/api/factor_board/retry_failed_factors', {});
+            showToast((res && res.message) || '\u5df2\u5f00\u59cb\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50', 'success');
+            await loadStatus();
+            await loadResults();
+        } catch (e) {
+            showToast((e && e.detail) || '\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50\u5931\u8d25', 'error');
+        }
+        setRetrying(false);
+    };
+
+    function safeNum(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
     }
 
-    // X轴日期标签
-    const xStep = Math.max(1, Math.floor(data.length / 10));
-    const xLabels = [];
-    for (let i = 0; i < data.length; i += xStep) {
-        const x = pad.left + (i / (data.length - 1)) * chartW;
-        xLabels.push({x, date: data[i].date});
-    }
+    const formatPct = (value) => safeNum(value).toFixed(2) + '%';
+    const formatRate = (value) => (safeNum(value) * 100).toFixed(2) + '%';
+    const formatNum = (value) => safeNum(value).toFixed(3);
+    const metricToneClass = (value) => safeNum(value) >= 0 ? 'factor-board-badge positive' : 'factor-board-badge negative';
+    const metricTextClass = (value) => safeNum(value) >= 0 ? 'text-profit' : 'text-loss';
+    const getHighQuantileExcess = (item) => safeNum(item && item.max_quantile_excess);
+    const getLowQuantileExcess = (item) => safeNum(item && item.min_quantile_excess);
+    const getSpreadExcess = (item) => getHighQuantileExcess(item) - getLowQuantileExcess(item);
+    const getFactorDirectionLabel = (item) => getSpreadExcess(item) >= 0 ? '高分位领先' : '低分位领先';
+    const getFactorDirectionClass = (item) => metricToneClass(getSpreadExcess(item));
+    const resolveSortValue = (item, key) => {
+        if (key === 'spread_excess') return getSpreadExcess(item);
+        if (key === 'high_quantile_excess') return getHighQuantileExcess(item);
+        if (key === 'low_quantile_excess') return getLowQuantileExcess(item);
+        return item && item[key] != null ? item[key] : '';
+    };
+    const isFavoriteFactor = (factorName) => favoriteFactors.includes(String(factorName || ''));
+    const toggleFavoriteFactor = (factorName) => {
+        const key = String(factorName || '');
+        if (!key) return;
+        setFavoriteFactors(prev => prev.includes(key) ? prev.filter(item => item !== key) : [...prev, key]);
+    };
+
+    const selectedSystemUniverse = (universeOptions.system_universes || []).find(item => item.code === analysisForm.universe_code);
+    const selectedCustomPool = (universeOptions.custom_pools || []).find(item => String(item.id) === String(analysisForm.custom_pool_id || '')) || null;
+    const failedFactors = Array.isArray(status.failed_factors) ? status.failed_factors : [];
+    const statusLogs = Array.isArray(status.logs) ? [...status.logs].reverse() : [];
+    const factorProgressPct = Math.max(0, Math.min(100, safeNum(status.total) ? (safeNum(status.progress) / Math.max(1, safeNum(status.total))) * 100 : 0));
+    const marketProgressPct = Math.max(0, Math.min(100, safeNum(status.market_total_codes) ? (safeNum(status.market_completed_codes) / Math.max(1, safeNum(status.market_total_codes))) * 100 : 0));
+    const quantileCount = detailQuantiles.length || 5;
+    const phaseOrder = ['prepare', 'universe', 'market', 'benchmark', 'factors', 'completed'];
+    const currentPhaseIndex = phaseOrder.indexOf(String(status.phase || ''));
+    const phaseState = (key, idx) => {
+        if (status.phase === 'cancelled' || status.phase === 'failed') return idx < currentPhaseIndex ? 'done' : '';
+        if (status.phase === 'stopping' && key === 'factors') return 'active';
+        if (String(status.phase || '') === key) return 'active';
+        if (currentPhaseIndex >= 0 && idx < currentPhaseIndex) return 'done';
+        if (!status.running && key === 'factors' && safeNum(status.result_count) > 0) return 'done';
+        return '';
+    };
+    const stageCards = [
+        { key: 'prepare', title: '\u51c6\u5907\u53c2\u6570', value: status.phase === 'queued' ? '\u5df2\u63d0\u4ea4' : '\u5c31\u7eea', meta: status.start_date && status.end_date ? `${status.start_date || '-'} ~ ${status.end_date || '-'}` : '\u7b49\u5f85\u542f\u52a8' },
+        { key: 'universe', title: '\u80a1\u7968\u6c60', value: status.universe_name || '-', meta: status.universe_code || '-' },
+        { key: 'market', title: '\u884c\u60c5\u51c6\u5907', value: `${Math.round(marketProgressPct)}%`, meta: `${safeNum(status.market_completed_codes)}/${safeNum(status.market_total_codes)} \u53ea\u80a1\u7968` },
+        { key: 'factors', title: '\u56e0\u5b50\u56de\u6d4b', value: `${Math.round(factorProgressPct)}%`, meta: `${safeNum(status.factor_completed)}/${safeNum(status.factor_total || status.total)} \u4e2a\u56e0\u5b50 \u00b7 \u4fdd\u7559 ${safeNum(status.result_count)} \u4e2a\u7ed3\u679c` },
+    ];
+    const filteredResults = results.filter(item => {
+        const keyword = search.trim().toLowerCase();
+        const matchesKeyword = !keyword || String(item.factor_name || '').toLowerCase().includes(keyword) || String(item.universe_name || '').toLowerCase().includes(keyword);
+        if (!matchesKeyword) return false;
+        if (resultPreset === 'positive') return getSpreadExcess(item) > 0;
+        if (resultPreset === 'high_ic') return safeNum(item.ic_mean) >= 0.03;
+        if (resultPreset === 'low_turnover') return safeNum(item.max_quantile_turnover) <= 15;
+        if (resultPreset === 'favorites') return isFavoriteFactor(item.factor_name);
+        return true;
+    }).sort((a, b) => {
+        const av = resolveSortValue(a, sortKey);
+        const bv = resolveSortValue(b, sortKey);
+        const aNum = Number(av);
+        const bNum = Number(bv);
+        let cmp = 0;
+        if (Number.isFinite(aNum) && Number.isFinite(bNum)) cmp = aNum - bNum;
+        else cmp = String(av).localeCompare(String(bv));
+        return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    const avgCoverage = results.length ? results.reduce((sum, item) => sum + safeNum(item.coverage_ratio), 0) / results.length : 0;
+    const avgIc = results.length ? results.reduce((sum, item) => sum + safeNum(item.ic_mean), 0) / results.length : 0;
+    const bestFactor = results.length ? [...results].sort((a, b) => Math.abs(getSpreadExcess(b)) - Math.abs(getSpreadExcess(a)))[0] : null;
+    const latestResult = detail.snapshot && detail.snapshot.latest_result ? detail.snapshot.latest_result : null;
+    const infoDescription = detail.info && detail.info.description ? detail.info.description : '\u6682\u65e0\u56e0\u5b50\u8bf4\u660e';
+    const economicMeaning = detail.info && detail.info.economic_meaning ? detail.info.economic_meaning : infoDescription;
+    const latestTradeDateLabel = detail.snapshot && detail.snapshot.latest_trade_date ? detail.snapshot.latest_trade_date : '-';
+    const avgHoldingWeight = currentHoldings.length ? currentHoldings.reduce((sum, item) => sum + safeNum(item.weight), 0) / currentHoldings.length : 0;
+    const topHolding = currentHoldings.length ? [...currentHoldings].sort((a, b) => safeNum(b.weight) - safeNum(a.weight))[0] : null;
+    const activeUniverseLabel = analysisForm.universe_type === 'system'
+        ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60')
+        : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60');
+    const activeUniverseMeta = analysisForm.universe_type === 'system'
+        ? ((selectedSystemUniverse && selectedSystemUniverse.code) || (analysisForm.universe_code || '-'))
+        : (((selectedCustomPool && selectedCustomPool.stock_count) || (poolForm.stock_items || []).length || 0) + '\u53ea\u80a1\u7968');
+    const customPoolCount = (universeOptions.custom_pools || []).length;
+    const selectedPoolCount = analysisForm.universe_type === 'custom'
+        ? ((selectedCustomPool && selectedCustomPool.stock_count) || 0)
+        : 0;
+    const favoriteCount = favoriteFactors.length;
 
     return (
-        <svg viewBox={`0 0 ${w} ${h}`} style={{width:'100%',height:'350px'}}>
-            {/* 网格线 */}
-            {yLines.map((line, i) => (
-                <line key={`y${i}`} x1={pad.left} y1={line.y} x2={w-pad.right} y2={line.y}
-                      stroke="#333" strokeWidth="0.5" strokeDasharray="3,3" />
-            ))}
+        <div className="factor-board-shell fade-in">
+            <div className="factor-board-hero">
+                <section className="factor-board-glass">
+                    <div className="factor-board-title">Alpha191 因子看板</div>
+                    <div className="factor-board-copy">基于真实回测结果统一查看 Alpha191 因子的高低分位超额、分位差、IC、覆盖率、换手与当前有效性。这里的“高分位超额/低分位超额”分别对应最高因子值分位与最低因子值分位相对基准的年化超额收益。</div>
+                    <div className="factor-board-pillrow">
+                        <span className="factor-board-pill">真实数据库结果</span>
+                        <span className="factor-board-pill">批量分析任务</span>
+                        <span className="factor-board-pill">因子详情与持仓</span>
+                        <span className="factor-board-pill">研究筛选与排序</span>
+                    </div>
+                </section>
+                <section className="factor-board-glass factor-board-panel">
+                    <div className="factor-board-toolbar">
+                        <div>
+                            <div className="card-title" style={{marginBottom: 6}}>{'\u7814\u7a76\u7b5b\u9009'}</div>
+                            <div className="factor-board-subtle">{'\u5df2\u5b8c\u6210 '}{Math.round(Math.max(0, Math.min(100, safeNum(status.progress))))}{'% \u00b7 \u5f53\u524d\u56e0\u5b50 '}{status.current_factor || '-'}</div>
+                        </div>
+                    </div>
+                    <div className="factor-board-progress"><span style={{ width: `${Math.max(0, Math.min(100, safeNum(status.progress)))}%` }}></span></div>
+                </section>
+                <section className="factor-board-glass factor-board-panel">
+                    <div className="factor-board-toolbar">
+                        <div>
+                            <div className="card-title" style={{marginBottom: 6}}>{'\u80a1\u7968\u6c60\u5de5\u4f5c\u53f0'}</div>
+                            <div className="factor-board-subtle">{'\u4e3b\u754c\u9762\u4ec5\u4fdd\u7559\u80a1\u7968\u6c60\u6982\u89c8\uff0c\u65b0\u5efa\u3001\u7f16\u8f91\u3001\u5220\u9664\u548c\u6210\u5206\u8c03\u6574\u7edf\u4e00\u5728\u72ec\u7acb\u5f39\u7a97\u4e2d\u5b8c\u6210\u3002'}</div>
+                        </div>
+                        <div className="factor-board-toolbar-right">
+                            <button className="btn btn-secondary" onClick={() => { resetPoolForm(); setShowPoolManager(true); }}>{'\u65b0\u5efa\u80a1\u7968\u6c60'}</button>
+                            <button className="btn btn-primary" onClick={() => setShowPoolManager(true)}>{'\u7ba1\u7406\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</button>
+                        </div>
+                    </div>
+                    <div className="factor-board-quickgrid">
+                        <div className="factor-board-mini-card">
+                            <div className="factor-board-mini-label">{'\u5f53\u524d\u7528\u4e8e\u5206\u6790'}</div>
+                            <div className="factor-board-mini-value small">{activeUniverseLabel}</div>
+                            <div className="factor-board-mini-meta">{activeUniverseMeta}</div>
+                        </div>
+                        <div className="factor-board-mini-card">
+                            <div className="factor-board-mini-label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u6570\u91cf'}</div>
+                            <div className="factor-board-mini-value">{customPoolCount}</div>
+                            <div className="factor-board-mini-meta">{'\u53ef\u4f9b\u540e\u7eed\u56de\u6d4b\u4e0e\u56e0\u5b50\u7b5b\u9009\u590d\u7528'}</div>
+                        </div>
+                        <div className="factor-board-mini-card">
+                            <div className="factor-board-mini-label">{'\u5f53\u524d\u81ea\u5b9a\u4e49\u6c60\u6210\u5206'}</div>
+                            <div className="factor-board-mini-value">{selectedPoolCount}</div>
+                            <div className="factor-board-mini-meta">{'\u4ec5\u5728\u9009\u4e2d\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u65f6\u751f\u6548'}</div>
+                        </div>
+                        <div className="factor-board-mini-card">
+                            <div className="factor-board-mini-label">{'\u5feb\u6377\u64cd\u4f5c'}</div>
+                            <div className="factor-board-mini-value small">{'\u7edf\u4e00\u5165\u53e3\uff0c\u907f\u514d\u4e3b\u9875\u62e5\u6324'}</div>
+                            <div className="factor-board-mini-meta">{'\u70b9\u51fb\u53f3\u4e0a\u89d2\u6309\u94ae\u5373\u53ef\u6253\u5f00\u7ba1\u7406\u9762\u677f'}</div>
+                        </div>
+                    </div>
+                </section>
 
-            {/* Y轴 */}
-            <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h-pad.bottom} stroke="#666" strokeWidth="1.5" />
-            {yLines.map((line, i) => (
-                <text key={`yt${i}`} x={pad.left-8} y={line.y+4} fill="#aaa" fontSize="12" textAnchor="end">
-                    {line.val.toFixed(0)}
-                </text>
-            ))}
+            <section className="card space-y factor-board-panel">
+                <div>
+                    <div className="card-title" style={{marginBottom: 6}}>研究筛选</div>
+                    <div className="factor-board-subtle">按因子名或股票池搜索结果，并按关键指标排序</div>
+                </div>
+                <div className="grid-2">
+                    <div className="field"><label className="label">因子搜索</label><input className="input" value={search} placeholder="例如 Alpha#001 / 中证500" onChange={e => setSearch(e.target.value)} /></div>
+                    <div className="field"><label className="label">排序字段</label><select className="input" value={sortKey} onChange={e => setSortKey(e.target.value)}><option value="spread_excess">高低分位差</option><option value="high_quantile_excess">高分位超额</option><option value="low_quantile_excess">低分位超额</option><option value="ic_mean">IC 均值</option><option value="ir_value">IR</option><option value="coverage_ratio">覆盖率</option><option value="max_quantile_turnover">高分位换手率</option></select></div>
+                    <div className="field"><label className="label">排序方向</label><select className="input" value={sortDir} onChange={e => setSortDir(e.target.value)}><option value="desc">从高到低</option><option value="asc">从低到高</option></select></div>
+                    <div className="field"><label className="label">最新批次</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{status.analysis_batch || '暂无批次'}</span></div></div>
+                </div>
+                <div>
+                    <div className="label" style={{marginBottom: 10}}>{'快捷筛选'}</div>
+                    <div className="factor-board-filterbar">
+                        <button className={'factor-board-filterchip' + (resultPreset === 'all' ? ' active' : '')} onClick={() => setResultPreset('all')}>{'全部因子'}</button>
+                        <button className={'factor-board-filterchip' + (resultPreset === 'positive' ? ' active' : '')} onClick={() => setResultPreset('positive')}>{'高分位领先'}</button>
+                        <button className={'factor-board-filterchip' + (resultPreset === 'high_ic' ? ' active' : '')} onClick={() => setResultPreset('high_ic')}>{'高 IC'}</button>
+                        <button className={'factor-board-filterchip' + (resultPreset === 'low_turnover' ? ' active' : '')} onClick={() => setResultPreset('low_turnover')}>{'低换手'}</button>
+                        <button className={'factor-board-filterchip' + (resultPreset === 'favorites' ? ' active' : '')} onClick={() => setResultPreset('favorites')}>{'已收藏'}{' ('}{favoriteCount}{')'}</button>
+                    </div>
+                </div>
+            </section>
+            </div>
 
-            {/* X轴 */}
-            <line x1={pad.left} y1={h-pad.bottom} x2={w-pad.right} y2={h-pad.bottom} stroke="#666" strokeWidth="1.5" />
-            {xLabels.map((label, i) => (
-                <text key={`xt${i}`} x={label.x} y={h-pad.bottom+25} fill="#aaa" fontSize="11" textAnchor="middle">
-                    {label.date}
-                </text>
-            ))}
+            <div className="factor-board-overview">
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</div>
+                    <div className="factor-board-overview-value small">{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60')}</div>
+                    <div className="factor-board-overview-meta">{'\u6279\u6b21\uff1a'}{status.analysis_batch || '\u6682\u65e0\u6279\u6b21'}</div>
+                </div>
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u5df2\u5206\u6790\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-value">{results.length}</div>
+                    <div className="factor-board-overview-meta">{'\u5f53\u524d\u663e\u793a '}{filteredResults.length}{' \u4e2a\u56e0\u5b50'}</div>
+                </div>
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u5e73\u5747\u8986\u76d6\u7387'}</div>
+                    <div className={'factor-board-overview-value ' + metricTextClass(avgCoverage)}>{formatPct(avgCoverage)}</div>
+                    <div className="factor-board-overview-meta">{'\u8861\u91cf\u6bcf\u4e2a\u4ea4\u6613\u65e5\u53ef\u53c2\u4e0e\u6392\u5e8f\u7684\u80a1\u7968\u8986\u76d6\u7a0b\u5ea6'}</div>
+                </div>
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u5e73\u5747 IC'}</div>
+                    <div className={'factor-board-overview-value ' + metricTextClass(avgIc)}>{formatNum(avgIc)}</div>
+                    <div className="factor-board-overview-meta">{'\u8861\u91cf\u56e0\u5b50\u6392\u5e8f\u4e0e\u540e\u7eed\u6536\u76ca\u7684\u4e00\u81f4\u6027'}</div>
+                </div>
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u5f53\u524d\u5206\u5316\u6700\u5f3a\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-value small">{bestFactor ? bestFactor.factor_name : '--'}</div>
+                    <div className="factor-board-overview-meta">{bestFactor ? ('高低分位差 ' + formatPct(getSpreadExcess(bestFactor))) : '\u6682\u65e0\u7ed3\u679c'}</div>
+                </div>
+                <div className="factor-board-overview-card">
+                    <div className="factor-board-overview-label">{'\u6536\u85cf\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-value">{favoriteCount}</div>
+                    <div className="factor-board-overview-meta">{'\u53ef\u5bf9\u91cd\u70b9\u8ddf\u8e2a\u7684 Alpha191 \u56e0\u5b50\u8fdb\u884c\u5feb\u901f\u7b5b\u9009'}</div>
+                </div>
+            </div>
 
-            {/* 填充区域 */}
-            <polygon points={fillPts} fill={color} fillOpacity="0.15" />
+            <section className="card space-y factor-board-panel">
+                <div className="factor-board-toolbar">
+                    <div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'\u5206\u6790\u8fc7\u7a0b'}</div>
+                        <div className="factor-board-subtle">{status.phase_label || '\u7b49\u5f85\u4efb\u52a1'}{' \u00b7 '}{status.message || '\u5f85\u542f\u52a8'}</div>
+                    </div>
+                    <div className="factor-board-toolbar-right">
+                        <div className="factor-board-results-tip">{'\u5f53\u524d\u6279\u6b21 '}{status.analysis_batch || '-'}</div>
+                        <div className="factor-board-results-tip">{'\u5df2\u4fdd\u7559 '}{safeNum(status.result_count)}{' \u4e2a\u56e0\u5b50\u7ed3\u679c'}</div>
+                        <button className="btn btn-secondary" onClick={retryFailedFactors} disabled={retrying || status.running || failedFactors.length === 0}>{retrying ? '\u91cd\u8bd5\u4e2d...' : '\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50'}</button>
+                    </div>
+                </div>
+                <div className="factor-board-stage-grid">
+                    {stageCards.map((item, idx) => (
+                        <div key={item.key} className={'factor-board-stage-card ' + phaseState(item.key, idx)}>
+                            <div className="factor-board-stage-title">{item.title}</div>
+                            <div className="factor-board-stage-value">{item.value}</div>
+                            <div className="factor-board-stage-meta">{item.meta}</div>
+                        </div>
+                    ))}
+                </div>
+                <div className="factor-board-process-grid">
+                    <div className="factor-board-process-card">
+                        <div className="factor-board-process-head">
+                            <div className="card-title" style={{marginBottom: 0}}>{'\u8fd0\u884c\u65e5\u5fd7'}</div>
+                            <div className="factor-board-subtle">{statusLogs.length}{' \u6761'}</div>
+                        </div>
+                        <div className="factor-board-log-panel">
+                            {statusLogs.length === 0 ? <div className="factor-board-empty small">{'\u6682\u65e0\u65e5\u5fd7'}</div> : statusLogs.map((entry, idx) => (
+                                <div key={idx} className="factor-board-log-line">{entry}</div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="factor-board-process-card">
+                        <div className="factor-board-process-head">
+                            <div className="card-title" style={{marginBottom: 0}}>{'\u5931\u8d25\u56e0\u5b50'}</div>
+                            <div className="factor-board-subtle">{failedFactors.length}{' \u4e2a'}</div>
+                        </div>
+                        {failedFactors.length === 0 ? <div className="factor-board-empty small">{'\u5f53\u524d\u6ca1\u6709\u5931\u8d25\u56e0\u5b50'}</div> : (
+                            <div className="factor-board-chip-list">
+                                {failedFactors.map(item => <span key={item} className="factor-board-filterchip active">{item}</span>)}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
 
-            {/* 数据线 */}
-            <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" />
+            <div className="factor-board-workbench">
+            <section className="card space-y factor-board-panel">
+                <div className="factor-board-toolbar">
+                    <div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'\u6570\u636e\u5e93\u8fde\u63a5'}</div>
+                        <div className="factor-board-subtle">{'\u914d\u7f6e\u56e0\u5b50\u770b\u677f\u5206\u6790\u6240\u4f7f\u7528\u7684 MySQL \u6570\u636e\u5e93\u8fde\u63a5\u4fe1\u606f\u3002'}</div>
+                    </div>
+                    <div className="factor-board-toolbar-left">
+                        <button className="btn btn-secondary" onClick={saveConfig} disabled={saving}>{saving ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u914d\u7f6e'}</button>
+                        <button className="btn btn-secondary" onClick={testConfig} disabled={testing}>{testing ? '\u6d4b\u8bd5\u4e2d...' : '\u6d4b\u8bd5\u8fde\u63a5'}</button>
+                    </div>
+                </div>
+                <div className="grid-2">
+                    <div className="field"><label className="label">{'\u4e3b\u673a'}</label><input className="input" value={dbConfig.host || ''} onChange={e => setDbConfig(prev => ({ ...prev, host: e.target.value }))} placeholder="localhost" /></div>
+                    <div className="field"><label className="label">{'\u7aef\u53e3'}</label><input className="input" type="number" value={dbConfig.port || 3306} onChange={e => setDbConfig(prev => ({ ...prev, port: Number(e.target.value || 3306) }))} placeholder="3306" /></div>
+                    <div className="field"><label className="label">{'\u7528\u6237\u540d'}</label><input className="input" value={dbConfig.user || ''} onChange={e => setDbConfig(prev => ({ ...prev, user: e.target.value }))} placeholder="root" /></div>
+                    <div className="field"><label className="label">{'\u6570\u636e\u5e93\u540d'}</label><input className="input" value={dbConfig.database || ''} onChange={e => setDbConfig(prev => ({ ...prev, database: e.target.value }))} placeholder="qtsys" /></div>
+                    <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u5bc6\u7801'}</label><input className="input" type="password" value={dbConfig.password || ''} onChange={e => setDbConfig(prev => ({ ...prev, password: e.target.value }))} placeholder={dbConfig.has_password ? '\u5df2\u4fdd\u5b58\u5bc6\u7801\uff0c\u7559\u7a7a\u5219\u4fdd\u6301\u4e0d\u53d8' : '\u8bf7\u8f93\u5165\u6570\u636e\u5e93\u5bc6\u7801'} /></div>
+                </div>
+                <div className="factor-board-status"><span className={'factor-board-dot' + (dbConfig.has_password ? ' running' : '')}></span><span>{dbConfig.has_password ? '\u6570\u636e\u5e93\u5bc6\u7801\u5df2\u4fdd\u5b58' : '\u5c1a\u672a\u4fdd\u5b58\u6570\u636e\u5e93\u5bc6\u7801'}</span></div>
+            </section>
 
-            {/* 标题和统计 */}
-            <text x={w/2} y={20} fill="#ccc" fontSize="14" fontWeight="600" textAnchor="middle">
-                收益曲线
-            </text>
-            <text x={w-pad.right} y={20} fill={color} fontSize="12" textAnchor="end">
-                {endVal >= startVal ? '+' : ''}{((endVal/startVal - 1) * 100).toFixed(2)}%
-            </text>
-        </svg>
+            <section className="card space-y factor-board-panel">
+                <div className="factor-board-toolbar">
+                    <div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'\u5206\u6790\u53c2\u6570'}</div>
+                        <div className="factor-board-subtle">{'\u9009\u62e9\u56de\u6d4b\u65f6\u95f4\u533a\u95f4\u4e0e\u80a1\u7968\u6c60\u540e\u542f\u52a8 Alpha191 \u56e0\u5b50\u6279\u91cf\u5206\u6790\u3002'}</div>
+                    </div>
+                    <div className="factor-board-toolbar-left">
+                        <button className="btn btn-primary" onClick={startAnalysis} disabled={starting || stopping || status.running || (analysisForm.universe_type === 'custom' && !analysisForm.custom_pool_id)}>{starting ? '\u542f\u52a8\u4e2d...' : '\u5f00\u59cb\u5206\u6790'}</button>
+                        <button className="btn btn-secondary" onClick={stopAnalysis} disabled={stopping || !status.running}>{stopping ? '\u505c\u6b62\u4e2d...' : '\u505c\u6b62\u5206\u6790'}</button>
+                    </div>
+                </div>
+                <div className="grid-2">
+                    <div className="field"><label className="label">{'\u56de\u6d4b\u5929\u6570'}</label><input className="input" type="number" min="60" max="3650" value={analysisForm.backtest_days || 365} onChange={e => setAnalysisForm(prev => ({ ...prev, backtest_days: Number(e.target.value || 365) }))} /></div>
+                    <div className="field"><label className="label">{'\u80a1\u7968\u6c60\u7c7b\u578b'}</label><select className="input" value={analysisForm.universe_type} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_type: e.target.value, custom_pool_id: e.target.value === 'custom' ? prev.custom_pool_id : '', universe_code: e.target.value === 'system' ? (prev.universe_code || '000905.SH') : prev.universe_code }))}><option value="system">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</option><option value="custom">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</option></select></div>
+                    <div className="field"><label className="label">{'\u5f00\u59cb\u65e5\u671f'}</label><input className="input" type="date" value={analysisForm.start_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, start_date: e.target.value }))} /></div>
+                    <div className="field"><label className="label">{'\u7ed3\u675f\u65e5\u671f'}</label><input className="input" type="date" value={analysisForm.end_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, end_date: e.target.value }))} /></div>
+                    {analysisForm.universe_type === 'system' ? (
+                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</label><select className="input" value={analysisForm.universe_code || '000905.SH'} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_code: e.target.value }))}>{(universeOptions.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name}{'\uff08'}{item.code}{'\uff09'}</option>)}</select></div>
+                    ) : (
+                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</label><select className="input" value={analysisForm.custom_pool_id || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, custom_pool_id: e.target.value }))}><option value="">{'\u8bf7\u9009\u62e9\u5df2\u4fdd\u5b58\u7684\u80a1\u7968\u6c60'}</option>{(universeOptions.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name}{'\uff08'}{item.stock_count}{'\u53ea\uff09'}</option>)}</select></div>
+                    )}
+                </div>
+                <div className="grid-2">
+                    <div className="field"><label className="label">{'\u5f53\u524d\u5206\u6790\u72b6\u6001'}</label><div className="factor-board-status"><span className={'factor-board-dot' + (status.running ? ' running' : '')}></span><span>{status.message || (status.running ? '\u5206\u6790\u8fdb\u884c\u4e2d' : '\u5f85\u542f\u52a8')}</span></div></div>
+                    <div className="field"><label className="label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60')}</span></div></div>
+                </div>
+            </section>
+            </div>
+
+            <section className="card space-y factor-board-panel">
+                <div className="factor-board-toolbar">
+                    <div>
+                        <div className="card-title" style={{marginBottom: 6}}>因子收益总览</div>
+                        <div className="factor-board-subtle">点击任意因子可查看详细收益曲线、公式说明和最新持仓</div>
+                    </div>
+                    <div className="factor-board-toolbar-right">
+                        <div className="factor-board-results-tip">{'\u8868\u683c\u652f\u6301\u6eda\u52a8\u67e5\u770b\u5168\u90e8\u5217'}</div>
+                        <div className="factor-board-results-tip">{'高分位超额=最高因子值分位相对基准超额；低分位超额=最低因子值分位相对基准超额；低分位超额高于高分位超额时，通常表示反向信号更强。'}</div>
+                        <div className="factor-board-subtle">{'\u5c55\u793a '}{filteredResults.length}{' / '}{results.length}{' \u4e2a\u56e0\u5b50'}</div>
+                    </div>
+                </div>
+                {loading ? <div className="factor-board-empty">正在加载因子看板数据...</div> : filteredResults.length === 0 ? <div className="factor-board-empty">暂无可展示的因子结果，请先配置数据库并运行分析。</div> : (
+                    <div className="table-wrap factor-board-results-wrap">
+                        <table className="factor-board-table">
+                            <thead>
+                                <tr>
+                                    <th>因子</th>
+                                    <th>股票池</th>
+                                    <th>高分位超额</th>
+                                    <th>低分位超额</th>
+                                    <th>IC 均值</th>
+                                    <th>IR</th>
+                                    <th>覆盖率</th>
+                                    <th>换手</th>
+                                    <th>最新交易日</th>
+                                    <th>详情</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredResults.map(item => {
+                                    const rowPositive = getSpreadExcess(item) >= 0;
+                                    return (
+                                        <tr key={(item.factor_name || '-') + '-' + (item.universe_name || '-')} className={rowPositive ? 'factor-board-row-positive' : 'factor-board-row-negative'}>
+                                            <td>
+                                                <div className="factor-board-factor-cell">
+                                                    <button className={'factor-board-fav-btn' + (isFavoriteFactor(item.factor_name) ? ' active' : '')} onClick={() => toggleFavoriteFactor(item.factor_name)} title={isFavoriteFactor(item.factor_name) ? '取消收藏' : '收藏因子'}>{isFavoriteFactor(item.factor_name) ? '★' : '☆'}</button>
+                                                    <span className={getFactorDirectionClass(item)}>{getFactorDirectionLabel(item)}</span>
+                                                    <div className="factor-board-factor-meta">
+                                                        <span className="factor-board-link" onClick={() => setSelectedFactor(item.factor_name)}>{item.factor_name}</span>
+                                                        <span className="factor-board-subtle">{item.universe_name || '\u9ed8\u8ba4\u80a1\u7968\u6c60'}{' · 高低分位差 '}{formatPct(getSpreadExcess(item))}{' · 最新 '}{item.latest_trade_date || '-'}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{item.universe_name || '-'}</td>
+                                            <td><span className={metricToneClass(item.max_quantile_excess)}>{formatPct(item.max_quantile_excess)}</span></td>
+                                            <td><span className={metricToneClass(item.min_quantile_excess)}>{formatPct(item.min_quantile_excess)}</span></td>
+                                            <td className={metricTextClass(item.ic_mean)}>{formatNum(item.ic_mean)}</td>
+                                            <td className={metricTextClass(item.ir_value)}>{formatNum(item.ir_value)}</td>
+                                            <td>{formatPct(item.coverage_ratio)}</td>
+                                            <td>{formatPct(item.max_quantile_turnover)}</td>
+                                            <td>{item.latest_trade_date || '-'}</td>
+                                            <td className="factor-board-row-action">
+                                                <button className="btn btn-secondary factor-board-detail-btn" onClick={() => setSelectedFactor(item.factor_name)}>查看详情</button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+
+            {showPoolManager && (
+                <div className="factor-board-modal" onClick={() => setShowPoolManager(false)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()}>
+                        <div className="factor-board-modal-head">
+                            <div>
+                                <div className="factor-board-modal-title">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u7ba1\u7406'}</div>
+                                <div className="factor-board-modal-copy">{'\u641c\u7d22\u80a1\u7968\u3001\u4fdd\u5b58\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u5e76\u5728\u5206\u6790\u65f6\u590d\u7528\u3002'}</div>
+                            </div>
+                            <button className="btn btn-secondary" onClick={() => setShowPoolManager(false)}>{'\u5173\u95ed'}</button>
+                        </div>
+                        <section className="card space-y factor-board-panel">
+                            <div className="factor-board-toolbar">
+                                <div>
+                                    <div className="card-title" style={{marginBottom: 6}}>{'\u80a1\u7968\u6c60\u7f16\u8f91\u5668'}</div>
+                                    <div className="factor-board-subtle">{'\u53ef\u65b0\u5efa\u3001\u7f16\u8f91\u3001\u5220\u9664\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div>
+                                </div>
+                                <div className="factor-board-toolbar-right">
+                                    <button className="btn btn-secondary" onClick={resetPoolForm}>{'\u65b0\u5efa'}</button>
+                                    <button className="btn btn-primary" onClick={savePool} disabled={poolSaving}>{poolSaving ? '\u4fdd\u5b58\u4e2d...' : (poolForm.id ? '\u66f4\u65b0\u80a1\u7968\u6c60' : '\u4fdd\u5b58\u80a1\u7968\u6c60')}</button>
+                                    {poolForm.id ? <button className="btn btn-secondary" onClick={deletePool} disabled={poolDeleting}>{poolDeleting ? '\u5220\u9664\u4e2d...' : '\u5220\u9664'}</button> : null}
+                                </div>
+                            </div>
+                            <div className="grid-2">
+                                <div className="field"><label className="label">{'\u80a1\u7968\u6c60\u540d\u79f0'}</label><input className="input" value={poolForm.name} placeholder="\u4f8b\u5982\uff1a\u6d88\u8d39\u9f99\u5934\u6c60" onChange={e => setPoolForm({ ...poolForm, name: e.target.value })} /></div>
+                                <div className="field"><label className="label">{'\u6210\u5206\u6570\u91cf'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{(poolForm.stock_items || []).length}{' \u53ea\u80a1\u7968'}</span></div></div>
+                            </div>
+                            <div className="field"><label className="label">{'\u8bf4\u660e'}</label><textarea className="input" rows="2" value={poolForm.description} placeholder="\u8bb0\u5f55\u8be5\u80a1\u7968\u6c60\u7684\u7814\u7a76\u4e3b\u9898\u6216\u9009\u80a1\u903b\u8f91" onChange={e => setPoolForm({ ...poolForm, description: e.target.value })}></textarea></div>
+                            <div className="field"><label className="label">{'\u6dfb\u52a0\u80a1\u7968'}</label><div className="stock-search-wrap"><input className="input" value={stockKeyword} placeholder="\u8f93\u5165\u80a1\u7968\u4ee3\u7801\u6216\u540d\u79f0" onChange={e => setStockKeyword(e.target.value)} onFocus={() => stockResults.length > 0 && setShowStockResults(true)} />{showStockResults && stockResults.length > 0 ? <div className="stock-search-dropdown">{stockResults.map(item => <div key={item.ts_code} className="stock-search-item" onMouseDown={() => addStockToPool(item)}><span>{item.name}</span><span style={{color:'var(--text-500)'}}>{item.ts_code}</span></div>)}</div> : null}</div></div>
+                            <div className="factor-board-list" style={{maxHeight: 220, overflowY: 'auto'}}>{(poolForm.stock_items || []).length === 0 ? <div className="factor-board-empty">{'\u5f53\u524d\u80a1\u7968\u6c60\u8fd8\u6ca1\u6709\u80a1\u7968\uff0c\u8bf7\u5148\u641c\u7d22\u5e76\u6dfb\u52a0\u3002'}</div> : (poolForm.stock_items || []).map((item, idx) => <div key={item.ts_code + '-' + idx} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{item.name || item.ts_code}</div><div className="factor-board-subtle">{item.ts_code}</div></div><button className="btn-link" onClick={() => removeStockFromPool(item.ts_code)}>{'\u79fb\u9664'}</button></div>)}</div>
+                        </section>
+                        <section className="card space-y factor-board-panel">
+                            <div>
+                                <div className="card-title" style={{marginBottom: 6}}>{'\u5df2\u4fdd\u5b58\u80a1\u7968\u6c60'}</div>
+                                <div className="factor-board-subtle">{'\u70b9\u51fb\u201c\u7528\u4e8e\u5206\u6790\u201d\u5373\u53ef\u5207\u6362\u5230\u8be5\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div>
+                            </div>
+                            <div className="factor-board-list" style={{maxHeight: 240, overflowY: 'auto'}}>{(universeOptions.custom_pools || []).length === 0 ? <div className="factor-board-empty">{'\u6682\u65e0\u5df2\u4fdd\u5b58\u7684\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div> : (universeOptions.custom_pools || []).map(pool => <div key={pool.id} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{pool.name}</div><div className="factor-board-subtle">{pool.stock_count}{' \u53ea\u80a1\u7968 \u00b7 '}{pool.description || '\u672a\u586b\u5199\u8bf4\u660e'}</div></div><div className="factor-board-toolbar-right"><button className="btn-link" onClick={() => { setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(pool.id) })); setShowPoolManager(false); }}>{'\u7528\u4e8e\u5206\u6790'}</button><button className="btn-link" onClick={() => editPool(pool)}>{'\u7f16\u8f91'}</button></div></div>)}</div>
+                        </section>
+                    </div>
+                </div>
+            )}
+
+            {selectedFactor && (
+                <div className="factor-board-modal" onClick={() => setSelectedFactor(null)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()}>
+                        <div className="factor-board-modal-head">
+                            <div>
+                                <div className="factor-board-modal-title">{selectedFactor}</div>
+                                <div className="factor-board-modal-copy">{'\u67e5\u770b\u8be5\u56e0\u5b50\u7684\u6700\u65b0\u6279\u6b21\u8868\u73b0\u3001\u5206\u4f4d\u6536\u76ca\u66f2\u7ebf\u3001Alpha191 \u516c\u5f0f\u4e0e\u5bf9\u5e94\u6301\u4ed3\u3002'}</div>
+                            </div>
+                            <button className="btn btn-secondary" onClick={() => setSelectedFactor(null)}>{'\u5173\u95ed'}</button>
+                        </div>
+                        {detailLoading ? <div className="factor-board-empty">{'\u6b63\u5728\u52a0\u8f7d\u56e0\u5b50\u8be6\u60c5...'}</div> : (
+                            <div className="factor-board-modal-grid">
+                                <div className="factor-board-modal-stack">
+                                    <section className="factor-board-chart-wrap">
+                                        <div className="factor-board-toolbar">
+                                            <div>
+                                                <div className="card-title" style={{marginBottom: 6}}>{'\u6536\u76ca\u66f2\u7ebf'}</div>
+                                                <div className="factor-board-subtle">{'\u5347\u7ea7\u4e3a\u591a\u5206\u4f4d\u540c\u5c4f\u5bf9\u6bd4\uff0c\u5e76\u652f\u6301\u6309\u533a\u95f4\u5207\u6362\u7814\u7a76\u7a97\u53e3\u3002'}</div>
+                                            </div>
+                                        </div>
+                                        {chartHasData ? (
+                                            <EquityCurveChart
+                                                series={quantileChartSeries}
+                                                selectedQuantile={detail.selectedQuantile}
+                                                onSelectQuantile={(quantile) => setDetail(prev => ({ ...prev, selectedQuantile: String(quantile) }))}
+                                                rangeKey={detail.rangeKey}
+                                                onRangeChange={(rangeKey) => setDetail(prev => ({ ...prev, rangeKey }))}
+                                                rangeOptions={detailRangeOptions}
+                                                spreadSeries={spreadSeries}
+                                                spreadReturnPct={spreadReturnPct}
+                                            />
+                                        ) : <div className="factor-board-empty">{'\u6682\u65e0\u8db3\u591f\u7684\u66f2\u7ebf\u6570\u636e'}</div>}
+                                    </section>
+                                    <section className="card space-y">
+                                        <div className="card-title" style={{marginBottom: 6}}>{'\u6700\u65b0\u7ee9\u6548\u5feb\u7167'}</div>
+                                        <div className="factor-board-grid">
+                                            <div className="metric-card compact"><div className="metric-label">{'高分位超额'}</div><div className={'metric-value ' + metricTextClass(latestResult && latestResult.max_quantile_excess)}>{formatPct(latestResult && latestResult.max_quantile_excess)}</div></div>
+                                            <div className="metric-card compact"><div className="metric-label">{'低分位超额'}</div><div className={'metric-value ' + metricTextClass(latestResult && latestResult.min_quantile_excess)}>{formatPct(latestResult && latestResult.min_quantile_excess)}</div></div>
+                                            <div className="metric-card compact"><div className="metric-label">{'高低分位差'}</div><div className={'metric-value ' + metricTextClass(getSpreadExcess(latestResult))}>{formatPct(getSpreadExcess(latestResult))}</div></div>
+                                            <div className="metric-card compact"><div className="metric-label">{'IC 均值'}</div><div className={'metric-value ' + (safeNum(latestResult && latestResult.ic_mean) >= 0 ? 'text-profit' : 'text-loss')}>{formatNum(latestResult && latestResult.ic_mean)}</div></div>
+                                        </div>
+                                    </section>
+                                </div>
+                                <div className="factor-board-modal-stack">
+                                    <section className="factor-board-research-panel">
+                                        <div className="factor-board-research-head">
+                                            <div>
+                                                <div className="factor-board-research-kicker">{'\u7814\u7a76\u6458\u8981'}</div>
+                                                <div className="factor-board-research-title">{selectedFactor}</div>
+                                                <div className="factor-board-research-copy">{infoDescription}</div>
+                                            </div>
+                                            <span className={getFactorDirectionClass(latestResult)}>{getFactorDirectionLabel(latestResult)}</span>
+                                        </div>
+                                        <div className="factor-board-research-grid">
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'\u6700\u65b0\u4ea4\u6613\u65e5'}</div><div className="factor-board-research-value">{latestTradeDateLabel}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'\u9009\u4e2d\u5206\u4f4d'}</div><div className="factor-board-research-value">{'Q'}{detail.selectedQuantile}{' / '}{quantileCount}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'高分位超额'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.max_quantile_excess)}>{formatPct(latestResult && latestResult.max_quantile_excess)}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'低分位超额'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.min_quantile_excess)}>{formatPct(latestResult && latestResult.min_quantile_excess)}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'IC \u5747\u503c'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.ic_mean)}>{formatNum(latestResult && latestResult.ic_mean)}</div></div>
+                                        </div>
+                                        <div className="factor-board-tagrow">
+                                            <span className="factor-board-tag">{activeUniverseLabel}</span>
+                                            <span className="factor-board-tag">{'\u533a\u95f4 '}{detail.rangeKey}</span>
+                                            <span className="factor-board-tag">{'\u8986\u76d6\u7387 '}{formatPct(latestResult && latestResult.coverage_ratio)}</span>
+                                            <span className="factor-board-tag">{'\u6362\u624b '}{formatPct(latestResult && latestResult.max_quantile_turnover)}</span>
+                                        </div>
+                                    </section>
+                                    <section className="card space-y">
+                                        <div className="card-title" style={{marginBottom: 6}}>{'\u56e0\u5b50\u4ecb\u7ecd'}</div>
+                                        <div className="factor-board-desc-box">{infoDescription}</div>
+                                    </section>
+                                    <section className="card space-y">
+                                        <div className="card-title" style={{marginBottom: 6}}>{'\u7ecf\u6d4e\u5b66\u542b\u4e49'}</div>
+                                        <div className="factor-board-desc-box">{economicMeaning}</div>
+                                    </section>
+                                    <section className="card space-y">
+                                        <div className="factor-board-section-head">
+                                            <div className="card-title" style={{marginBottom: 6}}>{'Alpha191 \u516c\u5f0f'}</div>
+                                            <div className="factor-board-formula-meta">{'\u771f\u5b9e\u53ef\u6267\u884c\u7248\u672c'}</div>
+                                        </div>
+                                        <div className="factor-board-formula-title">{'\u516c\u5f0f\u4e0e\u53d8\u91cf\u7ed3\u6784'}</div>
+                                        <pre className="factor-board-code">{detail.info && detail.info.formula ? detail.info.formula : '\u6682\u65e0\u516c\u5f0f'}</pre>
+                                    </section>
+                                    <section className="card space-y">
+                                        <div className="factor-board-toolbar">
+                                            <div>
+                                                <div className="card-title" style={{marginBottom: 6}}>{'\u6700\u65b0\u6301\u4ed3'}</div>
+                                                <div className="factor-board-subtle">{'\u6700\u65b0\u4ea4\u6613\u65e5 '}{latestTradeDateLabel}</div>
+                                            </div>
+                                            <div className="factor-board-subtle">{'Q'}{detail.selectedQuantile}{' / '}{quantileCount}</div>
+                                        </div>
+                                        <div className="factor-board-holdings-summary">
+                                            <div className="factor-board-holdings-stat"><span className="label">{'\u6301\u4ed3\u6837\u672c'}</span><span className="value">{currentHoldings.length}</span></div>
+                                            <div className="factor-board-holdings-stat"><span className="label">{'\u5e73\u5747\u6743\u91cd'}</span><span className="value">{formatRate(avgHoldingWeight)}</span></div>
+                                            <div className="factor-board-holdings-stat"><span className="label">{'\u6700\u9ad8\u6743\u91cd'}</span><span className="value">{topHolding ? topHolding.ts_code : '-'}</span></div>
+                                        </div>
+                                        {currentHoldings.length === 0 ? <div className="factor-board-empty">{'\u5f53\u524d\u5206\u4f4d\u6682\u65e0\u6301\u4ed3\u6837\u672c'}</div> : (
+                                            <div className="factor-board-list">
+                                                {currentHoldings.map((item, idx) => (
+                                                    <div key={item.ts_code + '-' + idx} className="factor-board-list-item">
+                                                        <div>
+                                                            <div style={{fontWeight: 600, color: '#f8fafc'}}>{item.ts_code}</div>
+                                                            <div className="factor-board-subtle">{'\u56e0\u5b50\u503c '}{formatNum(item.factor_value)}{' \u00b7 \u6743\u91cd '}{formatRate(item.weight)}</div>
+                                                        </div>
+                                                        <div className="text-xs text-muted">{'Q'}{item.quantile}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </section>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -4400,6 +5741,7 @@ function App() {
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
         { key: 'workflow', label: '因子工作流' },
+        { key: 'factorboard', label: '因子看板' },
         { key: 'news', label: '新闻' },
         { key: 'history', label: '历史' },
         { key: 'settings', label: '设置' },
@@ -4431,6 +5773,7 @@ function App() {
                 {page === 'market' && <MarketPage showToast={showToast} />}
                 {page === 'factor' && <FactorPage showToast={showToast} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
+                {page === 'factorboard' && <FactorBoardPage showToast={showToast} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}
                 {page === 'history' && <HistoryPage showToast={showToast} />}
                 {page === 'help' && <HelpPage showToast={showToast} />}

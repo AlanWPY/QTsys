@@ -1,4 +1,4 @@
-"""QTsys - 量化金融分析系统 FastAPI入口"""
+"""QTsys FastAPI 应用入口。"""
 import sys
 import os
 import asyncio
@@ -28,15 +28,16 @@ from api.routes_market import router as market_router
 from api.routes_ws import router as ws_router
 from api.routes_factor_backtest import router as factor_backtest_router
 from api.routes_quality import router as quality_router
+from api.routes_factor_board import router as factor_board_router
 
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-# 新闻自动刷新任务引用
+# 新闻自动刷新任务句柄
 _news_refresh_task = None
 
 
 async def _auto_refresh_news():
-    """后台定时刷新新闻 - 交易时段5分钟，其他时段15分钟"""
+    """后台定时刷新新闻。交易时段每 5 分钟，其余时段每 15 分钟。"""
     from datetime import datetime
     from database.connection import async_session
     logger.info("新闻自动刷新任务已启动")
@@ -76,7 +77,7 @@ async def _auto_refresh_news():
                         db.add(article)
                         saved += 1
                     await db.commit()
-                    logger.info(f"自动刷新: 抓取{len(items)}条, 新增{saved}条")
+                    logger.info(f"新闻自动刷新完成：抓取 {len(items)} 条，新增 {saved} 条")
         except Exception:
             logger.exception("新闻自动刷新异常")
         await asyncio.sleep(interval)
@@ -88,27 +89,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"QTsys v{VERSION} 启动中...")
     await init_db()
     logger.info("数据库初始化完成")
-
-    # MySQL 自动检测
-    try:
-        from database.connection import get_session_factory, switch_to_mysql
-        from config import build_mysql_url
-        async with get_session_factory()() as db:
-            from sqlalchemy import select
-            from database.models import Settings
-            result = await db.execute(select(Settings).where(Settings.id == 1))
-            settings = result.scalar_one_or_none()
-            if settings and settings.use_mysql and settings.mysql_host and settings.mysql_user:
-                url = build_mysql_url(
-                    settings.mysql_host, settings.mysql_port,
-                    settings.mysql_user, settings.mysql_password,
-                    settings.mysql_database,
-                )
-                switch_to_mysql(url)
-                await init_db()
-                logger.info("已自动切换到 MySQL")
-    except Exception:
-        logger.warning("MySQL 自动连接失败, 回退 SQLite")
+    logger.info("ORM 主库固定为 SQLite，MySQL 仅用于缓存与因子看板")
+    logger.warning("QTsys 访问地址：http://127.0.0.1:8000  | 监听地址：http://0.0.0.0:8000")
 
     _news_refresh_task = asyncio.create_task(_auto_refresh_news())
     yield
@@ -131,6 +113,7 @@ app.include_router(market_router)
 app.include_router(ws_router)
 app.include_router(factor_backtest_router)
 app.include_router(quality_router)
+app.include_router(factor_board_router)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -169,4 +152,11 @@ async def trigger_update():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+        log_level=os.getenv("QT_UVICORN_LOG_LEVEL", "info").lower(),
+        access_log=os.getenv("QT_UVICORN_ACCESS_LOG", "0").strip().lower() in {"1", "true", "yes", "on"},
+    )

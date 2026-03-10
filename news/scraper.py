@@ -218,7 +218,7 @@ async def scrape_10jqka(client: httpx.AsyncClient) -> list[NewsItem]:
                 ))
             break
         if not found:
-            logger.warning("同花顺: 所有CSS选择器均未匹配，页面可能已改版")
+            logger.info("同花顺: 所有 CSS 选择器均未匹配，页面可能已改版")
     except Exception:
         logger.exception("同花顺抓取异常")
     logger.info(f"同花顺: 抓取{len(items)}条")

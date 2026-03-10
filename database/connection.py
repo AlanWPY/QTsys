@@ -1,4 +1,4 @@
-"""数据库连接 - 支持 SQLite/MySQL 懒加载切换"""
+"""数据库连接与 schema 初始化。"""
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
@@ -15,10 +15,17 @@ class Base(DeclarativeBase):
     pass
 
 
+def _create_engine(database_url: str):
+    kwargs = {"echo": False}
+    if database_url.startswith("mysql+"):
+        kwargs["pool_pre_ping"] = True
+    return create_async_engine(database_url, **kwargs)
+
+
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_async_engine(DATABASE_URL, echo=False)
+        _engine = _create_engine(DATABASE_URL)
     return _engine
 
 
@@ -32,23 +39,8 @@ def get_session_factory():
 
 
 def switch_to_mysql(mysql_url: str):
-    """切换全局引擎到 MySQL"""
-    global _engine, _session_factory
-    if _engine:
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(_engine.dispose())
-            else:
-                loop.run_until_complete(_engine.dispose())
-        except Exception:
-            pass
-    _engine = create_async_engine(mysql_url, echo=False, pool_pre_ping=True)
-    _session_factory = async_sessionmaker(
-        _engine, class_=AsyncSession, expire_on_commit=False
-    )
-    logger.info(f"已切换到 MySQL 引擎")
+    """兼容旧接口：不再运行时切换 ORM 主库。"""
+    logger.warning("switch_to_mysql() 已弃用；ORM 主库保持为 SQLite")
 
 
 async def get_db():
@@ -66,15 +58,14 @@ class _SessionProxy:
 async_session = _SessionProxy()
 
 
-async def init_db():
-    async with get_engine().begin() as conn:
+async def _init_schema(engine):
+    async with engine.begin() as conn:
         from database.models import (
             Settings, Strategy, BacktestResult, Factor, FactorResult,
-            FactorBacktestResult, NewsArticle,
-            DailyQuote, DailyBasic, IndexDaily, TradeCalendar
+            FactorBacktestResult, NewsArticle, StockPool,
+            DailyQuote, DailyBasic, IndexDaily, TradeCalendar,
         )
         await conn.run_sync(Base.metadata.create_all)
-        # 兼容旧库迁移
         _migrate_cols = [
             ("backtest_results", "benchmark_curve", "JSON DEFAULT '[]'"),
             ("settings", "llm_api_key", "VARCHAR(500) DEFAULT ''"),
@@ -97,3 +88,15 @@ async def init_db():
                 )
             except Exception:
                 pass
+
+
+async def init_db():
+    await _init_schema(get_engine())
+
+
+async def init_external_db(database_url: str):
+    engine = _create_engine(database_url)
+    try:
+        await _init_schema(engine)
+    finally:
+        await engine.dispose()

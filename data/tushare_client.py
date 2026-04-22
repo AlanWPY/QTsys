@@ -2,6 +2,9 @@
 import time
 import threading
 import warnings
+import sys
+for _optional_module in ("pyarrow", "numexpr", "bottleneck"):
+    sys.modules.setdefault(_optional_module, None)
 import tushare as ts
 import pandas as pd
 from typing import Optional

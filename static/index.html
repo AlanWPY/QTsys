@@ -22,7 +22,12 @@
     --border: #2d3348;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-800); color: var(--text-200); min-height: 100vh; }
+body {
+    font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-800);
+    color: var(--text-200);
+    min-height: 100vh;
+}
 a { color: var(--accent-light); text-decoration: none; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-800); }
@@ -97,14 +102,229 @@ td { padding: 8px 12px; border-bottom: 1px solid var(--bg-600); }
 tr:hover td { background: var(--bg-600); }
 
 /* ===== 策略页面 ===== */
-.strategy-layout { display: flex; gap: 16px; }
-.strategy-sidebar { width: 240px; flex-shrink: 0; }
-.strategy-list { max-height: 420px; overflow-y: auto; }
-.strategy-item { padding: 12px; border-radius: 8px; cursor: pointer; transition: all 0.15s; background: var(--bg-700); margin-bottom: 6px; }
-.strategy-item:hover { background: var(--bg-600); }
-.strategy-item.selected { background: var(--bg-500); border: 1px solid var(--accent); }
-.strategy-item-name { font-size: 14px; font-weight: 500; }
-.strategy-item-desc { font-size: 12px; color: var(--text-500); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strategy-layout { display: grid; grid-template-columns: 260px minmax(0, 1.35fr) minmax(340px, 0.95fr); gap: 18px; align-items: start; }
+.strategy-card {
+    background: linear-gradient(180deg, rgba(30,34,53,0.96), rgba(15,23,42,0.94));
+    border: 1px solid rgba(129,140,248,0.12);
+    border-radius: 18px;
+    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.34);
+}
+.strategy-sidebar { padding: 14px; position: sticky; top: 18px; max-height: calc(100vh - 110px); overflow: hidden; }
+.strategy-sidebar-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.strategy-sidebar-title { font-size: 16px; font-weight: 700; color: var(--text-100); }
+.strategy-sidebar-subtitle { font-size: 12px; color: var(--text-400); line-height: 1.6; }
+.strategy-list { max-height: calc(100vh - 260px); overflow-y: auto; padding-right: 4px; }
+.strategy-item {
+    padding: 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    background: rgba(30,41,59,0.62);
+    border: 1px solid transparent;
+    margin-bottom: 8px;
+}
+.strategy-item:hover { transform: translateY(-1px); background: rgba(51,65,85,0.75); }
+.strategy-item.selected { background: rgba(99,102,241,0.16); border-color: rgba(129,140,248,0.45); }
+.strategy-item-name { font-size: 14px; font-weight: 600; color: var(--text-100); }
+.strategy-item-desc { font-size: 12px; color: var(--text-400); margin-top: 6px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.strategy-editor-shell { padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 760px; }
+.strategy-panel-eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #a5b4fc; }
+.strategy-panel-title { font-size: 22px; font-weight: 700; color: #eef2ff; margin-top: 6px; }
+.strategy-panel-subtitle { font-size: 13px; color: var(--text-400); margin-top: 6px; line-height: 1.6; }
+.strategy-topbar { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.strategy-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.strategy-form-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; }
+.strategy-mini-card {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(15,23,42,0.58);
+    border: 1px solid rgba(148,163,184,0.1);
+}
+.strategy-mini-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.strategy-mini-value { margin-top: 6px; font-size: 13px; color: var(--text-200); line-height: 1.6; }
+.strategy-ai-panel { padding: 18px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 18px; max-height: calc(100vh - 110px); }
+.strategy-ai-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.strategy-ai-title { font-size: 18px; font-weight: 700; color: #eef2ff; }
+.strategy-ai-subtitle { font-size: 12px; color: var(--text-400); line-height: 1.6; margin-top: 6px; }
+.strategy-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.strategy-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #dbeafe;
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(96,165,250,0.2);
+}
+.strategy-chip.muted {
+    color: var(--text-300);
+    background: rgba(148,163,184,0.08);
+    border-color: rgba(148,163,184,0.14);
+}
+.strategy-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-300); }
+.strategy-switch input { accent-color: var(--accent-light); }
+.strategy-suggestion-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.strategy-suggestion {
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(148,163,184,0.12);
+    background: rgba(15,23,42,0.55);
+    color: var(--text-300);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.strategy-suggestion:hover { border-color: rgba(129,140,248,0.35); color: #eef2ff; transform: translateY(-1px); }
+.strategy-ai-messages {
+    flex: 1;
+    min-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 4px;
+}
+.strategy-ai-message {
+    padding: 12px 14px;
+    border-radius: 16px;
+    line-height: 1.7;
+    font-size: 13px;
+    border: 1px solid rgba(148,163,184,0.1);
+}
+.strategy-ai-message.user {
+    align-self: flex-end;
+    background: rgba(99,102,241,0.18);
+    color: #eef2ff;
+    max-width: 92%;
+}
+.strategy-ai-message.assistant {
+    background: rgba(15,23,42,0.72);
+    color: var(--text-200);
+}
+.strategy-ai-message-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.strategy-ai-message-body { white-space: pre-wrap; color: var(--text-200); }
+.strategy-ai-block {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(30,41,59,0.58);
+    border: 1px solid rgba(148,163,184,0.1);
+}
+.strategy-ai-block-title { font-size: 12px; font-weight: 700; color: #c7d2fe; margin-bottom: 8px; }
+.strategy-ai-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.strategy-ai-bullet {
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(99,102,241,0.1);
+    color: var(--text-200);
+    font-size: 12px;
+}
+.strategy-ai-textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.7;
+}
+.strategy-ai-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.strategy-ai-market-list { display: flex; flex-direction: column; gap: 8px; }
+.strategy-ai-market-item {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(15,23,42,0.52);
+    border: 1px solid rgba(148,163,184,0.08);
+}
+.strategy-ai-market-title { font-size: 12px; font-weight: 600; color: var(--text-200); line-height: 1.5; }
+.strategy-ai-market-meta { margin-top: 4px; font-size: 11px; color: var(--text-500); }
+.strategy-ai-market-summary { margin-top: 6px; font-size: 12px; color: var(--text-400); line-height: 1.6; }
+.strategy-editor-tip { display: flex; flex-wrap: wrap; gap: 10px; }
+.strategy-empty-hint { text-align: center; color: var(--text-500); font-size: 12px; padding: 24px 12px; }
+
+.backtest-card {
+    background: linear-gradient(180deg, rgba(20,24,39,0.94), rgba(15,23,42,0.92));
+    border: 1px solid rgba(129,140,248,0.12);
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(2,6,23,0.24);
+}
+.backtest-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.backtest-hero-copy { font-size: 12px; color: var(--text-400); line-height: 1.7; max-width: 720px; }
+.backtest-mode-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.backtest-mode-chip {
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(148,163,184,0.16);
+    background: rgba(15,23,42,0.52);
+    color: var(--text-300);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.backtest-mode-chip.active {
+    background: rgba(99,102,241,0.16);
+    border-color: rgba(129,140,248,0.45);
+    color: #eef2ff;
+    box-shadow: inset 0 0 0 1px rgba(129,140,248,0.18);
+}
+.backtest-mode-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.backtest-pool-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(15,23,42,0.56);
+    border: 1px solid rgba(148,163,184,0.1);
+}
+.backtest-pool-title { font-size: 14px; font-weight: 700; color: #eef2ff; }
+.backtest-pool-copy { font-size: 12px; color: var(--text-400); line-height: 1.7; margin-top: 6px; }
+.backtest-pool-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.backtest-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(96,165,250,0.18);
+    color: #dbeafe;
+    font-size: 12px;
+}
+.backtest-pool-side {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(30,41,59,0.62);
+    border: 1px solid rgba(148,163,184,0.08);
+}
+.backtest-side-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.backtest-side-value { margin-top: 8px; font-size: 13px; color: var(--text-200); line-height: 1.6; }
+.backtest-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.backtest-risk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.backtest-runbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.backtest-runhint { font-size: 12px; color: var(--text-500); }
+@media (max-width: 1080px) {
+    .backtest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .backtest-risk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .backtest-pool-panel { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+    .backtest-grid, .backtest-risk-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 1280px) {
+    .strategy-layout { grid-template-columns: 240px minmax(0, 1fr); }
+    .strategy-ai-panel { grid-column: 1 / -1; position: static; max-height: none; }
+}
+@media (max-width: 960px) {
+    .strategy-layout { grid-template-columns: 1fr; }
+    .strategy-sidebar, .strategy-ai-panel { position: static; max-height: none; }
+    .strategy-form-grid { grid-template-columns: 1fr; }
+    .strategy-topbar { flex-direction: column; }
+}
 
 /* ===== 历史记录 ===== */
 .history-item { background: var(--bg-700); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
@@ -841,6 +1061,172 @@ const api = {
     remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.ok ? r.json() : _rejectHttp(r)),
 };
 
+
+const STRATEGY_TEMPLATE = [
+    'def initialize(context):',
+    '    context.lookback = 20',
+    '    context.position_pct = 0.2',
+    '',
+    'def handle_data(context):',
+    '    for ts_code in context.universe:',
+    '        closes = context.get_history(ts_code, context.lookback + 1, "close")',
+    '        if len(closes) < context.lookback + 1:',
+    '            continue',
+    '',
+    '        pos = context.positions.get(ts_code)',
+    '        has_position = pos is not None and pos.amount > 0',
+    '',
+    '        # TODO: 在这里填写买卖逻辑',
+    '        if not has_position:',
+    '            pass',
+    '',
+].join('\n');
+
+const STRATEGY_AI_SUGGESTIONS = [
+    '生成一个适用于沪深300成分股的低换手动量策略',
+    '基于中证500股票池生成因子驱动的轮动策略',
+    '根据最新市场环境生成一个防御型量化策略',
+    '围绕回撤控制和仓位管理生成稳健策略',
+];
+
+const BACKTEST_PREFILL_KEY = 'qtsys_backtest_prefill';
+function pushBacktestPrefill(payload) {
+    try {
+        localStorage.setItem(BACKTEST_PREFILL_KEY, JSON.stringify({ ...payload, updated_at: Date.now() }));
+        window.dispatchEvent(new CustomEvent('qtsys:backtest-prefill'));
+    } catch (_) {}
+}
+function readBacktestPrefill() {
+    try {
+        const raw = localStorage.getItem(BACKTEST_PREFILL_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_) { return null; }
+}
+function clearBacktestPrefill() {
+    try { localStorage.removeItem(BACKTEST_PREFILL_KEY); } catch (_) {}
+}
+
+const HISTORY_FOCUS_KEY = 'qtsys_history_focus';
+function pushHistoryFocus(payload) {
+    try {
+        localStorage.setItem(HISTORY_FOCUS_KEY, JSON.stringify({ ...payload, updated_at: Date.now() }));
+        window.dispatchEvent(new CustomEvent('qtsys:history-focus'));
+    } catch (_) {}
+}
+function readHistoryFocus() {
+    try {
+        const raw = localStorage.getItem(HISTORY_FOCUS_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_) { return null; }
+}
+function clearHistoryFocus() {
+    try { localStorage.removeItem(HISTORY_FOCUS_KEY); } catch (_) {}
+}
+
+const STRATEGY_AI_PREFILL_KEY = 'qtsys_strategy_ai_prefill';
+function pushStrategyAIPrefill(payload) {
+    try {
+        localStorage.setItem(STRATEGY_AI_PREFILL_KEY, JSON.stringify({ ...payload, updated_at: Date.now() }));
+        window.dispatchEvent(new CustomEvent('qtsys:strategy-ai-prefill'));
+    } catch (_) {}
+}
+function readStrategyAIPrefill() {
+    try {
+        const raw = localStorage.getItem(STRATEGY_AI_PREFILL_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_) { return null; }
+}
+function clearStrategyAIPrefill() {
+    try { localStorage.removeItem(STRATEGY_AI_PREFILL_KEY); } catch (_) {}
+}
+
+const STRATEGY_BACKTEST_CONTEXT_KEY = 'qtsys_strategy_backtest_contexts';
+function readStrategyBacktestContextMap() {
+    try {
+        const raw = localStorage.getItem(STRATEGY_BACKTEST_CONTEXT_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) { return {}; }
+}
+function writeStrategyBacktestContextMap(payload) {
+    try { localStorage.setItem(STRATEGY_BACKTEST_CONTEXT_KEY, JSON.stringify(payload || {})); } catch (_) {}
+}
+function readStrategyBacktestContext(strategyId) {
+    if (!strategyId) return null;
+    return readStrategyBacktestContextMap()[String(strategyId)] || null;
+}
+function saveStrategyBacktestContext(strategyId, context) {
+    if (!strategyId || !context) return;
+    const payload = readStrategyBacktestContextMap();
+    payload[String(strategyId)] = { ...context, updated_at: Date.now() };
+    const entries = Object.entries(payload)
+        .sort((a, b) => (b[1] && b[1].updated_at ? b[1].updated_at : 0) - (a[1] && a[1].updated_at ? a[1].updated_at : 0))
+        .slice(0, 60);
+    writeStrategyBacktestContextMap(Object.fromEntries(entries));
+}
+function clearStrategyBacktestContext(strategyId) {
+    if (!strategyId) return;
+    const payload = readStrategyBacktestContextMap();
+    delete payload[String(strategyId)];
+    writeStrategyBacktestContextMap(payload);
+}
+function compactDate(value) {
+    return String(value || '').replace(/-/g, '').trim().slice(0, 8);
+}
+function todayCompactDate() {
+    const now = new Date();
+    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+}
+function shiftCompactDate(value, offsetDays) {
+    const text = compactDate(value);
+    if (!/^\d{8}$/.test(text)) return '';
+    const year = parseInt(text.slice(0, 4), 10);
+    const month = parseInt(text.slice(4, 6), 10);
+    const day = parseInt(text.slice(6, 8), 10);
+    const current = new Date(year, month - 1, day);
+    current.setDate(current.getDate() + offsetDays);
+    return `${current.getFullYear()}${String(current.getMonth() + 1).padStart(2, '0')}${String(current.getDate()).padStart(2, '0')}`;
+}
+function resolveAnalysisWindow(startDate, endDate, backtestDays) {
+    const safeEnd = compactDate(endDate) || todayCompactDate();
+    const safeStart = compactDate(startDate);
+    if (safeStart && (!safeEnd || safeStart <= safeEnd)) {
+        return { start_date: safeStart, end_date: safeEnd };
+    }
+    const days = Math.max(parseInt(backtestDays, 10) || 365, 1);
+    return { start_date: shiftCompactDate(safeEnd, -(days + 40)), end_date: safeEnd };
+}
+function normalizeStockItems(stockItems) {
+    const seen = new Set();
+    return (Array.isArray(stockItems) ? stockItems : [])
+        .map(item => ({ ts_code: String((item && (item.ts_code || item.code)) || '').trim().toUpperCase(), name: String((item && item.name) || '').trim() }))
+        .filter(item => {
+            if (!item.ts_code || seen.has(item.ts_code)) return false;
+            seen.add(item.ts_code);
+            return true;
+        });
+}
+function normalizeBacktestContext(context) {
+    if (!context || typeof context !== 'object') return null;
+    const stockItems = normalizeStockItems(context.stock_items);
+    const stockCodes = stockItems.map(item => item.ts_code);
+    const window = resolveAnalysisWindow(context.start_date, context.end_date, context.backtest_days);
+    return {
+        ...context,
+        stock_items: stockItems,
+        stock_codes: stockCodes,
+        stock_count: stockCodes.length,
+        benchmark: context.benchmark || context.benchmark_code || '000300.SH',
+        start_date: window.start_date,
+        end_date: window.end_date,
+        universe: stockCodes.join(','),
+    };
+}
+
 const METRIC_LABELS = {
     total_return: ['总收益率', '%'], annual_return: ['年化收益率', '%'],
     annual_volatility: ['年化波动率', '%'], sharpe_ratio: ['夏普比率', ''],
@@ -877,7 +1263,7 @@ function CodeEditor({ value, onChange }) {
 }
 
 /* ===== Settings Page ===== */
-function SettingsPage({ showToast }) {
+function LegacySettingsPageOld({ showToast }) {
     const [s, setS] = useState({ tushare_token: '', default_cash: 1000000, commission_rate: 0.0003, stamp_tax_rate: 0.001, slippage: 0.002, llm_api_key: '', llm_base_url: '', llm_model: '', mysql_host: '', mysql_port: 3306, mysql_user: '', mysql_password: '', mysql_database: 'qtsys', use_mysql: 0, has_tushare_token: false, has_llm_api_key: false, has_mysql_password: false });
     const [loading, setLoading] = useState(false);
     const [mysqlTesting, setMysqlTesting] = useState(false);
@@ -988,8 +1374,213 @@ function SettingsPage({ showToast }) {
         </div>
     );
 }
+function SettingsPage({ showToast }) {
+    const [s, setS] = useState({
+        tushare_token: '',
+        default_cash: 1000000,
+        commission_rate: 0.0003,
+        stamp_tax_rate: 0.001,
+        slippage: 0.002,
+        llm_api_key: '',
+        llm_base_url: '',
+        llm_model: '',
+        mysql_host: '',
+        mysql_port: 3306,
+        mysql_user: '',
+        mysql_password: '',
+        mysql_database: 'qtsys',
+        use_mysql: 0,
+        has_tushare_token: false,
+        has_llm_api_key: false,
+        has_mysql_password: false,
+    });
+    const [loading, setLoading] = useState(false);
+    const [mysqlTesting, setMysqlTesting] = useState(false);
+    const [llmTesting, setLlmTesting] = useState(false);
+    const [llmTestInfo, setLlmTestInfo] = useState(null);
+
+    const mergeSettingsResponse = (prev, next) => ({
+        ...prev,
+        ...next,
+        tushare_token: next.has_tushare_token ? (prev.tushare_token || '') : '',
+        llm_api_key: next.has_llm_api_key ? (prev.llm_api_key || '') : '',
+        mysql_password: next.has_mysql_password ? (prev.mysql_password || '') : '',
+    });
+
+    useEffect(() => {
+        api.get('/api/settings').then(data => setS(prev => mergeSettingsResponse(prev, data))).catch(() => {});
+    }, []);
+
+    const save = async () => {
+        setLoading(true);
+        try {
+            const res = await api.put('/api/settings', s);
+            setS(prev => mergeSettingsResponse(prev, res));
+            showToast('设置已保存', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '保存设置失败', 'error');
+        }
+        setLoading(false);
+    };
+
+    const validate = async () => {
+        try {
+            const res = await api.post('/api/data/validate_token');
+            showToast(res.valid ? 'Tushare Token 验证成功' : 'Tushare Token 无效', res.valid ? 'success' : 'error');
+        } catch (e) {
+            showToast((e && e.detail) || 'Token 验证失败', 'error');
+        }
+    };
+
+    const testMysql = async () => {
+        if (!s.mysql_host || !s.mysql_user) {
+            showToast('请先填写 MySQL 主机和用户名', 'error');
+            return;
+        }
+        setMysqlTesting(true);
+        try {
+            const res = await api.post('/api/settings/test_mysql', {
+                host: s.mysql_host,
+                port: s.mysql_port,
+                user: s.mysql_user,
+                password: s.mysql_password,
+                database: s.mysql_database,
+            });
+            showToast(res.message || (res.success ? 'MySQL 连接成功' : 'MySQL 连接失败'), res.success ? 'success' : 'error');
+        } catch (e) {
+            showToast((e && e.detail) || 'MySQL 测试失败', 'error');
+        }
+        setMysqlTesting(false);
+    };
+
+    const activateMysql = async () => {
+        if (!s.mysql_host || !s.mysql_user) {
+            showToast('请先保存 MySQL 配置', 'error');
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.post('/api/settings/activate_mysql');
+            showToast(res.message || (res.success ? 'MySQL 已启用' : 'MySQL 启用失败'), res.success ? 'success' : 'error');
+            if (res.success) setS(prev => ({ ...prev, use_mysql: 1 }));
+        } catch (e) {
+            showToast((e && e.detail) || '启用 MySQL 失败', 'error');
+        }
+        setLoading(false);
+    };
+
+    const testLLM = async () => {
+        setLlmTesting(true);
+        setLlmTestInfo(null);
+        try {
+            const res = await api.post('/api/settings/test_llm', {
+                api_key: s.llm_api_key,
+                base_url: s.llm_base_url,
+                model: s.llm_model,
+            });
+            setLlmTestInfo(res);
+            showToast(res.message || (res.success ? '模型连接成功' : '模型连接失败'), res.success ? 'success' : 'error');
+        } catch (e) {
+            const detail = (e && e.detail) || '模型连接测试失败';
+            setLlmTestInfo({ success: false, message: detail });
+            showToast(detail, 'error');
+        }
+        setLlmTesting(false);
+    };
+
+    const F = (label, key, type, step, placeholder='') => (
+        <div className="field">
+            <label className="label">{label}</label>
+            <input
+                className="input"
+                type={type || 'text'}
+                step={step}
+                placeholder={placeholder}
+                value={s[key] || ''}
+                onChange={e => setS({ ...s, [key]: type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value })}
+            />
+        </div>
+    );
+
+    return (
+        <div className="fade-in space-y" style={{maxWidth:760, margin:'0 auto'}}>
+            <h2 style={{fontSize:24, fontWeight:700}}>系统设置</h2>
+            <div className="card space-y">
+                <div className="card-title">数据源配置</div>
+                {F('Tushare Token', 'tushare_token', 'password', undefined, s.has_tushare_token ? '已保存，留空则保持当前 Token 不变' : '请输入 Tushare Token')}
+                {s.has_tushare_token && <div className="text-xs text-muted">当前 Token 已保存；如需替换，直接输入新 Token 后保存即可。</div>}
+                <button className="btn-link mt-2" onClick={validate}>验证 Token</button>
+            </div>
+            <div className="card space-y">
+                <div className="card-title">回测参数</div>
+                <div className="grid-2">
+                    {F('初始资金', 'default_cash', 'number')}
+                    {F('佣金费率', 'commission_rate', 'number', '0.0001')}
+                    {F('印花税率', 'stamp_tax_rate', 'number', '0.0001')}
+                    {F('滑点', 'slippage', 'number', '0.001')}
+                </div>
+            </div>
+            <div className="card space-y">
+                <div className="card-title">大模型配置</div>
+                <p className="text-xs text-muted" style={{marginBottom:8}}>
+                    此配置会同时用于因子挖掘、新闻分析和 AI 策略助手，支持 OpenAI 兼容接口。
+                </p>
+                {F('API Key', 'llm_api_key', 'password', undefined, s.has_llm_api_key ? '已保存，留空则保持当前 Key 不变' : '请输入模型 API Key')}
+                <div className="grid-2">
+                    {F('接口地址', 'llm_base_url', 'text', undefined, '例如：https://your-endpoint/v1')}
+                    {F('模型名称', 'llm_model', 'text', undefined, '例如：claude-sonnet-4-5')}
+                </div>
+                <div className="flex gap-sm">
+                    <button className="btn btn-secondary" onClick={testLLM} disabled={llmTesting}>
+                        {llmTesting ? <span className="spinner"/> : null}测试模型连接
+                    </button>
+                    {llmTestInfo && llmTestInfo.success ? (
+                        <span className="text-profit text-sm" style={{lineHeight:'32px'}}>连接成功</span>
+                    ) : null}
+                </div>
+                {llmTestInfo ? (
+                    <div className="strategy-mini-card">
+                        <div className="strategy-mini-label">测试结果</div>
+                        <div className="strategy-mini-value" style={{whiteSpace:'pre-wrap'}}>
+                            {llmTestInfo.message || (llmTestInfo.success ? '模型连接成功' : '模型连接失败')}
+                            {llmTestInfo.normalized_base_url ? `\n实际地址：${llmTestInfo.normalized_base_url}` : ''}
+                            {llmTestInfo.resolved_model ? `\n实际模型：${llmTestInfo.resolved_model}` : ''}
+                            {llmTestInfo.response_preview ? `\n响应预览：${llmTestInfo.response_preview}` : ''}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+            <div className="card space-y">
+                <div className="card-title">MySQL 配置</div>
+                <p className="text-xs text-muted" style={{marginBottom:8}}>
+                    因子看板与部分缓存能力依赖 MySQL。主业务元数据仍保存在本地 SQLite。
+                </p>
+                <div className="grid-2">
+                    {F('主机地址', 'mysql_host')}
+                    {F('端口', 'mysql_port', 'number')}
+                    {F('用户名', 'mysql_user')}
+                    {F('密码', 'mysql_password', 'password', undefined, s.has_mysql_password ? '已保存，留空则保持当前密码不变' : '请输入 MySQL 密码')}
+                    {F('数据库名', 'mysql_database')}
+                </div>
+                <div className="flex gap-sm">
+                    <button className="btn btn-secondary" onClick={testMysql} disabled={mysqlTesting}>
+                        {mysqlTesting ? <span className="spinner"/> : null}测试连接
+                    </button>
+                    {s.use_mysql ? (
+                        <span className="text-profit text-sm" style={{lineHeight:'32px'}}>MySQL 已启用</span>
+                    ) : (
+                        <button className="btn btn-secondary" onClick={activateMysql} disabled={loading}>启用 MySQL</button>
+                    )}
+                </div>
+            </div>
+            <button className="btn btn-primary" onClick={save} disabled={loading}>
+                {loading ? <span className="spinner"/> : null}保存设置
+            </button>
+        </div>
+    );
+}
 /* ===== Strategy Page ===== */
-function StrategyPage({ showToast }) {
+function LegacyStrategyPageOld({ showToast }) {
     const [strategies, setStrategies] = useState([]);
     const [selected, setSelected] = useState(null);
     const [code, setCode] = useState('');
@@ -1056,8 +1647,421 @@ function StrategyPage({ showToast }) {
         </div>
     );
 }
+function StrategyPage({ showToast, openBacktestWithStrategy }) {
+    const [strategies, setStrategies] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const [code, setCode] = useState('');
+    const [name, setName] = useState('');
+    const [desc, setDesc] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiSkills, setAiSkills] = useState([]);
+    const [aiContext, setAiContext] = useState({ news_count: 0, news_items: [] });
+    const [includeMarketContext, setIncludeMarketContext] = useState(true);
+    const selectedIdRef = useRef(null);
+    const pendingBacktestContextRef = useRef(null);
+    const [aiMessages, setAiMessages] = useState([
+        {
+            role: 'assistant',
+            content: '告诉我你的交易目标、市场偏好和风险要求，我会生成可直接保存并用于回测的 QTsys 策略代码。',
+        },
+    ]);
+
+    useEffect(() => {
+        selectedIdRef.current = selected ? selected.id : null;
+    }, [selected]);
+
+    const load = useCallback(async (preferredId) => {
+        try {
+            const items = await api.get('/api/strategies');
+            setStrategies(items);
+            const targetId = preferredId || selectedIdRef.current;
+            if (targetId) {
+                const target = items.find(item => item.id === targetId);
+                if (target) {
+                    setSelected(target);
+                    setName(target.name || '');
+                    setDesc(target.description || '');
+                    setCode(target.code || '');
+                }
+            }
+        } catch (_) {}
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        api.get('/api/strategies/ai/skills')
+            .then(res => setAiSkills((res && res.skills) || []))
+            .catch(() => setAiSkills([]));
+    }, []);
+
+    const selectStrategy = (strategy) => {
+        setSelected(strategy);
+        setName(strategy.name || '');
+        setDesc(strategy.description || '');
+        setCode(strategy.code || '');
+    };
+
+    const bindStrategyBacktestContext = (strategyId, overrideContext) => {
+        const resolved = normalizeBacktestContext(overrideContext || pendingBacktestContextRef.current);
+        if (!strategyId || !resolved || !resolved.stock_codes || !resolved.stock_codes.length) return null;
+        saveStrategyBacktestContext(strategyId, resolved);
+        pendingBacktestContextRef.current = null;
+        return resolved;
+    };
+
+    const jumpToBacktest = (strategy, overrideContext) => {
+        if (!strategy || !strategy.id) {
+            showToast('请先保存策略后再进入回测', 'error');
+            return;
+        }
+        const benchmarkCode = /上证50/.test(strategy.name || '') ? '000016.SH'
+            : /中证500/.test(strategy.name || '') ? '000905.SH'
+            : /中证1000/.test(strategy.name || '') ? '000852.SH'
+            : '000300.SH';
+        const defaultUniverse = benchmarkCode === '000016.SH'
+            ? '600519.SH,601318.SH,600036.SH'
+            : benchmarkCode === '000905.SH'
+                ? '000738.SZ,002050.SZ,300124.SZ'
+                : benchmarkCode === '000852.SH'
+                    ? '300750.SZ,688111.SH,002371.SZ'
+                    : '600519.SH,000858.SZ,601318.SH';
+        const linkedContext = normalizeBacktestContext(overrideContext || readStrategyBacktestContext(strategy.id));
+        const finalBenchmark = linkedContext && linkedContext.benchmark ? linkedContext.benchmark : benchmarkCode;
+        const finalUniverse = linkedContext && linkedContext.universe ? linkedContext.universe : defaultUniverse;
+        pushBacktestPrefill({
+            strategy_id: String(strategy.id),
+            strategy_name: strategy.name || '',
+            benchmark: finalBenchmark,
+            universe: finalUniverse,
+            start_date: linkedContext && linkedContext.start_date ? linkedContext.start_date : '',
+            end_date: linkedContext && linkedContext.end_date ? linkedContext.end_date : '',
+            universe_type: linkedContext && linkedContext.universe_type ? linkedContext.universe_type : '',
+            universe_code: linkedContext && linkedContext.universe_code ? linkedContext.universe_code : '',
+            universe_name: linkedContext && linkedContext.universe_name ? linkedContext.universe_name : '',
+            custom_pool_id: linkedContext && linkedContext.custom_pool_id ? linkedContext.custom_pool_id : null,
+            stock_items: linkedContext && linkedContext.stock_items ? linkedContext.stock_items : [],
+            stock_count: linkedContext && linkedContext.stock_count ? linkedContext.stock_count : 0,
+            source: linkedContext && linkedContext.source ? linkedContext.source : 'strategy',
+            source_label: linkedContext && linkedContext.source_label ? linkedContext.source_label : '',
+        });
+        if (openBacktestWithStrategy) openBacktestWithStrategy();
+    };
+
+    const newStrategy = () => {
+        setSelected(null);
+        setName('新策略草稿');
+        setDesc('AI 或手工创建的策略草稿');
+        setCode(STRATEGY_TEMPLATE);
+    };
+
+    const initBuiltin = async () => {
+        try {
+            const res = await api.post('/api/strategies/init_builtin');
+            await load();
+            showToast((res && res.message) || '内置策略已加载', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '加载内置策略失败', 'error');
+        }
+    };
+
+    const save = async () => {
+        if (!name.trim()) { showToast('请填写策略名称', 'error'); return; }
+        if (!code.trim()) { showToast('策略代码不能为空', 'error'); return; }
+        setSaving(true);
+        try {
+            if (selected) {
+                await api.put('/api/strategies/' + selected.id, { name, description: desc, code });
+                bindStrategyBacktestContext(selected.id);
+                showToast('策略已更新', 'success');
+                await load(selected.id);
+            } else {
+                const created = await api.post('/api/strategies', { name, description: desc, code });
+                if (created && created.id) bindStrategyBacktestContext(created.id);
+                showToast('策略已创建', 'success');
+                await load(created.id);
+                if (created && created.id) {
+                    const detail = await api.get('/api/strategies/' + created.id);
+                    selectStrategy(detail);
+                }
+            }
+        } catch (e) {
+            showToast((e && e.detail) || '保存策略失败', 'error');
+        }
+        setSaving(false);
+    };
+
+    const delStrategy = async (id) => {
+        if (!confirm('确认删除该策略吗？')) return;
+        try {
+            await api.remove('/api/strategies/' + id);
+            clearStrategyBacktestContext(id);
+            if (selected && selected.id === id) {
+                setSelected(null);
+                setName('');
+                setDesc('');
+                setCode('');
+            }
+            await load();
+            showToast('策略已删除', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '删除策略失败', 'error');
+        }
+    };
+
+    const requestAI = async (saveDirect, promptOverride) => {
+        const finalPrompt = (promptOverride || aiPrompt || '').trim();
+        if (!finalPrompt) { showToast('请输入你希望 AI 生成的策略需求', 'error'); return; }
+        const originalPrompt = finalPrompt;
+        const userMessage = { role: 'user', content: finalPrompt };
+        const nextMessages = [...aiMessages.map(item => ({ role: item.role, content: item.content })), userMessage];
+        setAiMessages(prev => [...prev, userMessage]);
+        setAiPrompt('');
+        setAiLoading(true);
+        try {
+            const res = await api.post('/api/strategies/ai/generate', {
+                messages: nextMessages,
+                current_strategy: { name, description: desc, code },
+                include_market_context: includeMarketContext,
+                save: saveDirect,
+            });
+            if (!res || !res.strategy || !res.strategy.code || !String(res.strategy.code).trim()) {
+                throw { detail: 'AI 已返回结果，但未生成可用的策略代码，请重试或缩短需求描述。' };
+            }
+            const assistantMessage = {
+                role: 'assistant',
+                content: res.assistant_reply || 'AI 已生成策略草稿。',
+                strategy: res.strategy || null,
+                saved_strategy: res.saved_strategy || null,
+            };
+            setAiMessages(prev => [...prev, assistantMessage]);
+            if (res.context_summary) setAiContext(res.context_summary);
+            if (res.strategy) {
+                setName(res.strategy.name || 'AI 生成策略');
+                setDesc(res.strategy.description || '');
+                setCode(res.strategy.code || '');
+            }
+            if (res.saved_strategy && res.saved_strategy.id) {
+                const linkedContext = bindStrategyBacktestContext(res.saved_strategy.id);
+                await load(res.saved_strategy.id);
+                const detail = await api.get('/api/strategies/' + res.saved_strategy.id);
+                selectStrategy(detail);
+                jumpToBacktest(detail, linkedContext);
+                showToast('AI 策略已保存，并已带入回测页', 'success');
+            } else {
+                setSelected(null);
+                showToast('AI 已生成策略草稿', 'success');
+            }
+        } catch (e) {
+            setAiPrompt(originalPrompt);
+            setAiMessages(prev => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === 'user' && last.content === originalPrompt) {
+                    next.pop();
+                }
+                next.push({
+                    role: 'assistant',
+                    content: '生成失败：' + ((e && e.detail) || 'AI 生成失败，请稍后重试。'),
+                    strategy: null,
+                    saved_strategy: null,
+                });
+                return next;
+            });
+            showToast((e && e.detail) || 'AI 生成失败', 'error');
+        }
+        setAiLoading(false);
+    };
+
+    useEffect(() => {
+        const applyStrategyPrefill = () => {
+            const prefill = readStrategyAIPrefill();
+            if (!prefill || !prefill.prompt) return;
+            clearStrategyAIPrefill();
+            pendingBacktestContextRef.current = normalizeBacktestContext(prefill.backtest_context || null);
+            setAiPrompt(prefill.prompt);
+            if (prefill.auto_generate) setTimeout(() => requestAI(false, prefill.prompt), 0);
+        };
+        applyStrategyPrefill();
+        window.addEventListener('qtsys:strategy-ai-prefill', applyStrategyPrefill);
+        return () => window.removeEventListener('qtsys:strategy-ai-prefill', applyStrategyPrefill);
+    }, [aiMessages, name, desc, code, includeMarketContext]);
+
+    return (
+        <div className="fade-in strategy-layout">
+            <div className="strategy-card strategy-sidebar">
+                <div className="strategy-sidebar-head">
+                    <div>
+                        <div className="strategy-sidebar-title">策略库</div>
+                        <div className="strategy-sidebar-subtitle">统一管理手工策略、内置模板和 AI 生成策略。</div>
+                    </div>
+                    <div className="flex gap-sm">
+                        <button className="btn btn-primary flex-1 text-sm" onClick={newStrategy}>新建草稿</button>
+                        <button className="btn btn-secondary flex-1 text-sm" onClick={initBuiltin}>加载内置</button>
+                    </div>
+                </div>
+                <div className="strategy-list">
+                    {strategies.length === 0 && <div className="strategy-empty-hint">当前还没有策略，可先新建或加载内置模板。</div>}
+                    {strategies.map(strategy => (
+                        <div
+                            key={strategy.id}
+                            onClick={() => selectStrategy(strategy)}
+                            className={'strategy-item' + (selected && selected.id === strategy.id ? ' selected' : '')}
+                        >
+                            <div className="strategy-item-name">{strategy.name}</div>
+                            <div className="strategy-item-desc">{strategy.description || '暂无描述'}</div>
+                            <button className="btn-danger mt-2" onClick={(e) => { e.stopPropagation(); delStrategy(strategy.id); }}>删除</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="strategy-card strategy-editor-shell">
+                <div className="strategy-topbar">
+                    <div>
+                        <div className="strategy-panel-eyebrow">Strategy Workspace</div>
+                        <div className="strategy-panel-title">{selected ? '编辑现有策略' : '策略草稿工作台'}</div>
+                        <div className="strategy-panel-subtitle">AI 生成的策略会自动写入当前编辑器，你可以继续修改、保存、回测和分析。</div>
+                    </div>
+                    <div className="strategy-toolbar-actions">
+                        <button className="btn btn-secondary" onClick={newStrategy}>重置草稿</button>
+                        <button className="btn btn-secondary" onClick={() => jumpToBacktest(selected)} disabled={!selected || saving}>前往回测</button>
+                        <button className="btn btn-primary" onClick={save} disabled={saving}>
+                            {saving ? <span className="spinner"/> : null}
+                            {selected ? '保存修改' : '保存为新策略'}
+                        </button>
+                    </div>
+                </div>
+                <div className="strategy-form-grid">
+                    <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="策略名称" />
+                    <input className="input" value={desc} onChange={e => setDesc(e.target.value)} placeholder="策略描述" />
+                    <div className="strategy-mini-card">
+                        <div className="strategy-mini-label">状态</div>
+                        <div className="strategy-mini-value">{selected ? `已选中 #${selected.id}` : '未保存草稿'}</div>
+                    </div>
+                </div>
+                <div className="strategy-editor-tip">
+                    <div className="strategy-chip muted">模板要求：必须包含 initialize / handle_data</div>
+                    <div className="strategy-chip muted">保存后可直接进入回测页面使用</div>
+                    <div className="strategy-chip muted">AI 会自动进行本地模板校验</div>
+                </div>
+                <CodeEditor value={code} onChange={setCode} />
+            </div>
+            <div className="strategy-card strategy-ai-panel">
+                <div className="strategy-ai-header">
+                    <div>
+                        <div className="strategy-ai-title">AI 策略助手</div>
+                        <div className="strategy-ai-subtitle">结合系统模板、最新市场新闻和量化风控规则，生成可直接落库的策略。</div>
+                    </div>
+                    <label className="strategy-switch">
+                        <input
+                            type="checkbox"
+                            checked={includeMarketContext}
+                            onChange={e => setIncludeMarketContext(e.target.checked)}
+                        />
+                        结合最新市场消息
+                    </label>
+                </div>
+                <div className="strategy-chip-row">
+                    {(aiSkills || []).map(skill => (
+                        <div key={skill.key || skill.name} className="strategy-chip" title={skill.description || ''}>
+                            {skill.name}
+                        </div>
+                    ))}
+                </div>
+                <div>
+                    <div className="strategy-mini-label" style={{marginBottom:8}}>常用提示</div>
+                    <div className="strategy-suggestion-grid">
+                        {STRATEGY_AI_SUGGESTIONS.map(item => (
+                            <button key={item} className="strategy-suggestion" onClick={() => setAiPrompt(item)}>{item}</button>
+                        ))}
+                    </div>
+                </div>
+                {!!((aiContext.news_items || []).length) && (
+                    <div>
+                        <div className="strategy-mini-label" style={{marginBottom:8}}>已注入市场快照（{aiContext.news_count || 0} 条）</div>
+                        <div className="strategy-ai-market-list">
+                            {(aiContext.news_items || []).slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="strategy-ai-market-item">
+                                    <div className="strategy-ai-market-title">{item.title || '未命名新闻'}</div>
+                                    <div className="strategy-ai-market-meta">{[item.publish_time, item.source, item.sentiment_label].filter(Boolean).join(' · ')}</div>
+                                    <div className="strategy-ai-market-summary">{item.summary || '暂无摘要'}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                <div className="strategy-ai-messages">
+                    {aiMessages.map((message, idx) => (
+                        <div key={idx} className={'strategy-ai-message ' + message.role}>
+                            <div className="strategy-ai-message-head">
+                                <span>{message.role === 'user' ? '你的需求' : 'AI 输出'}</span>
+                                {message.saved_strategy ? <span>已保存 #{message.saved_strategy.id}</span> : null}
+                            </div>
+                            <div className="strategy-ai-message-body">{message.content}</div>
+                            {message.saved_strategy ? (
+                                <div style={{marginTop:10}}>
+                                    <button className="btn btn-secondary" onClick={() => jumpToBacktest(message.saved_strategy)}>立即回测</button>
+                                </div>
+                            ) : null}
+                            {message.strategy ? (
+                                <div className="strategy-ai-block">
+                                    <div className="strategy-ai-block-title">本轮生成结果</div>
+                                    <div className="strategy-mini-value" style={{marginTop:0}}>
+                                        <strong>{message.strategy.name}</strong>
+                                        <div style={{marginTop:6, color:'var(--text-400)'}}>{message.strategy.description}</div>
+                                    </div>
+                                    {!!(message.strategy.logic_points || []).length && (
+                                        <div style={{marginTop:10}}>
+                                            <div className="strategy-mini-label" style={{marginBottom:8}}>核心逻辑</div>
+                                            <div className="strategy-ai-list">
+                                                {(message.strategy.logic_points || []).map((item, pointIdx) => (
+                                                    <div key={pointIdx} className="strategy-ai-bullet">{item}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!!(message.strategy.risk_points || []).length && (
+                                        <div style={{marginTop:10}}>
+                                            <div className="strategy-mini-label" style={{marginBottom:8}}>风险提示</div>
+                                            <div className="strategy-ai-list">
+                                                {(message.strategy.risk_points || []).map((item, pointIdx) => (
+                                                    <div key={pointIdx} className="strategy-ai-bullet">{item}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {message.strategy.market_view ? (
+                                        <div style={{marginTop:10}}>
+                                            <div className="strategy-mini-label" style={{marginBottom:8}}>市场判断</div>
+                                            <div className="strategy-mini-value" style={{marginTop:0}}>{message.strategy.market_view}</div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+                <textarea
+                    className="input strategy-ai-textarea"
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    placeholder="例如：请生成一个适合当前震荡行情、面向沪深300成分股的低换手趋势策略，并控制最大单股仓位。"
+                />
+                <div className="strategy-ai-actions">
+                    <button className="btn btn-secondary" onClick={() => requestAI(false)} disabled={aiLoading}>
+                        {aiLoading ? <span className="spinner"/> : null}生成草稿
+                    </button>
+                    <button className="btn btn-primary" onClick={() => requestAI(true)} disabled={aiLoading}>
+                        {aiLoading ? <span className="spinner"/> : null}生成并保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 /* ===== Backtest Page ===== */
-function BacktestPage({ showToast }) {
+function BacktestPage({ showToast, openHistoryWithResult }) {
     const [strategies, setStrategies] = useState([]);
     const [strategyId, setStrategyId] = useState('');
     const [universe, setUniverse] = useState('000001.SZ');
@@ -1079,6 +2083,11 @@ function BacktestPage({ showToast }) {
     // Walk-Forward
     const [wfRunning, setWfRunning] = useState(false);
     const [wfResult, setWfResult] = useState(null);
+    const [prefillInfo, setPrefillInfo] = useState(null);
+    const [universeInputMode, setUniverseInputMode] = useState('codes');
+    const [dateInputMode, setDateInputMode] = useState('manual');
+    const [benchmarkInputMode, setBenchmarkInputMode] = useState('manual');
+    const resultRef = useRef(null);
 
     useEffect(() => {
         api.get('/api/strategies').then(s => {
@@ -1087,38 +2096,109 @@ function BacktestPage({ showToast }) {
         }).catch(() => {});
     }, []);
 
+    const applyBacktestPrefill = useCallback((strategyList) => {
+        const prefill = readBacktestPrefill();
+        if (!prefill || !prefill.strategy_id) return;
+        const list = strategyList || strategies;
+        const exists = (list || []).some(item => String(item.id) === String(prefill.strategy_id));
+        if (!exists) return;
+        setStrategyId(String(prefill.strategy_id));
+        if (prefill.universe) setUniverse(prefill.universe);
+        if (prefill.benchmark) setBenchmark(prefill.benchmark);
+        if (prefill.start_date) setStartDate(prefill.start_date);
+        if (prefill.end_date) setEndDate(prefill.end_date);
+        setPrefillInfo(prefill);
+        setUniverseInputMode(prefill.universe_type ? 'pool' : 'codes');
+        setDateInputMode(prefill.start_date || prefill.end_date ? 'source' : 'manual');
+        setBenchmarkInputMode(prefill.benchmark ? 'source' : 'manual');
+    }, [strategies]);
+
+    useEffect(() => {
+        applyBacktestPrefill(strategies);
+    }, [strategies, applyBacktestPrefill]);
+
+    useEffect(() => {
+        const handler = () => applyBacktestPrefill();
+        window.addEventListener('qtsys:backtest-prefill', handler);
+        return () => window.removeEventListener('qtsys:backtest-prefill', handler);
+    }, [applyBacktestPrefill]);
+
+    useEffect(() => {
+        if (!result || !resultRef.current) return;
+        setTimeout(() => {
+            try { resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+        }, 80);
+    }, [result]);
+
+    const buildUniversePayload = () => {
+        const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+        const useDescriptor = !!(prefillInfo && prefillInfo.universe_type && universeInputMode === 'pool');
+        const payload = { universe: codes };
+        if (useDescriptor) {
+            payload.universe_type = prefillInfo.universe_type || '';
+            payload.universe_code = prefillInfo.universe_code || '';
+            payload.universe_name = prefillInfo.universe_name || '';
+            payload.custom_pool_id = prefillInfo.custom_pool_id || null;
+            payload.stock_items = Array.isArray(prefillInfo.stock_items) ? prefillInfo.stock_items : [];
+        }
+        return { codes, payload, useDescriptor };
+    };
+
+    const restoreSourceDateRange = () => {
+        if (prefillInfo && prefillInfo.start_date) setStartDate(prefillInfo.start_date);
+        if (prefillInfo && prefillInfo.end_date) setEndDate(prefillInfo.end_date);
+        setDateInputMode(prefillInfo && (prefillInfo.start_date || prefillInfo.end_date) ? 'source' : 'manual');
+    };
+
+    const restoreSourceBenchmark = () => {
+        if (prefillInfo && prefillInfo.benchmark) setBenchmark(prefillInfo.benchmark);
+        setBenchmarkInputMode(prefillInfo && prefillInfo.benchmark ? 'source' : 'manual');
+    };
+
     const runBacktest = async () => {
         if (!strategyId) { showToast('请选择策略', 'error'); return; }
         setRunning(true); setResult(null); setLogs([]);
         try {
-            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/run', {
-                strategy_id: parseInt(strategyId), universe: codes,
+                strategy_id: parseInt(strategyId),
+                ...universePayload.payload,
                 start_date: startDate, end_date: endDate,
                 initial_cash: cash, benchmark,
                 max_position_pct: maxPosPct,
                 max_drawdown_limit: maxDdLimit,
             });
             setResult(res); setLogs(res.logs || []);
+            setResultTab('chart');
+            if (res && res.id) pushHistoryFocus({ result_id: res.id, tab: 'chart' });
             showToast('回测完成', 'success');
         } catch (e) { showToast(e.detail || '回测失败', 'error'); }
         setRunning(false);
+    };
+    const openResultInHistory = () => {
+        if (!result || !result.id) {
+            showToast('请先运行回测并生成结果', 'error');
+            return;
+        }
+        pushHistoryFocus({ result_id: result.id, tab: resultTab || 'risk' });
+        if (openHistoryWithResult) openHistoryWithResult();
     };
 
     const runOptimize = async () => {
         if (!strategyId) { showToast('请选择策略', 'error'); return; }
         let grid;
-        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误,请输入有效JSON', 'error'); return; }
+        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误，请输入有效 JSON', 'error'); return; }
         setOptimizing(true); setOptimizeResults(null);
         try {
-            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/optimize', {
-                strategy_id: parseInt(strategyId), universe: codes,
+                strategy_id: parseInt(strategyId),
+                ...universePayload.payload,
                 start_date: startDate, end_date: endDate,
                 initial_cash: cash, benchmark, param_grid: grid,
             });
             setOptimizeResults(res.results);
-            showToast(`优化完成, 共${res.results.length}组参数`, 'success');
+            showToast(`优化完成，共 ${res.results.length} 组参数`, 'success');
         } catch (e) { showToast(e.detail || '优化失败', 'error'); }
         setOptimizing(false);
     };
@@ -1129,188 +2209,87 @@ function BacktestPage({ showToast }) {
         try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误', 'error'); return; }
         setWfRunning(true); setWfResult(null);
         try {
-            const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
+            const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/walk_forward', {
-                strategy_id: parseInt(strategyId), universe: codes,
+                strategy_id: parseInt(strategyId),
+                ...universePayload.payload,
                 start_date: startDate, end_date: endDate,
                 param_grid: grid, benchmark,
             });
             setWfResult(res);
-            showToast('Walk-Forward验证完成', 'success');
-        } catch (e) { showToast(e.detail || 'Walk-Forward失败', 'error'); }
+            showToast('Walk-Forward 验证完成', 'success');
+        } catch (e) { showToast(e.detail || 'Walk-Forward 验证失败', 'error'); }
         setWfRunning(false);
     };
 
     return (
         <div className="fade-in space-y">
+            {prefillInfo ? (
+                <div className="card" style={{padding:'12px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+                        <div>
+                            <div style={{fontSize:12,color:'var(--text-500)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{'\u7b56\u7565\u5df2\u63a5\u5165\u56de\u6d4b'}</div>
+                            <div style={{fontSize:15,fontWeight:700,color:'var(--text-100)',marginTop:4}}>{prefillInfo.strategy_name || `\u7b56\u7565 #${prefillInfo.strategy_id}`}</div>
+                            <div style={{fontSize:12,color:'var(--text-400)',marginTop:4}}>{'\u5df2\u81ea\u52a8\u5e26\u5165\u7b56\u7565\u3001\u57fa\u51c6\u548c\u80a1\u7968\u6c60\u6765\u6e90\uff0c\u53ef\u76f4\u63a5\u8fd0\u884c\u56de\u6d4b\uff0c\u4e5f\u53ef\u4ee5\u5148\u505a\u624b\u52a8\u8986\u76d6\u540e\u518d\u8fd0\u884c\u3002'}</div>
+                        </div>
+                        <button className="btn btn-secondary" onClick={() => { setPrefillInfo(null); setUniverseInputMode('codes'); setDateInputMode('manual'); setBenchmarkInputMode('manual'); clearBacktestPrefill(); }}>{'\u5173\u95ed\u63d0\u793a'}</button>
+                    </div>
+                </div>
+            ) : null}
             <BacktestForm strategies={strategies} strategyId={strategyId} setStrategyId={setStrategyId}
                 universe={universe} setUniverse={setUniverse} startDate={startDate} setStartDate={setStartDate}
                 endDate={endDate} setEndDate={setEndDate} cash={cash} setCash={setCash}
                 benchmark={benchmark} setBenchmark={setBenchmark} running={running} onRun={runBacktest}
-                maxPosPct={maxPosPct} setMaxPosPct={setMaxPosPct} maxDdLimit={maxDdLimit} setMaxDdLimit={setMaxDdLimit} />
+                maxPosPct={maxPosPct} setMaxPosPct={setMaxPosPct} maxDdLimit={maxDdLimit} setMaxDdLimit={setMaxDdLimit}
+                prefillInfo={prefillInfo} universeInputMode={universeInputMode} setUniverseInputMode={setUniverseInputMode} dateInputMode={dateInputMode} setDateInputMode={setDateInputMode} benchmarkInputMode={benchmarkInputMode} setBenchmarkInputMode={setBenchmarkInputMode} restoreSourceDateRange={restoreSourceDateRange} restoreSourceBenchmark={restoreSourceBenchmark} />
             <div className="card space-y">
                 <div className="flex items-center justify-between">
-                    <div className="card-title" style={{marginBottom:0}}>参数优化</div>
+                    <div className="card-title" style={{marginBottom:0}}>{'\u53c2\u6570\u4f18\u5316'}</div>
                     <button className="btn btn-secondary" onClick={() => setShowOptimizer(!showOptimizer)}>
-                        {showOptimizer ? '收起' : '展开'}
+                        {showOptimizer ? '\u6536\u8d77' : '\u5c55\u5f00'}
                     </button>
                 </div>
                 {showOptimizer && (
                     <div className="space-y">
-                        <div className="field">
-                            <label className="label">参数网格 (JSON格式)</label>
-                            <textarea className="input" rows={3} value={paramGrid}
-                                onChange={e => setParamGrid(e.target.value)}
-                                style={{fontFamily:'monospace',fontSize:13}} />
-                        </div>
-                        <div className="flex gap-sm">
-                            <button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>
-                                {optimizing ? <><span className="spinner"/> 优化中...</> : '开始网格搜索'}
-                            </button>
-                            <button className="btn btn-secondary" onClick={runWalkForward} disabled={wfRunning}>
-                                {wfRunning ? <><span className="spinner"/> 验证中...</> : 'Walk-Forward验证'}
-                            </button>
-                        </div>
-                        {optimizeResults && optimizeResults.length > 0 && (
-                            <div className="table-wrap">
-                                <table>
-                                    <thead><tr>
-                                        <th>排名</th><th>参数</th><th style={{textAlign:'right'}}>夏普比率</th>
-                                        <th style={{textAlign:'right'}}>总收益%</th><th style={{textAlign:'right'}}>年化收益%</th>
-                                        <th style={{textAlign:'right'}}>最大回撤%</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        {optimizeResults.map((r, i) => (
-                                            <tr key={i}>
-                                                <td>{i + 1}</td>
-                                                <td style={{fontFamily:'monospace',fontSize:12}}>{JSON.stringify(r.params)}</td>
-                                                <td style={{textAlign:'right'}} className={r.sharpe_ratio >= 1 ? 'text-profit' : 'text-loss'}>{r.sharpe_ratio}</td>
-                                                <td style={{textAlign:'right'}} className={r.total_return >= 0 ? 'text-profit' : 'text-loss'}>{r.total_return}</td>
-                                                <td style={{textAlign:'right'}} className={r.annual_return >= 0 ? 'text-profit' : 'text-loss'}>{r.annual_return}</td>
-                                                <td style={{textAlign:'right'}} className="text-loss">{r.max_drawdown}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        {wfResult && wfResult.summary && (
+                        <div className="backtest-pool-panel" style={{padding:'14px 16px'}}>
                             <div>
-                                <div style={{fontSize:13,fontWeight:600,color:'var(--text-100)',marginBottom:8}}>Walk-Forward验证结果</div>
-                                <div className="grid-4" style={{gap:8,marginBottom:10}}>
-                                    <div className="metric-card"><div className="metric-label">窗口数</div><div className="metric-value">{wfResult.summary.total_windows}</div></div>
-                                    <div className="metric-card"><div className="metric-label">训练期夏普</div><div className="metric-value">{wfResult.summary.avg_train_sharpe}</div></div>
-                                    <div className="metric-card"><div className="metric-label">样本外夏普</div><div className="metric-value" className={wfResult.summary.avg_oos_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{wfResult.summary.avg_oos_sharpe}</div></div>
-                                    <div className="metric-card"><div className="metric-label">过拟合比率</div><div className="metric-value" style={{color: wfResult.summary.overfit_ratio >= 0.5 ? 'var(--profit)' : 'var(--loss)'}}>{wfResult.summary.overfit_ratio}</div></div>
-                                </div>
-                                <div className="table-wrap">
-                                    <table>
-                                        <thead><tr><th>窗口</th><th>训练期</th><th>测试期</th><th>最优参数</th><th style={{textAlign:'right'}}>训练夏普</th><th style={{textAlign:'right'}}>测试夏普</th><th style={{textAlign:'right'}}>测试收益%</th></tr></thead>
-                                        <tbody>{wfResult.windows.map((w,i) => (
-                                            <tr key={i}>
-                                                <td>{w.window}</td><td className="text-xs">{w.train_period}</td><td className="text-xs">{w.test_period}</td>
-                                                <td style={{fontFamily:'monospace',fontSize:11}}>{JSON.stringify(w.best_params)}</td>
-                                                <td style={{textAlign:'right'}}>{w.train_sharpe}</td>
-                                                <td style={{textAlign:'right'}} className={w.test_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{w.test_sharpe}</td>
-                                                <td style={{textAlign:'right'}} className={w.test_return >= 0 ? 'text-profit' : 'text-loss'}>{w.test_return}</td>
-                                            </tr>
-                                        ))}</tbody>
-                                    </table>
-                                </div>
+                                <div className="backtest-pool-title">{'\u5f53\u524d\u4f18\u5316\u4e0a\u4e0b\u6587'}</div>
+                                <div className="backtest-pool-copy">{'\u4f18\u5316\u548c Walk-Forward \u4f1a\u7ee7\u627f\u5f53\u524d\u9875\u9762\u4e2d\u7684\u80a1\u7968\u6c60\u3001\u65f6\u95f4\u533a\u95f4\u548c\u57fa\u51c6\u8bbe\u7f6e\u3002'}</div>
                             </div>
-                        )}
+                            <div className="backtest-pool-meta" style={{justifyContent:'flex-end'}}>
+                                <span className="backtest-badge">{universeInputMode === 'pool' ? '\u80a1\u7968\u6c60\u6a21\u5f0f' : '\u4ee3\u7801\u5217\u8868\u6a21\u5f0f'}</span>
+                                <span className="backtest-badge">{dateInputMode === 'source' ? '\u533a\u95f4\u8ddf\u968f\u6765\u6e90' : '\u533a\u95f4\u624b\u52a8\u8986\u76d6'}</span>
+                                <span className="backtest-badge">{benchmarkInputMode === 'source' ? '\u57fa\u51c6\u8ddf\u968f\u6765\u6e90' : '\u57fa\u51c6\u624b\u52a8\u8986\u76d6'}</span>
+                                {prefillInfo && prefillInfo.stock_count ? <span className="backtest-badge">{prefillInfo.stock_count}{'\u53ea\u80a1\u7968'}</span> : null}
+                            </div>
+                        </div>
+                        <div className="field"><label className="label">{'\u53c2\u6570\u7f51\u683c\uff08JSON \u683c\u5f0f\uff09'}</label><textarea className="input" rows={3} value={paramGrid} onChange={e => setParamGrid(e.target.value)} style={{fontFamily:'monospace',fontSize:13}} /></div>
+                        <div className="flex gap-sm"><button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>{optimizing ? <><span className="spinner"/> {'\u4f18\u5316\u4e2d...'}</> : '\u5f00\u59cb\u7f51\u683c\u641c\u7d22'}</button><button className="btn btn-secondary" onClick={runWalkForward} disabled={wfRunning}>{wfRunning ? <><span className="spinner"/> {'\u9a8c\u8bc1\u4e2d...'}</> : 'Walk-Forward \u9a8c\u8bc1'}</button></div>
+                        {optimizeResults && optimizeResults.length > 0 && (<div className="table-wrap"><table><thead><tr><th>{'\u6392\u540d'}</th><th>{'\u53c2\u6570'}</th><th style={{textAlign:'right'}}>{'\u590f\u666e\u6bd4\u7387'}</th><th style={{textAlign:'right'}}>{'\u603b\u6536\u76ca'}</th><th style={{textAlign:'right'}}>{'\u5e74\u5316\u6536\u76ca%'}</th><th style={{textAlign:'right'}}>{'\u6700\u5927\u56de\u64a4'}</th></tr></thead><tbody>{optimizeResults.map((r, i) => (<tr key={i}><td>{i + 1}</td><td style={{fontFamily:'monospace',fontSize:12}}>{JSON.stringify(r.params)}</td><td style={{textAlign:'right'}} className={r.sharpe_ratio >= 1 ? 'text-profit' : 'text-loss'}>{r.sharpe_ratio}</td><td style={{textAlign:'right'}} className={r.total_return >= 0 ? 'text-profit' : 'text-loss'}>{r.total_return}</td><td style={{textAlign:'right'}} className={r.annual_return >= 0 ? 'text-profit' : 'text-loss'}>{r.annual_return}</td><td style={{textAlign:'right'}} className="text-loss">{r.max_drawdown}</td></tr>))}</tbody></table></div>)}
+                        {wfResult && wfResult.summary && (<div><div style={{fontSize:13,fontWeight:600,color:'var(--text-100)',marginBottom:8}}>{'Walk-Forward \u9a8c\u8bc1\u7ed3\u679c'}</div><div className="grid-4" style={{gap:8,marginBottom:10}}><div className="metric-card"><div className="metric-label">{'\u7a97\u53e3\u6570'}</div><div className="metric-value">{wfResult.summary.total_windows}</div></div><div className="metric-card"><div className="metric-label">{'\u8bad\u7ec3\u671f\u590f\u666e'}</div><div className="metric-value">{wfResult.summary.avg_train_sharpe}</div></div><div className="metric-card"><div className="metric-label">{'\u6837\u672c\u5916\u590f\u666e'}</div><div className="metric-value" style={{color: wfResult.summary.avg_oos_sharpe >= 0 ? 'var(--profit)' : 'var(--loss)'}}>{wfResult.summary.avg_oos_sharpe}</div></div><div className="metric-card"><div className="metric-label">{'\u8fc7\u62df\u5408\u6bd4\u7387'}</div><div className="metric-value" style={{color: wfResult.summary.overfit_ratio >= 0.5 ? 'var(--loss)' : 'var(--profit)'}}>{wfResult.summary.overfit_ratio}</div></div></div><div className="table-wrap"><table><thead><tr><th>{'\u7a97\u53e3'}</th><th>{'\u8bad\u7ec3\u671f'}</th><th>{'\u6d4b\u8bd5\u671f'}</th><th>{'\u6700\u4f18\u53c2\u6570'}</th><th style={{textAlign:'right'}}>{'\u8bad\u7ec3\u590f\u666e'}</th><th style={{textAlign:'right'}}>{'\u6d4b\u8bd5\u590f\u666e'}</th><th style={{textAlign:'right'}}>{'\u6d4b\u8bd5\u6536\u76ca%'}</th></tr></thead><tbody>{wfResult.windows.map((w,i) => (<tr key={i}><td>{w.window}</td><td className="text-xs">{w.train_period}</td><td className="text-xs">{w.test_period}</td><td style={{fontFamily:'monospace',fontSize:11}}>{JSON.stringify(w.best_params)}</td><td style={{textAlign:'right'}}>{w.train_sharpe}</td><td style={{textAlign:'right'}} className={w.test_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{w.test_sharpe}</td><td style={{textAlign:'right'}} className={w.test_return >= 0 ? 'text-profit' : 'text-loss'}>{w.test_return}</td></tr>))}</tbody></table></div></div>)}
                     </div>
                 )}
             </div>
+            {result && <div ref={resultRef}><BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} onOpenHistory={openResultInHistory} /></div>}
             <QualityPanel universe={universe} startDate={startDate} endDate={endDate} showToast={showToast} />
-            {result && <BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} />}
         </div>
     );
 }
 
-function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun, maxPosPct, setMaxPosPct, maxDdLimit, setMaxDdLimit }) {
-    return (
-        <div className="card space-y">
-            <div className="card-title">回测配置</div>
-            <div className="grid-6">
-                <div className="field"><label className="label">策略</label>
-                    <select className="input" value={strategyId} onChange={e => setStrategyId(e.target.value)}>
-                        {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                </div>
-                <div className="field"><label className="label">股票代码(逗号分隔)</label>
-                    <input className="input" value={universe} onChange={e => setUniverse(e.target.value)} />
-                </div>
-                <div className="field"><label className="label">开始日期</label>
-                    <input className="input" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="YYYYMMDD" />
-                </div>
-                <div className="field"><label className="label">结束日期</label>
-                    <input className="input" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="YYYYMMDD" />
-                </div>
-                <div className="field"><label className="label">初始资金</label>
-                    <input className="input" type="number" value={cash} onChange={e => setCash(parseFloat(e.target.value)||0)} />
-                </div>
-                <div className="field"><label className="label">基准指数</label>
-                    <input className="input" value={benchmark} onChange={e => setBenchmark(e.target.value)} />
-                </div>
-            </div>
-            <div style={{fontSize:13,fontWeight:600,color:'var(--text-300)',marginTop:8}}>风控参数</div>
-            <div className="grid-4" style={{gap:8}}>
-                <div className="field"><label className="label">单股最大仓位%</label>
-                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxPosPct}
-                        onChange={e => setMaxPosPct(parseFloat(e.target.value)||0)} />
-                </div>
-                <div className="field"><label className="label">回撤熔断% (0=关闭)</label>
-                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxDdLimit}
-                        onChange={e => setMaxDdLimit(parseFloat(e.target.value)||0)} />
-                </div>
-            </div>
-            <button className="btn btn-primary" onClick={onRun} disabled={running}>
-                {running ? <><span className="spinner"/> 回测运行中...</> : '运行回测'}
-            </button>
-        </div>
-    );
+function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun, maxPosPct, setMaxPosPct, maxDdLimit, setMaxDdLimit, prefillInfo, universeInputMode, setUniverseInputMode, dateInputMode, setDateInputMode, benchmarkInputMode, setBenchmarkInputMode, restoreSourceDateRange, restoreSourceBenchmark }) {
+    const hasPoolDescriptor = !!(prefillInfo && prefillInfo.universe_type);
+    const hasSourceDate = !!(prefillInfo && (prefillInfo.start_date || prefillInfo.end_date));
+    const hasSourceBenchmark = !!(prefillInfo && prefillInfo.benchmark);
+    const poolSummary = hasPoolDescriptor ? [prefillInfo.universe_name || '', prefillInfo.universe_code || '', prefillInfo.stock_count ? `${prefillInfo.stock_count}\u53ea\u80a1\u7968` : '', prefillInfo.start_date && prefillInfo.end_date ? `${prefillInfo.start_date} ~ ${prefillInfo.end_date}` : ''].filter(Boolean).join(' \u00b7 ') : '';
+    const stateSummary = [universeInputMode === 'pool' && hasPoolDescriptor ? '\u80a1\u7968\u6c60\u76f4\u8fde\u540e\u7aef' : '\u4ee3\u7801\u5217\u8868\u624b\u52a8\u8f93\u5165', dateInputMode === 'source' && hasSourceDate ? '\u533a\u95f4\u8ddf\u968f\u6765\u6e90' : '\u533a\u95f4\u624b\u52a8\u8986\u76d6', benchmarkInputMode === 'source' && hasSourceBenchmark ? '\u57fa\u51c6\u8ddf\u968f\u6765\u6e90' : '\u57fa\u51c6\u624b\u52a8\u8986\u76d6'].join(' \u00b7 ');
+    return (<div className="card backtest-card space-y"><div className="backtest-hero"><div><div className="card-title" style={{marginBottom: 8}}>{'\u56de\u6d4b\u914d\u7f6e'}</div><div className="backtest-hero-copy">{'\u5c06\u7b56\u7565\u3001\u80a1\u7968\u6c60\u3001\u56de\u6d4b\u533a\u95f4\u548c\u98ce\u63a7\u53c2\u6570\u7edf\u4e00\u653e\u5728\u540c\u4e00\u5de5\u4f5c\u533a\u4e2d\u7ba1\u7406\u3002\u5982\u679c\u7b56\u7565\u6765\u81ea\u56e0\u5b50\u770b\u677f\uff0c\u53ef\u4ee5\u76f4\u63a5\u9501\u5b9a\u6765\u6e90\u80a1\u7968\u6c60\u3001\u533a\u95f4\u548c\u57fa\u51c6\uff1b\u82e5\u9700\u8981\u505a\u5b9e\u9a8c\u6027\u8c03\u6574\uff0c\u53ef\u4ee5\u968f\u65f6\u5207\u6362\u5230\u624b\u52a8\u8986\u76d6\u3002'}</div></div><div className="backtest-mode-row"><button className={'backtest-mode-chip' + (universeInputMode === 'pool' ? ' active' : '')} disabled={!hasPoolDescriptor} onClick={() => hasPoolDescriptor && setUniverseInputMode('pool')}>{'\u80a1\u7968\u6c60\u6a21\u5f0f'}</button><button className={'backtest-mode-chip' + (universeInputMode === 'codes' ? ' active' : '')} onClick={() => setUniverseInputMode('codes')}>{'\u4ee3\u7801\u5217\u8868\u6a21\u5f0f'}</button></div></div>{universeInputMode === 'pool' && hasPoolDescriptor ? (<div className="backtest-pool-panel"><div><div className="backtest-pool-title">{'\u5f53\u524d\u56de\u6d4b\u5c06\u76f4\u63a5\u4f7f\u7528\u6765\u6e90\u80a1\u7968\u6c60'}</div><div className="backtest-pool-copy">{'\u540e\u7aef\u4f1a\u6309\u80a1\u7968\u6c60\u63cf\u8ff0\u5b9e\u65f6\u89e3\u6790\u7cfb\u7edf\u6307\u6570\u6210\u5206\u80a1\u6216\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u4e0d\u518d\u4f9d\u8d56\u524d\u7aef\u62fc\u63a5\u957f\u4ee3\u7801\u5b57\u7b26\u4e32\u3002'}</div><div className="backtest-pool-meta"><span className="backtest-badge">{prefillInfo.source_label || '\u7b56\u7565\u8054\u52a8'}</span><span className="backtest-badge">{prefillInfo.universe_type === 'system' ? '\u7cfb\u7edf\u80a1\u7968\u6c60' : '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</span>{prefillInfo.stock_count ? <span className="backtest-badge">{prefillInfo.stock_count}{'\u53ea\u80a1\u7968'}</span> : null}</div></div><div className="backtest-pool-side"><div className="backtest-side-label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</div><div className="backtest-side-value">{prefillInfo.universe_name || '-'}</div><div className="backtest-side-value" style={{marginTop: 10, color: 'var(--text-400)'}}>{poolSummary || '\u672a\u63d0\u4f9b\u80a1\u7968\u6c60\u6458\u8981'}</div></div></div>) : (<div className="field"><label className="label">{'\u80a1\u7968\u4ee3\u7801\u5217\u8868\uff08\u9017\u53f7\u5206\u9694\uff09'}</label><input className="input" value={universe} onChange={e => setUniverse(e.target.value)} placeholder="600519.SH,000858.SZ,601318.SH" /><div className="backtest-runhint" style={{marginTop: 6}}>{'\u9002\u5408\u4e34\u65f6\u6d4b\u8bd5\u5c0f\u6837\u672c\u80a1\u7968\u6c60\uff1b\u5982\u9700\u590d\u7528\u56e0\u5b50\u770b\u677f\u6216\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u8bf7\u5207\u56de\u80a1\u7968\u6c60\u6a21\u5f0f\u3002'}</div></div>)}<div className="backtest-grid"><div className="field"><label className="label">{'\u7b56\u7565'}</label><select className="input" value={strategyId} onChange={e => setStrategyId(e.target.value)}>{strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div><div className="field"><label className="label">{'\u8d77\u59cb\u65e5\u671f'}</label><div className="backtest-mode-row" style={{marginBottom: 8}}><button className={'backtest-mode-chip' + (dateInputMode === 'source' ? ' active' : '')} disabled={!hasSourceDate} onClick={() => hasSourceDate && restoreSourceDateRange()}>{'\u6765\u6e90\u9501\u5b9a'}</button><button className={'backtest-mode-chip' + (dateInputMode === 'manual' ? ' active' : '')} onClick={() => setDateInputMode('manual')}>{'\u624b\u52a8\u8986\u76d6'}</button></div><input className="input" value={startDate} onChange={e => { setDateInputMode('manual'); setStartDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} /><div className="backtest-runhint" style={{marginTop: 6}}>{dateInputMode === 'source' && hasSourceDate ? `${prefillInfo.start_date || '-'} ~ ${prefillInfo.end_date || '-'}` : '\u624b\u52a8\u8f93\u5165\u56de\u6d4b\u533a\u95f4'}</div></div><div className="field"><label className="label">{'\u7ed3\u675f\u65e5\u671f'}</label><input className="input" value={endDate} onChange={e => { setDateInputMode('manual'); setEndDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} /></div><div className="field"><label className="label">{'\u57fa\u51c6\u6307\u6570'}</label><div className="backtest-mode-row" style={{marginBottom: 8}}><button className={'backtest-mode-chip' + (benchmarkInputMode === 'source' ? ' active' : '')} disabled={!hasSourceBenchmark} onClick={() => hasSourceBenchmark && restoreSourceBenchmark()}>{'\u6765\u6e90\u9501\u5b9a'}</button><button className={'backtest-mode-chip' + (benchmarkInputMode === 'manual' ? ' active' : '')} onClick={() => setBenchmarkInputMode('manual')}>{'\u624b\u52a8\u8986\u76d6'}</button></div><input className="input" value={benchmark} onChange={e => { setBenchmarkInputMode('manual'); setBenchmark(e.target.value); }} disabled={benchmarkInputMode === 'source' && hasSourceBenchmark} /><div className="backtest-runhint" style={{marginTop: 6}}>{benchmarkInputMode === 'source' && hasSourceBenchmark ? prefillInfo.benchmark : '\u53ef\u8f93\u5165 000300.SH\u3001000905.SH \u7b49\u57fa\u51c6\u4ee3\u7801'}</div></div><div className="field"><label className="label">{'\u521d\u59cb\u8d44\u91d1'}</label><input className="input" type="number" value={cash} onChange={e => setCash(parseFloat(e.target.value)||0)} /></div><div className="field"><label className="label">{'\u5f53\u524d\u72b6\u6001'}</label><div className="backtest-side-value" style={{marginTop: 0}}>{stateSummary}</div></div></div><div style={{fontSize:13,fontWeight:600,color:'var(--text-300)',marginTop:8}}>{'\u98ce\u63a7\u53c2\u6570'}</div><div className="backtest-risk-grid"><div className="field"><label className="label">{'\u5355\u80a1\u6700\u5927\u4ed3\u4f4d'}</label><input className="input" type="number" step="0.05" min="0" max="1" value={maxPosPct} onChange={e => setMaxPosPct(parseFloat(e.target.value)||0)} /></div><div className="field"><label className="label">{'\u56de\u64a4\u7194\u65ad %\uff080 = \u5173\u95ed\uff09'}</label><input className="input" type="number" step="0.05" min="0" max="1" value={maxDdLimit} onChange={e => setMaxDdLimit(parseFloat(e.target.value)||0)} /></div></div><div className="backtest-runbar"><div className="backtest-runhint">{universeInputMode === 'pool' && hasPoolDescriptor ? '\u5c06\u6309\u80a1\u7968\u6c60\u63cf\u8ff0\u5728\u540e\u7aef\u89e3\u6790\u771f\u5b9e\u6210\u5206\u80a1\u540e\u518d\u8fd0\u884c\u3002' : '\u5c06\u76f4\u63a5\u6309\u8f93\u5165\u7684\u80a1\u7968\u4ee3\u7801\u5217\u8868\u8fd0\u884c\u56de\u6d4b\u3002'}</div><button className="btn btn-primary" onClick={onRun} disabled={running}>{running ? <><span className="spinner"/> {'\u56de\u6d4b\u8fd0\u884c\u4e2d...'}</> : '\u8fd0\u884c\u56de\u6d4b'}</button></div></div>);
 }
 /* ===== Backtest Result View ===== */
-function BacktestResultView({ result, tab, setTab, logs }) {
+function BacktestResultView({ result, tab, setTab, logs, onOpenHistory }) {
     const metrics = result.metrics || {};
-    const tabs = [
-        { key: 'chart', label: '收益曲线' },
-        { key: 'metrics', label: '绩效指标' },
-        { key: 'trades', label: '交易记录' },
-        { key: 'risk', label: '风险分析' },
-        { key: 'attribution', label: '归因分析' },
-        { key: 'logs', label: '运行日志' },
-    ];
-    const exportCSV = () => {
-        if (result.id) window.open('/api/backtest/export/' + result.id, '_blank');
-    };
-    return (
-        <div className="fade-in space-y">
-            <div className="flex items-center justify-between">
-                <MetricCards metrics={metrics} />
-            </div>
-            <div className="card" style={{padding:0}}>
-                <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
-                    <div style={{display:'flex',flexWrap:'wrap'}}>
-                        {tabs.map(t => (
-                            <button key={t.key} onClick={() => setTab(t.key)}
-                                className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>
-                        ))}
-                    </div>
-                    {result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={exportCSV}>导出 CSV</button>}
-                </div>
-                <div className="tab-content">
-                    {tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}
-                    {tab === 'metrics' && <MetricsTable metrics={metrics} />}
-                    {tab === 'trades' && <TradesTable trades={result.trades} />}
-                    {tab === 'risk' && <RiskAnalysisTab resultId={result.id} />}
-                    {tab === 'attribution' && <AttributionTab resultId={result.id} />}
-                    {tab === 'logs' && <LogsPanel logs={logs} />}
-                </div>
-            </div>
-        </div>
-    );
+    const tabs = [{ key: 'chart', label: '\u6536\u76ca\u66f2\u7ebf' }, { key: 'metrics', label: '\u7ee9\u6548\u6307\u6807' }, { key: 'trades', label: '\u4ea4\u6613\u8bb0\u5f55' }, { key: 'risk', label: '\u98ce\u9669\u5206\u6790' }, { key: 'attribution', label: '\u5f52\u56e0\u5206\u6790' }, { key: 'logs', label: '\u8fd0\u884c\u65e5\u5fd7' }];
+    const exportCSV = () => { if (result.id) window.open('/api/backtest/export/' + result.id, '_blank'); };
+    return (<div className="fade-in space-y"><div className="flex items-center justify-between"><MetricCards metrics={metrics} /></div><div className="card" style={{padding:0}}><div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}><div style={{display:'flex',flexWrap:'wrap'}}>{tabs.map(t => <button key={t.key} onClick={() => setTab(t.key)} className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>)}</div><div style={{display:'flex',gap:8,alignItems:'center'}}>{result.id && onOpenHistory ? <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={onOpenHistory}>{'\u67e5\u770b\u5386\u53f2'}</button> : null}{result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={exportCSV}>{'\u5bfc\u51fa CSV'}</button>}</div></div><div className="tab-content">{tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}{tab === 'metrics' && <MetricsTable metrics={metrics} />}{tab === 'trades' && <TradesTable trades={result.trades} />}{tab === 'risk' && <RiskAnalysisTab resultId={result.id} />}{tab === 'attribution' && <AttributionTab resultId={result.id} />}{tab === 'logs' && <LogsPanel logs={logs} />}</div></div></div>);
 }
 
 /* ===== Risk Analysis Tab ===== */
@@ -1822,22 +2801,48 @@ function LogsPanel({ logs }) {
 function HistoryPage({ showToast }) {
     const [results, setResults] = useState([]);
     const [detail, setDetail] = useState(null);
+    const [detailTab, setDetailTab] = useState('risk');
     const [selectedIds, setSelectedIds] = useState([]);
     const [comparing, setComparing] = useState(false);
     const [compareData, setCompareData] = useState(null);
-    useEffect(() => { api.get('/api/backtest/history').then(setResults).catch(() => {}); }, []);
+    const [historyFocusId, setHistoryFocusId] = useState(null);
 
-    const viewDetail = async (id) => {
-        try { const res = await api.get('/api/backtest/history/' + id); setDetail(res); }
-        catch (e) { showToast('加载失败', 'error'); }
+    const loadResults = useCallback(() => {
+        api.get('/api/backtest/history').then(setResults).catch(() => {});
+    }, []);
+
+    const viewDetail = async (id, preferredTab) => {
+        try {
+            const res = await api.get('/api/backtest/history/' + id);
+            setDetail(res);
+            setDetailTab(preferredTab || 'risk');
+            setHistoryFocusId(id);
+        } catch (e) {
+            showToast('加载失败', 'error');
+        }
     };
+
+    const applyHistoryFocus = useCallback(() => {
+        const focus = readHistoryFocus();
+        if (!focus || !focus.result_id) return;
+        setHistoryFocusId(focus.result_id);
+        viewDetail(focus.result_id, focus.tab || 'risk');
+    }, []);
+
+    useEffect(() => { loadResults(); }, [loadResults]);
+    useEffect(() => { applyHistoryFocus(); }, [applyHistoryFocus]);
+    useEffect(() => {
+        const handler = () => applyHistoryFocus();
+        window.addEventListener('qtsys:history-focus', handler);
+        return () => window.removeEventListener('qtsys:history-focus', handler);
+    }, [applyHistoryFocus]);
 
     const toggleSelect = (id) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
     const runCompare = async () => {
-        if (selectedIds.length < 2) { showToast('请至少选择2个结果', 'error'); return; }
+        if (selectedIds.length < 2) { showToast('请至少选择 2 个结果', 'error'); return; }
         setComparing(true); setCompareData(null);
         try {
             const res = await api.post('/api/backtest/compare', { result_ids: selectedIds });
@@ -1850,16 +2855,10 @@ function HistoryPage({ showToast }) {
         return (
             <div className="fade-in space-y">
                 <div className="flex items-center justify-between">
-                    <button className="btn-link" onClick={() => setDetail(null)}>&larr; 返回列表</button>
-                    <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}}
-                        onClick={() => window.open('/api/backtest/export/' + detail.id, '_blank')}>导出 CSV</button>
+                    <button className="btn-link" onClick={() => { setDetail(null); setDetailTab('risk'); clearHistoryFocus(); }}>&larr; 返回列表</button>
+                    <div className="text-xs text-muted">结果 #{detail.id}</div>
                 </div>
-                <MetricCards metrics={detail.metrics} />
-                <div className="card"><EquityChart data={detail.equity_curve} benchmarkData={detail.benchmark_curve} trades={detail.trades} /></div>
-                <div className="card">
-                    <div className="card-title">交易记录</div>
-                    <TradesTable trades={detail.trades} />
-                </div>
+                <BacktestResultView result={detail} tab={detailTab} setTab={setDetailTab} logs={detail.logs || []} />
             </div>
         );
     }
@@ -1894,8 +2893,8 @@ function HistoryPage({ showToast }) {
             ) : (
                 <div className="space-y-sm">
                     {results.map(r => (
-                        <div key={r.id} className="history-item" style={{position:'relative'}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,flex:1,cursor:'pointer'}} onClick={() => viewDetail(r.id)}>
+                        <div key={r.id} className="history-item" style={{position:'relative', border: historyFocusId === r.id ? '1px solid var(--accent)' : '1px solid transparent', boxShadow: historyFocusId === r.id ? '0 0 0 1px rgba(99,102,241,0.18)' : 'none'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,flex:1,cursor:'pointer'}} onClick={() => viewDetail(r.id, 'risk')}>
                                 <div>
                                     <div style={{fontWeight:500}}>{r.strategy_name}</div>
                                     <div className="text-xs text-muted" style={{marginTop:4}}>
@@ -1904,6 +2903,7 @@ function HistoryPage({ showToast }) {
                                 </div>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <button className="btn-link" onClick={() => viewDetail(r.id, 'attribution')}>归因</button>
                                 <div style={{textAlign:'right'}}>
                                     <div className={'history-return ' + ((r.metrics?.total_return ?? 0) >= 0 ? 'text-profit' : 'text-loss')}>
                                         {r.metrics?.total_return ?? 0}%
@@ -1921,6 +2921,7 @@ function HistoryPage({ showToast }) {
         </div>
     );
 }
+
 /* ===== Compare View ===== */
 function CompareView({ data }) {
     const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
@@ -4808,29 +5809,29 @@ function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey
         : '';
     const baselineY = yScale(1);
     const noteText = viewMode === 'focus'
-        ? '\u805a\u7126\u89c6\u56fe\u4ec5\u7a81\u51fa\u5f53\u524d\u9009\u4e2d\u5206\u4f4d\uff0c\u5e76\u4ee51.00\u4f5c\u4e3a\u57fa\u51c6\u51c0\u503c\u7ebf\u3002'
+        ? '聚焦视图仅突出当前选中分位，并以1.00作为基准净值线。'
         : (viewMode === 'spread'
-            ? '\u591a\u7a7a\u89c6\u56fe\u5355\u72ec\u89c2\u5bdf\u6700\u9ad8\u5206\u4f4d\u4e0e\u6700\u4f4e\u5206\u4f4d\u4e4b\u95f4\u7684\u7ec4\u5408\u6536\u76ca\u5dee\u3002'
-            : '\u5168\u666f\u89c6\u56fe\u540c\u65f6\u5c55\u793a\u6240\u6709\u5206\u4f4d\u7ec4\u5408\uff0c\u767d\u8272\u865a\u7ebf\u4ee3\u8868\u591a\u7a7a\u4ef7\u5dee\u3002');
+            ? '多空视图单独观察最高分位与最低分位之间的组合收益差。'
+            : '全景视图同时展示所有分位组合，白色虚线代表多空价差。');
 
     return (
         <div className="factor-board-chart-shell">
             <div className="factor-board-chart-head">
                 <div className="factor-board-chart-meta">
                     <div className="factor-board-chart-kpi">
-                        <span className="label">{'\u533a\u95f4'}</span>
+                        <span className="label">{'区间'}</span>
                         <span className="value">{dateStart}{' ~ '}{dateEnd}</span>
                     </div>
                     <div className="factor-board-chart-kpi">
-                        <span className="label">{'\u5206\u4f4d\u6570'}</span>
+                        <span className="label">{'分位数'}</span>
                         <span className="value">{usableSeries.length}</span>
                     </div>
                     <div className="factor-board-chart-kpi">
-                        <span className="label">{'\u5f53\u524d\u805a\u7126'}</span>
+                        <span className="label">{'当前聚焦'}</span>
                         <span className={'value ' + (selectedReturn >= 0 ? 'text-profit' : 'text-loss')}>Q{activeSeries.quantile} {selectedReturn >= 0 ? '+' : ''}{selectedReturn.toFixed(2)}%</span>
                     </div>
                     <div className="factor-board-chart-kpi">
-                        <span className="label">{'\u591a\u7a7a\u4ef7\u5dee'}</span>
+                        <span className="label">{'多空价差'}</span>
                         <span className={'value ' + (spreadReturn >= 0 ? 'spread-positive' : 'spread-negative')}>{spreadReturn >= 0 ? '+' : ''}{spreadReturn.toFixed(2)}%</span>
                     </div>
                 </div>
@@ -4842,11 +5843,11 @@ function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey
             </div>
             <div className="factor-board-chart-toolbar">
                 <div className="factor-board-chart-viewtabs">
-                    <button className={'factor-board-range-chip' + (viewMode === 'all' ? ' active' : '')} onClick={() => setViewMode('all')}>{'\u5168\u666f\u5206\u4f4d'}</button>
-                    <button className={'factor-board-range-chip' + (viewMode === 'focus' ? ' active' : '')} onClick={() => setViewMode('focus')}>{'\u805a\u7126\u5206\u4f4d'}</button>
-                    <button className={'factor-board-range-chip' + (viewMode === 'spread' ? ' active' : '')} onClick={() => setViewMode('spread')}>{'\u591a\u7a7a\u4ef7\u5dee'}</button>
+                    <button className={'factor-board-range-chip' + (viewMode === 'all' ? ' active' : '')} onClick={() => setViewMode('all')}>{'全景分位'}</button>
+                    <button className={'factor-board-range-chip' + (viewMode === 'focus' ? ' active' : '')} onClick={() => setViewMode('focus')}>{'聚焦分位'}</button>
+                    <button className={'factor-board-range-chip' + (viewMode === 'spread' ? ' active' : '')} onClick={() => setViewMode('spread')}>{'多空价差'}</button>
                 </div>
-                <div className="factor-board-subtle">{'\u5355\u51fb\u4e0b\u65b9 Q \u6807\u7b7e\u53ef\u5207\u6362\u805a\u7126\u5206\u4f4d'}</div>
+                <div className="factor-board-subtle">{'单击下方 Q 标签可切换聚焦分位'}</div>
             </div>
             <div className="factor-board-chart-tabs">
                 {usableSeries.map(item => (
@@ -4879,7 +5880,7 @@ function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey
                 <line x1={pad.left} y1={pad.top} x2={pad.left} y2={h - pad.bottom} stroke="rgba(148,163,184,0.28)" />
                 <line x1={pad.left} y1={h - pad.bottom} x2={w - pad.right} y2={h - pad.bottom} stroke="rgba(148,163,184,0.28)" />
                 <line x1={pad.left} y1={baselineY} x2={w - pad.right} y2={baselineY} stroke="rgba(148,163,184,0.40)" strokeDasharray="6 6" />
-                <text x={w - pad.right} y={baselineY - 8} textAnchor="end" className="factor-board-chart-baseline">{'\u57fa\u51c6 1.00'}</text>
+                <text x={w - pad.right} y={baselineY - 8} textAnchor="end" className="factor-board-chart-baseline">{'基准 1.00'}</text>
                 {viewMode !== 'spread' && activeArea ? <polygon points={activeArea} fill="url(#factorBoardActiveArea)" /> : null}
                 {drawSeries.map(item => {
                     const points = item.points.map(point => `${xScale(point.date)},${yScale(point.value)}`).join(' ');
@@ -4932,7 +5933,7 @@ function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey
                     <div className="factor-board-legend-item spread">
                         <div className="factor-board-legend-main">
                             <span className="factor-board-legend-swatch spread"></span>
-                            <span className="factor-board-legend-name subtle">{'\u591a\u7a7a\u4ef7\u5dee'}</span>
+                            <span className="factor-board-legend-name subtle">{'多空价差'}</span>
                         </div>
                         <span className={'factor-board-legend-return ' + (spreadReturn >= 0 ? 'positive' : 'negative')}>
                             {spreadReturn >= 0 ? '+' : ''}{spreadReturn.toFixed(2)}%
@@ -4944,7 +5945,7 @@ function EquityCurveChart({ series, selectedQuantile, onSelectQuantile, rangeKey
         </div>
     );
 }
-function FactorBoardPage({ showToast }) {
+function FactorBoardPage({ showToast, openStrategyWorkspace }) {
     const todayStr = new Date().toISOString().slice(0, 10);
     const [dbConfig, setDbConfig] = useState({ host: 'localhost', port: 3306, user: 'root', password: '', database: 'qtsys', has_password: false });
     const [status, setStatus] = useState({ running: false, progress: 0, total: 191, current_factor: '', message: '', backtest_days: 365, start_date: '', end_date: '', universe_type: 'system', universe_code: '000905.SH', universe_name: '中证500' });
@@ -5036,7 +6037,7 @@ function FactorBoardPage({ showToast }) {
             const quantiles = Array.from(new Set((details || []).map(item => String(item.quantile)))).sort((a, b) => Number(a) - Number(b));
             setDetail({ info, snapshot, details: Array.isArray(details) ? details : [], selectedQuantile: quantiles[0] || '1', rangeKey: '1Y' });
         }).catch((e) => {
-            showToast((e && e.detail) || '\u52a0\u8f7d\u56e0\u5b50\u8be6\u60c5\u5931\u8d25', 'error');
+            showToast((e && e.detail) || '加载因子详情失败', 'error');
             setDetail({ info: null, snapshot: null, details: [], selectedQuantile: '1', rangeKey: '1Y' });
         }).finally(() => setDetailLoading(false));
     }, [selectedFactor, showToast]);
@@ -5110,10 +6111,10 @@ function FactorBoardPage({ showToast }) {
         setSaving(true);
         try {
             const res = await api.post('/api/factor_board/save_config', { ...dbConfig });
-            showToast(res.message || (res.success ? '\u914d\u7f6e\u5df2\u4fdd\u5b58' : '\u4fdd\u5b58\u5931\u8d25'), res.success ? 'success' : 'error');
+            showToast(res.message || (res.success ? '配置已保存' : '保存失败'), res.success ? 'success' : 'error');
             if (res && res.success) await loadConfig();
         } catch (e) {
-            showToast((e && e.detail) || '\u4fdd\u5b58\u914d\u7f6e\u5931\u8d25', 'error');
+            showToast((e && e.detail) || '保存配置失败', 'error');
         }
         setSaving(false);
     };
@@ -5135,13 +6136,13 @@ function FactorBoardPage({ showToast }) {
     const resetPoolForm = () => { setPoolForm({ id: null, name: '', description: '', stock_items: [] }); setStockKeyword(''); setStockResults([]); setShowStockResults(false); };
 
     const savePool = async () => {
-        if (!poolForm.name.trim()) { showToast('\u8bf7\u8f93\u5165\u80a1\u7968\u6c60\u540d\u79f0', 'error'); return; }
-        if ((poolForm.stock_items || []).length === 0) { showToast('\u8bf7\u81f3\u5c11\u6dfb\u52a0\u4e00\u53ea\u80a1\u7968', 'error'); return; }
+        if (!poolForm.name.trim()) { showToast('请输入股票池名称', 'error'); return; }
+        if ((poolForm.stock_items || []).length === 0) { showToast('请至少添加一只股票', 'error'); return; }
         setPoolSaving(true);
         try {
             const payload = { name: poolForm.name.trim(), description: poolForm.description || '', stock_items: poolForm.stock_items || [] };
             const res = poolForm.id ? await api.put('/api/factor_board/custom_pools/' + poolForm.id, payload) : await api.post('/api/factor_board/custom_pools', payload);
-            showToast(poolForm.id ? '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u5df2\u66f4\u65b0' : '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u5df2\u4fdd\u5b58', 'success');
+            showToast(poolForm.id ? '自定义股票池已更新' : '自定义股票池已保存', 'success');
             await loadUniverses();
             setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(res.id) }));
             setPoolForm({ id: res.id, name: res.name || '', description: res.description || '', stock_items: Array.isArray(res.stock_items) ? res.stock_items : [] });
@@ -5161,23 +6162,23 @@ function FactorBoardPage({ showToast }) {
                 end_date: toApiDate(analysisForm.end_date) || null,
                 universe_type: analysisForm.universe_type,
                 universe_code: analysisForm.universe_type === 'system' ? analysisForm.universe_code : '',
-                universe_name: analysisForm.universe_type === 'system' ? ((systemPool && systemPool.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((customPool && customPool.name) || ''),
+                universe_name: analysisForm.universe_type === 'system' ? ((systemPool && systemPool.name) || '系统股票池') : ((customPool && customPool.name) || ''),
                 custom_pool_id: analysisForm.universe_type === 'custom' ? Number(analysisForm.custom_pool_id || 0) || null : null,
                 benchmark_code: analysisForm.universe_type === 'system' ? analysisForm.universe_code : '',
             };
             const res = await api.post('/api/factor_board/start_analysis', payload);
-            showToast(res.message || '\u5206\u6790\u4efb\u52a1\u5df2\u542f\u52a8', 'success'); refreshAll(true);
-        } catch (e) { showToast((e && e.detail) || '\u542f\u52a8\u5206\u6790\u5931\u8d25', 'error'); }
+            showToast(res.message || '分析任务已启动', 'success'); refreshAll(true);
+        } catch (e) { showToast((e && e.detail) || '启动分析失败', 'error'); }
         setStarting(false);
     };
     const stopAnalysis = async () => {
         setStopping(true);
         try {
             const res = await api.post('/api/factor_board/stop_analysis', {});
-            showToast((res && res.message) || '\u5df2\u53d1\u9001\u505c\u6b62\u8bf7\u6c42', 'success');
+            showToast((res && res.message) || '已发送停止请求', 'success');
             await loadStatus();
         } catch (e) {
-            showToast((e && e.detail) || '\u505c\u6b62\u5206\u6790\u5931\u8d25', 'error');
+            showToast((e && e.detail) || '停止分析失败', 'error');
         }
         setStopping(false);
     };
@@ -5185,11 +6186,11 @@ function FactorBoardPage({ showToast }) {
         setRetrying(true);
         try {
             const res = await api.post('/api/factor_board/retry_failed_factors', {});
-            showToast((res && res.message) || '\u5df2\u5f00\u59cb\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50', 'success');
+            showToast((res && res.message) || '已开始重试失败因子', 'success');
             await loadStatus();
             await loadResults();
         } catch (e) {
-            showToast((e && e.detail) || '\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50\u5931\u8d25', 'error');
+            showToast((e && e.detail) || '重试失败因子失败', 'error');
         }
         setRetrying(false);
     };
@@ -5240,10 +6241,10 @@ function FactorBoardPage({ showToast }) {
         return '';
     };
     const stageCards = [
-        { key: 'prepare', title: '\u51c6\u5907\u53c2\u6570', value: status.phase === 'queued' ? '\u5df2\u63d0\u4ea4' : '\u5c31\u7eea', meta: status.start_date && status.end_date ? `${status.start_date || '-'} ~ ${status.end_date || '-'}` : '\u7b49\u5f85\u542f\u52a8' },
-        { key: 'universe', title: '\u80a1\u7968\u6c60', value: status.universe_name || '-', meta: status.universe_code || '-' },
-        { key: 'market', title: '\u884c\u60c5\u51c6\u5907', value: `${Math.round(marketProgressPct)}%`, meta: `${safeNum(status.market_completed_codes)}/${safeNum(status.market_total_codes)} \u53ea\u80a1\u7968` },
-        { key: 'factors', title: '\u56e0\u5b50\u56de\u6d4b', value: `${Math.round(factorProgressPct)}%`, meta: `${safeNum(status.factor_completed)}/${safeNum(status.factor_total || status.total)} \u4e2a\u56e0\u5b50 \u00b7 \u4fdd\u7559 ${safeNum(status.result_count)} \u4e2a\u7ed3\u679c` },
+        { key: 'prepare', title: '准备参数', value: status.phase === 'queued' ? '已提交' : '就绪', meta: status.start_date && status.end_date ? `${status.start_date || '-'} ~ ${status.end_date || '-'}` : '等待启动' },
+        { key: 'universe', title: '股票池', value: status.universe_name || '-', meta: status.universe_code || '-' },
+        { key: 'market', title: '行情准备', value: `${Math.round(marketProgressPct)}%`, meta: `${safeNum(status.market_completed_codes)}/${safeNum(status.market_total_codes)} 只股票` },
+        { key: 'factors', title: '因子回测', value: `${Math.round(factorProgressPct)}%`, meta: `${safeNum(status.factor_completed)}/${safeNum(status.factor_total || status.total)} 个因子 · 保留 ${safeNum(status.result_count)} 个结果` },
     ];
     const filteredResults = results.filter(item => {
         const keyword = search.trim().toLowerCase();
@@ -5269,22 +6270,102 @@ function FactorBoardPage({ showToast }) {
     const avgIc = results.length ? results.reduce((sum, item) => sum + safeNum(item.ic_mean), 0) / results.length : 0;
     const bestFactor = results.length ? [...results].sort((a, b) => Math.abs(getSpreadExcess(b)) - Math.abs(getSpreadExcess(a)))[0] : null;
     const latestResult = detail.snapshot && detail.snapshot.latest_result ? detail.snapshot.latest_result : null;
-    const infoDescription = detail.info && detail.info.description ? detail.info.description : '\u6682\u65e0\u56e0\u5b50\u8bf4\u660e';
+    const infoDescription = detail.info && detail.info.description ? detail.info.description : '暂无因子说明';
     const economicMeaning = detail.info && detail.info.economic_meaning ? detail.info.economic_meaning : infoDescription;
     const latestTradeDateLabel = detail.snapshot && detail.snapshot.latest_trade_date ? detail.snapshot.latest_trade_date : '-';
     const avgHoldingWeight = currentHoldings.length ? currentHoldings.reduce((sum, item) => sum + safeNum(item.weight), 0) / currentHoldings.length : 0;
     const topHolding = currentHoldings.length ? [...currentHoldings].sort((a, b) => safeNum(b.weight) - safeNum(a.weight))[0] : null;
     const activeUniverseLabel = analysisForm.universe_type === 'system'
-        ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60')
-        : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60');
+        ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '系统股票池')
+        : ((selectedCustomPool && selectedCustomPool.name) || '未选择自定义股票池');
     const activeUniverseMeta = analysisForm.universe_type === 'system'
         ? ((selectedSystemUniverse && selectedSystemUniverse.code) || (analysisForm.universe_code || '-'))
-        : (((selectedCustomPool && selectedCustomPool.stock_count) || (poolForm.stock_items || []).length || 0) + '\u53ea\u80a1\u7968');
+        : (((selectedCustomPool && selectedCustomPool.stock_count) || (poolForm.stock_items || []).length || 0) + '只股票');
     const customPoolCount = (universeOptions.custom_pools || []).length;
     const selectedPoolCount = analysisForm.universe_type === 'custom'
         ? ((selectedCustomPool && selectedCustomPool.stock_count) || 0)
         : 0;
     const favoriteCount = favoriteFactors.length;
+
+    const buildFactorStrategyPrompt = (factorName, resultItem, factorInfo) => {
+        const info = factorInfo || detail.info || {};
+        const promptParts = [
+            `请基于 Alpha191 因子 ${factorName || selectedFactor || ''} 生成一个适用于 QTsys 的股票量化策略。`,
+            `当前研究股票池：${activeUniverseLabel}（${activeUniverseMeta}）。`,
+        ];
+        if (analysisForm.start_date || analysisForm.end_date) {
+            promptParts.push(`建议参考的研究区间：${analysisForm.start_date || '-'} 至 ${analysisForm.end_date || '-' }。`);
+        }
+        if (resultItem) {
+            promptParts.push(`该因子当前回测摘要：高分位超额 ${formatPct(resultItem.max_quantile_excess)}，低分位超额 ${formatPct(resultItem.min_quantile_excess)}，高低分位差 ${formatPct(getSpreadExcess(resultItem))}，IC 均值 ${formatNum(resultItem.ic_mean)}，覆盖率 ${formatPct(resultItem.coverage_ratio)}，换手 ${formatPct(resultItem.max_quantile_turnover)}。`);
+        }
+        if (info.description) {
+            promptParts.push(`因子说明：${info.description}`);
+        }
+        if (info.economic_meaning) {
+            promptParts.push(`经济学含义：${info.economic_meaning}`);
+        }
+        if (info.formula) {
+            promptParts.push(`真实公式：${info.formula}`);
+        }
+        promptParts.push('请把这个因子转化为可执行的选股/调仓逻辑，并明确买入条件、卖出条件、仓位控制、止损或风险控制。');
+        promptParts.push('不要硬编码大量股票列表，直接使用 context.universe。若该因子更适合作为反向信号，请按反向信号设计策略。');
+        return promptParts.filter(Boolean).join('\n');
+    };
+
+    const buildFactorBacktestContext = async () => {
+        const window = resolveAnalysisWindow(analysisForm.start_date, analysisForm.end_date, analysisForm.backtest_days);
+        if (analysisForm.universe_type === 'custom') {
+            const stockItems = normalizeStockItems(selectedCustomPool && selectedCustomPool.stock_items ? selectedCustomPool.stock_items : []);
+            return normalizeBacktestContext({
+                source: 'factorboard',
+                source_label: '因子看板',
+                universe_type: 'custom',
+                universe_code: selectedCustomPool ? `custom:${selectedCustomPool.id}` : 'custom',
+                universe_name: selectedCustomPool && selectedCustomPool.name ? selectedCustomPool.name : '自定义股票池',
+                custom_pool_id: selectedCustomPool ? selectedCustomPool.id : null,
+                benchmark: '000300.SH',
+                backtest_days: analysisForm.backtest_days,
+                start_date: window.start_date,
+                end_date: window.end_date,
+                stock_items: stockItems,
+            });
+        }
+
+        const targetCode = (analysisForm.universe_code || '000905.SH');
+        const res = await api.get(`/api/factor_board/system_universe_members?code=${encodeURIComponent(targetCode)}`);
+        return normalizeBacktestContext({
+            source: 'factorboard',
+            source_label: '因子看板',
+            universe_type: 'system',
+            universe_code: res.code || targetCode,
+            universe_name: res.name || (selectedSystemUniverse && selectedSystemUniverse.name) || targetCode,
+            benchmark: res.benchmark_code || (selectedSystemUniverse && selectedSystemUniverse.benchmark_code) || targetCode,
+            backtest_days: analysisForm.backtest_days,
+            start_date: window.start_date,
+            end_date: window.end_date,
+            stock_items: normalizeStockItems(res.stock_items || []),
+        });
+    };
+
+    const openStrategyFromFactor = async (factorName, resultItem, factorInfo) => {
+        const prompt = buildFactorStrategyPrompt(factorName, resultItem, factorInfo);
+        let backtestContext = null;
+        try {
+            backtestContext = await buildFactorBacktestContext();
+        } catch (e) {
+            showToast((e && e.detail) || '获取股票池成分失败，将仅打开 AI 策略草稿', 'error');
+        }
+        pushStrategyAIPrefill({
+            source: 'factorboard',
+            factor_name: factorName,
+            prompt,
+            auto_generate: true,
+            backtest_context: backtestContext,
+        });
+        if (openStrategyWorkspace) openStrategyWorkspace();
+        showToast('已将因子研究上下文发送到 AI 策略助手', 'success');
+    };
 
     return (
         <div className="factor-board-shell fade-in">
@@ -5302,8 +6383,8 @@ function FactorBoardPage({ showToast }) {
                 <section className="factor-board-glass factor-board-panel">
                     <div className="factor-board-toolbar">
                         <div>
-                            <div className="card-title" style={{marginBottom: 6}}>{'\u7814\u7a76\u7b5b\u9009'}</div>
-                            <div className="factor-board-subtle">{'\u5df2\u5b8c\u6210 '}{Math.round(Math.max(0, Math.min(100, safeNum(status.progress))))}{'% \u00b7 \u5f53\u524d\u56e0\u5b50 '}{status.current_factor || '-'}</div>
+                            <div className="card-title" style={{marginBottom: 6}}>{'研究筛选'}</div>
+                            <div className="factor-board-subtle">{'已完成 '}{Math.round(Math.max(0, Math.min(100, safeNum(status.progress))))}{'% · 当前因子 '}{status.current_factor || '-'}</div>
                         </div>
                     </div>
                     <div className="factor-board-progress"><span style={{ width: `${Math.max(0, Math.min(100, safeNum(status.progress)))}%` }}></span></div>
@@ -5311,34 +6392,34 @@ function FactorBoardPage({ showToast }) {
                 <section className="factor-board-glass factor-board-panel">
                     <div className="factor-board-toolbar">
                         <div>
-                            <div className="card-title" style={{marginBottom: 6}}>{'\u80a1\u7968\u6c60\u5de5\u4f5c\u53f0'}</div>
-                            <div className="factor-board-subtle">{'\u4e3b\u754c\u9762\u4ec5\u4fdd\u7559\u80a1\u7968\u6c60\u6982\u89c8\uff0c\u65b0\u5efa\u3001\u7f16\u8f91\u3001\u5220\u9664\u548c\u6210\u5206\u8c03\u6574\u7edf\u4e00\u5728\u72ec\u7acb\u5f39\u7a97\u4e2d\u5b8c\u6210\u3002'}</div>
+                            <div className="card-title" style={{marginBottom: 6}}>{'股票池工作台'}</div>
+                            <div className="factor-board-subtle">{'主界面仅保留股票池概览，新建、编辑、删除和成分调整统一在独立弹窗中完成。'}</div>
                         </div>
                         <div className="factor-board-toolbar-right">
-                            <button className="btn btn-secondary" onClick={() => { resetPoolForm(); setShowPoolManager(true); }}>{'\u65b0\u5efa\u80a1\u7968\u6c60'}</button>
-                            <button className="btn btn-primary" onClick={() => setShowPoolManager(true)}>{'\u7ba1\u7406\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</button>
+                            <button className="btn btn-secondary" onClick={() => { resetPoolForm(); setShowPoolManager(true); }}>{'新建股票池'}</button>
+                            <button className="btn btn-primary" onClick={() => setShowPoolManager(true)}>{'管理自定义股票池'}</button>
                         </div>
                     </div>
                     <div className="factor-board-quickgrid">
                         <div className="factor-board-mini-card">
-                            <div className="factor-board-mini-label">{'\u5f53\u524d\u7528\u4e8e\u5206\u6790'}</div>
+                            <div className="factor-board-mini-label">{'当前用于分析'}</div>
                             <div className="factor-board-mini-value small">{activeUniverseLabel}</div>
                             <div className="factor-board-mini-meta">{activeUniverseMeta}</div>
                         </div>
                         <div className="factor-board-mini-card">
-                            <div className="factor-board-mini-label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u6570\u91cf'}</div>
+                            <div className="factor-board-mini-label">{'自定义股票池数量'}</div>
                             <div className="factor-board-mini-value">{customPoolCount}</div>
-                            <div className="factor-board-mini-meta">{'\u53ef\u4f9b\u540e\u7eed\u56de\u6d4b\u4e0e\u56e0\u5b50\u7b5b\u9009\u590d\u7528'}</div>
+                            <div className="factor-board-mini-meta">{'可供后续回测与因子筛选复用'}</div>
                         </div>
                         <div className="factor-board-mini-card">
-                            <div className="factor-board-mini-label">{'\u5f53\u524d\u81ea\u5b9a\u4e49\u6c60\u6210\u5206'}</div>
+                            <div className="factor-board-mini-label">{'当前自定义池成分'}</div>
                             <div className="factor-board-mini-value">{selectedPoolCount}</div>
-                            <div className="factor-board-mini-meta">{'\u4ec5\u5728\u9009\u4e2d\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u65f6\u751f\u6548'}</div>
+                            <div className="factor-board-mini-meta">{'仅在选中自定义股票池时生效'}</div>
                         </div>
                         <div className="factor-board-mini-card">
-                            <div className="factor-board-mini-label">{'\u5feb\u6377\u64cd\u4f5c'}</div>
-                            <div className="factor-board-mini-value small">{'\u7edf\u4e00\u5165\u53e3\uff0c\u907f\u514d\u4e3b\u9875\u62e5\u6324'}</div>
-                            <div className="factor-board-mini-meta">{'\u70b9\u51fb\u53f3\u4e0a\u89d2\u6309\u94ae\u5373\u53ef\u6253\u5f00\u7ba1\u7406\u9762\u677f'}</div>
+                            <div className="factor-board-mini-label">{'快捷操作'}</div>
+                            <div className="factor-board-mini-value small">{'统一入口，避免主页拥挤'}</div>
+                            <div className="factor-board-mini-meta">{'点击右上角按钮即可打开管理面板'}</div>
                         </div>
                     </div>
                 </section>
@@ -5369,47 +6450,47 @@ function FactorBoardPage({ showToast }) {
 
             <div className="factor-board-overview">
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</div>
-                    <div className="factor-board-overview-value small">{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60')}</div>
-                    <div className="factor-board-overview-meta">{'\u6279\u6b21\uff1a'}{status.analysis_batch || '\u6682\u65e0\u6279\u6b21'}</div>
+                    <div className="factor-board-overview-label">{'当前股票池'}</div>
+                    <div className="factor-board-overview-value small">{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '系统股票池') : ((selectedCustomPool && selectedCustomPool.name) || '未选择自定义股票池')}</div>
+                    <div className="factor-board-overview-meta">{'批次：'}{status.analysis_batch || '暂无批次'}</div>
                 </div>
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u5df2\u5206\u6790\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-label">{'已分析因子'}</div>
                     <div className="factor-board-overview-value">{results.length}</div>
-                    <div className="factor-board-overview-meta">{'\u5f53\u524d\u663e\u793a '}{filteredResults.length}{' \u4e2a\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-meta">{'当前显示 '}{filteredResults.length}{' 个因子'}</div>
                 </div>
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u5e73\u5747\u8986\u76d6\u7387'}</div>
+                    <div className="factor-board-overview-label">{'平均覆盖率'}</div>
                     <div className={'factor-board-overview-value ' + metricTextClass(avgCoverage)}>{formatPct(avgCoverage)}</div>
-                    <div className="factor-board-overview-meta">{'\u8861\u91cf\u6bcf\u4e2a\u4ea4\u6613\u65e5\u53ef\u53c2\u4e0e\u6392\u5e8f\u7684\u80a1\u7968\u8986\u76d6\u7a0b\u5ea6'}</div>
+                    <div className="factor-board-overview-meta">{'衡量每个交易日可参与排序的股票覆盖程度'}</div>
                 </div>
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u5e73\u5747 IC'}</div>
+                    <div className="factor-board-overview-label">{'平均 IC'}</div>
                     <div className={'factor-board-overview-value ' + metricTextClass(avgIc)}>{formatNum(avgIc)}</div>
-                    <div className="factor-board-overview-meta">{'\u8861\u91cf\u56e0\u5b50\u6392\u5e8f\u4e0e\u540e\u7eed\u6536\u76ca\u7684\u4e00\u81f4\u6027'}</div>
+                    <div className="factor-board-overview-meta">{'衡量因子排序与后续收益的一致性'}</div>
                 </div>
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u5f53\u524d\u5206\u5316\u6700\u5f3a\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-label">{'当前分化最强因子'}</div>
                     <div className="factor-board-overview-value small">{bestFactor ? bestFactor.factor_name : '--'}</div>
-                    <div className="factor-board-overview-meta">{bestFactor ? ('高低分位差 ' + formatPct(getSpreadExcess(bestFactor))) : '\u6682\u65e0\u7ed3\u679c'}</div>
+                    <div className="factor-board-overview-meta">{bestFactor ? ('高低分位差 ' + formatPct(getSpreadExcess(bestFactor))) : '暂无结果'}</div>
                 </div>
                 <div className="factor-board-overview-card">
-                    <div className="factor-board-overview-label">{'\u6536\u85cf\u56e0\u5b50'}</div>
+                    <div className="factor-board-overview-label">{'收藏因子'}</div>
                     <div className="factor-board-overview-value">{favoriteCount}</div>
-                    <div className="factor-board-overview-meta">{'\u53ef\u5bf9\u91cd\u70b9\u8ddf\u8e2a\u7684 Alpha191 \u56e0\u5b50\u8fdb\u884c\u5feb\u901f\u7b5b\u9009'}</div>
+                    <div className="factor-board-overview-meta">{'可对重点跟踪的 Alpha191 因子进行快速筛选'}</div>
                 </div>
             </div>
 
             <section className="card space-y factor-board-panel">
                 <div className="factor-board-toolbar">
                     <div>
-                        <div className="card-title" style={{marginBottom: 6}}>{'\u5206\u6790\u8fc7\u7a0b'}</div>
-                        <div className="factor-board-subtle">{status.phase_label || '\u7b49\u5f85\u4efb\u52a1'}{' \u00b7 '}{status.message || '\u5f85\u542f\u52a8'}</div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'分析过程'}</div>
+                        <div className="factor-board-subtle">{status.phase_label || '等待任务'}{' · '}{status.message || '待启动'}</div>
                     </div>
                     <div className="factor-board-toolbar-right">
-                        <div className="factor-board-results-tip">{'\u5f53\u524d\u6279\u6b21 '}{status.analysis_batch || '-'}</div>
-                        <div className="factor-board-results-tip">{'\u5df2\u4fdd\u7559 '}{safeNum(status.result_count)}{' \u4e2a\u56e0\u5b50\u7ed3\u679c'}</div>
-                        <button className="btn btn-secondary" onClick={retryFailedFactors} disabled={retrying || status.running || failedFactors.length === 0}>{retrying ? '\u91cd\u8bd5\u4e2d...' : '\u91cd\u8bd5\u5931\u8d25\u56e0\u5b50'}</button>
+                        <div className="factor-board-results-tip">{'当前批次 '}{status.analysis_batch || '-'}</div>
+                        <div className="factor-board-results-tip">{'已保留 '}{safeNum(status.result_count)}{' 个因子结果'}</div>
+                        <button className="btn btn-secondary" onClick={retryFailedFactors} disabled={retrying || status.running || failedFactors.length === 0}>{retrying ? '重试中...' : '重试失败因子'}</button>
                     </div>
                 </div>
                 <div className="factor-board-stage-grid">
@@ -5424,21 +6505,21 @@ function FactorBoardPage({ showToast }) {
                 <div className="factor-board-process-grid">
                     <div className="factor-board-process-card">
                         <div className="factor-board-process-head">
-                            <div className="card-title" style={{marginBottom: 0}}>{'\u8fd0\u884c\u65e5\u5fd7'}</div>
-                            <div className="factor-board-subtle">{statusLogs.length}{' \u6761'}</div>
+                            <div className="card-title" style={{marginBottom: 0}}>{'运行日志'}</div>
+                            <div className="factor-board-subtle">{statusLogs.length}{' 条'}</div>
                         </div>
                         <div className="factor-board-log-panel">
-                            {statusLogs.length === 0 ? <div className="factor-board-empty small">{'\u6682\u65e0\u65e5\u5fd7'}</div> : statusLogs.map((entry, idx) => (
+                            {statusLogs.length === 0 ? <div className="factor-board-empty small">{'暂无日志'}</div> : statusLogs.map((entry, idx) => (
                                 <div key={idx} className="factor-board-log-line">{entry}</div>
                             ))}
                         </div>
                     </div>
                     <div className="factor-board-process-card">
                         <div className="factor-board-process-head">
-                            <div className="card-title" style={{marginBottom: 0}}>{'\u5931\u8d25\u56e0\u5b50'}</div>
-                            <div className="factor-board-subtle">{failedFactors.length}{' \u4e2a'}</div>
+                            <div className="card-title" style={{marginBottom: 0}}>{'失败因子'}</div>
+                            <div className="factor-board-subtle">{failedFactors.length}{' 个'}</div>
                         </div>
-                        {failedFactors.length === 0 ? <div className="factor-board-empty small">{'\u5f53\u524d\u6ca1\u6709\u5931\u8d25\u56e0\u5b50'}</div> : (
+                        {failedFactors.length === 0 ? <div className="factor-board-empty small">{'当前没有失败因子'}</div> : (
                             <div className="factor-board-chip-list">
                                 {failedFactors.map(item => <span key={item} className="factor-board-filterchip active">{item}</span>)}
                             </div>
@@ -5451,49 +6532,49 @@ function FactorBoardPage({ showToast }) {
             <section className="card space-y factor-board-panel">
                 <div className="factor-board-toolbar">
                     <div>
-                        <div className="card-title" style={{marginBottom: 6}}>{'\u6570\u636e\u5e93\u8fde\u63a5'}</div>
-                        <div className="factor-board-subtle">{'\u914d\u7f6e\u56e0\u5b50\u770b\u677f\u5206\u6790\u6240\u4f7f\u7528\u7684 MySQL \u6570\u636e\u5e93\u8fde\u63a5\u4fe1\u606f\u3002'}</div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'数据库连接'}</div>
+                        <div className="factor-board-subtle">{'配置因子看板分析所使用的 MySQL 数据库连接信息。'}</div>
                     </div>
                     <div className="factor-board-toolbar-left">
-                        <button className="btn btn-secondary" onClick={saveConfig} disabled={saving}>{saving ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u914d\u7f6e'}</button>
-                        <button className="btn btn-secondary" onClick={testConfig} disabled={testing}>{testing ? '\u6d4b\u8bd5\u4e2d...' : '\u6d4b\u8bd5\u8fde\u63a5'}</button>
+                        <button className="btn btn-secondary" onClick={saveConfig} disabled={saving}>{saving ? '保存中...' : '保存配置'}</button>
+                        <button className="btn btn-secondary" onClick={testConfig} disabled={testing}>{testing ? '测试中...' : '测试连接'}</button>
                     </div>
                 </div>
                 <div className="grid-2">
-                    <div className="field"><label className="label">{'\u4e3b\u673a'}</label><input className="input" value={dbConfig.host || ''} onChange={e => setDbConfig(prev => ({ ...prev, host: e.target.value }))} placeholder="localhost" /></div>
-                    <div className="field"><label className="label">{'\u7aef\u53e3'}</label><input className="input" type="number" value={dbConfig.port || 3306} onChange={e => setDbConfig(prev => ({ ...prev, port: Number(e.target.value || 3306) }))} placeholder="3306" /></div>
-                    <div className="field"><label className="label">{'\u7528\u6237\u540d'}</label><input className="input" value={dbConfig.user || ''} onChange={e => setDbConfig(prev => ({ ...prev, user: e.target.value }))} placeholder="root" /></div>
-                    <div className="field"><label className="label">{'\u6570\u636e\u5e93\u540d'}</label><input className="input" value={dbConfig.database || ''} onChange={e => setDbConfig(prev => ({ ...prev, database: e.target.value }))} placeholder="qtsys" /></div>
-                    <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u5bc6\u7801'}</label><input className="input" type="password" value={dbConfig.password || ''} onChange={e => setDbConfig(prev => ({ ...prev, password: e.target.value }))} placeholder={dbConfig.has_password ? '\u5df2\u4fdd\u5b58\u5bc6\u7801\uff0c\u7559\u7a7a\u5219\u4fdd\u6301\u4e0d\u53d8' : '\u8bf7\u8f93\u5165\u6570\u636e\u5e93\u5bc6\u7801'} /></div>
+                    <div className="field"><label className="label">{'主机'}</label><input className="input" value={dbConfig.host || ''} onChange={e => setDbConfig(prev => ({ ...prev, host: e.target.value }))} placeholder="localhost" /></div>
+                    <div className="field"><label className="label">{'端口'}</label><input className="input" type="number" value={dbConfig.port || 3306} onChange={e => setDbConfig(prev => ({ ...prev, port: Number(e.target.value || 3306) }))} placeholder="3306" /></div>
+                    <div className="field"><label className="label">{'用户名'}</label><input className="input" value={dbConfig.user || ''} onChange={e => setDbConfig(prev => ({ ...prev, user: e.target.value }))} placeholder="root" /></div>
+                    <div className="field"><label className="label">{'数据库名'}</label><input className="input" value={dbConfig.database || ''} onChange={e => setDbConfig(prev => ({ ...prev, database: e.target.value }))} placeholder="qtsys" /></div>
+                    <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'密码'}</label><input className="input" type="password" value={dbConfig.password || ''} onChange={e => setDbConfig(prev => ({ ...prev, password: e.target.value }))} placeholder={dbConfig.has_password ? '已保存密码，留空则保持不变' : '请输入数据库密码'} /></div>
                 </div>
-                <div className="factor-board-status"><span className={'factor-board-dot' + (dbConfig.has_password ? ' running' : '')}></span><span>{dbConfig.has_password ? '\u6570\u636e\u5e93\u5bc6\u7801\u5df2\u4fdd\u5b58' : '\u5c1a\u672a\u4fdd\u5b58\u6570\u636e\u5e93\u5bc6\u7801'}</span></div>
+                <div className="factor-board-status"><span className={'factor-board-dot' + (dbConfig.has_password ? ' running' : '')}></span><span>{dbConfig.has_password ? '数据库密码已保存' : '尚未保存数据库密码'}</span></div>
             </section>
 
             <section className="card space-y factor-board-panel">
                 <div className="factor-board-toolbar">
                     <div>
-                        <div className="card-title" style={{marginBottom: 6}}>{'\u5206\u6790\u53c2\u6570'}</div>
-                        <div className="factor-board-subtle">{'\u9009\u62e9\u56de\u6d4b\u65f6\u95f4\u533a\u95f4\u4e0e\u80a1\u7968\u6c60\u540e\u542f\u52a8 Alpha191 \u56e0\u5b50\u6279\u91cf\u5206\u6790\u3002'}</div>
+                        <div className="card-title" style={{marginBottom: 6}}>{'分析参数'}</div>
+                        <div className="factor-board-subtle">{'选择回测时间区间与股票池后启动 Alpha191 因子批量分析。'}</div>
                     </div>
                     <div className="factor-board-toolbar-left">
-                        <button className="btn btn-primary" onClick={startAnalysis} disabled={starting || stopping || status.running || (analysisForm.universe_type === 'custom' && !analysisForm.custom_pool_id)}>{starting ? '\u542f\u52a8\u4e2d...' : '\u5f00\u59cb\u5206\u6790'}</button>
-                        <button className="btn btn-secondary" onClick={stopAnalysis} disabled={stopping || !status.running}>{stopping ? '\u505c\u6b62\u4e2d...' : '\u505c\u6b62\u5206\u6790'}</button>
+                        <button className="btn btn-primary" onClick={startAnalysis} disabled={starting || stopping || status.running || (analysisForm.universe_type === 'custom' && !analysisForm.custom_pool_id)}>{starting ? '启动中...' : '开始分析'}</button>
+                        <button className="btn btn-secondary" onClick={stopAnalysis} disabled={stopping || !status.running}>{stopping ? '停止中...' : '停止分析'}</button>
                     </div>
                 </div>
                 <div className="grid-2">
-                    <div className="field"><label className="label">{'\u56de\u6d4b\u5929\u6570'}</label><input className="input" type="number" min="60" max="3650" value={analysisForm.backtest_days || 365} onChange={e => setAnalysisForm(prev => ({ ...prev, backtest_days: Number(e.target.value || 365) }))} /></div>
-                    <div className="field"><label className="label">{'\u80a1\u7968\u6c60\u7c7b\u578b'}</label><select className="input" value={analysisForm.universe_type} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_type: e.target.value, custom_pool_id: e.target.value === 'custom' ? prev.custom_pool_id : '', universe_code: e.target.value === 'system' ? (prev.universe_code || '000905.SH') : prev.universe_code }))}><option value="system">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</option><option value="custom">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</option></select></div>
-                    <div className="field"><label className="label">{'\u5f00\u59cb\u65e5\u671f'}</label><input className="input" type="date" value={analysisForm.start_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, start_date: e.target.value }))} /></div>
-                    <div className="field"><label className="label">{'\u7ed3\u675f\u65e5\u671f'}</label><input className="input" type="date" value={analysisForm.end_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, end_date: e.target.value }))} /></div>
+                    <div className="field"><label className="label">{'回测天数'}</label><input className="input" type="number" min="60" max="3650" value={analysisForm.backtest_days || 365} onChange={e => setAnalysisForm(prev => ({ ...prev, backtest_days: Number(e.target.value || 365) }))} /></div>
+                    <div className="field"><label className="label">{'股票池类型'}</label><select className="input" value={analysisForm.universe_type} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_type: e.target.value, custom_pool_id: e.target.value === 'custom' ? prev.custom_pool_id : '', universe_code: e.target.value === 'system' ? (prev.universe_code || '000905.SH') : prev.universe_code }))}><option value="system">{'系统股票池'}</option><option value="custom">{'自定义股票池'}</option></select></div>
+                    <div className="field"><label className="label">{'开始日期'}</label><input className="input" type="date" value={analysisForm.start_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, start_date: e.target.value }))} /></div>
+                    <div className="field"><label className="label">{'结束日期'}</label><input className="input" type="date" value={analysisForm.end_date || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, end_date: e.target.value }))} /></div>
                     {analysisForm.universe_type === 'system' ? (
-                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</label><select className="input" value={analysisForm.universe_code || '000905.SH'} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_code: e.target.value }))}>{(universeOptions.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name}{'\uff08'}{item.code}{'\uff09'}</option>)}</select></div>
+                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'系统股票池'}</label><select className="input" value={analysisForm.universe_code || '000905.SH'} onChange={e => setAnalysisForm(prev => ({ ...prev, universe_code: e.target.value }))}>{(universeOptions.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name}{'（'}{item.code}{'）'}</option>)}</select></div>
                     ) : (
-                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</label><select className="input" value={analysisForm.custom_pool_id || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, custom_pool_id: e.target.value }))}><option value="">{'\u8bf7\u9009\u62e9\u5df2\u4fdd\u5b58\u7684\u80a1\u7968\u6c60'}</option>{(universeOptions.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name}{'\uff08'}{item.stock_count}{'\u53ea\uff09'}</option>)}</select></div>
+                        <div className="field" style={{gridColumn: '1 / -1'}}><label className="label">{'自定义股票池'}</label><select className="input" value={analysisForm.custom_pool_id || ''} onChange={e => setAnalysisForm(prev => ({ ...prev, custom_pool_id: e.target.value }))}><option value="">{'请选择已保存的股票池'}</option>{(universeOptions.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name}{'（'}{item.stock_count}{'只）'}</option>)}</select></div>
                     )}
                 </div>
                 <div className="grid-2">
-                    <div className="field"><label className="label">{'\u5f53\u524d\u5206\u6790\u72b6\u6001'}</label><div className="factor-board-status"><span className={'factor-board-dot' + (status.running ? ' running' : '')}></span><span>{status.message || (status.running ? '\u5206\u6790\u8fdb\u884c\u4e2d' : '\u5f85\u542f\u52a8')}</span></div></div>
-                    <div className="field"><label className="label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '\u7cfb\u7edf\u80a1\u7968\u6c60') : ((selectedCustomPool && selectedCustomPool.name) || '\u672a\u9009\u62e9\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60')}</span></div></div>
+                    <div className="field"><label className="label">{'当前分析状态'}</label><div className="factor-board-status"><span className={'factor-board-dot' + (status.running ? ' running' : '')}></span><span>{status.message || (status.running ? '分析进行中' : '待启动')}</span></div></div>
+                    <div className="field"><label className="label">{'当前股票池'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{analysisForm.universe_type === 'system' ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '系统股票池') : ((selectedCustomPool && selectedCustomPool.name) || '未选择自定义股票池')}</span></div></div>
                 </div>
             </section>
             </div>
@@ -5505,9 +6586,9 @@ function FactorBoardPage({ showToast }) {
                         <div className="factor-board-subtle">点击任意因子可查看详细收益曲线、公式说明和最新持仓</div>
                     </div>
                     <div className="factor-board-toolbar-right">
-                        <div className="factor-board-results-tip">{'\u8868\u683c\u652f\u6301\u6eda\u52a8\u67e5\u770b\u5168\u90e8\u5217'}</div>
+                        <div className="factor-board-results-tip">{'表格支持滚动查看全部列'}</div>
                         <div className="factor-board-results-tip">{'高分位超额=最高因子值分位相对基准超额；低分位超额=最低因子值分位相对基准超额；低分位超额高于高分位超额时，通常表示反向信号更强。'}</div>
-                        <div className="factor-board-subtle">{'\u5c55\u793a '}{filteredResults.length}{' / '}{results.length}{' \u4e2a\u56e0\u5b50'}</div>
+                        <div className="factor-board-subtle">{'展示 '}{filteredResults.length}{' / '}{results.length}{' 个因子'}</div>
                     </div>
                 </div>
                 {loading ? <div className="factor-board-empty">正在加载因子看板数据...</div> : filteredResults.length === 0 ? <div className="factor-board-empty">暂无可展示的因子结果，请先配置数据库并运行分析。</div> : (
@@ -5538,7 +6619,7 @@ function FactorBoardPage({ showToast }) {
                                                     <span className={getFactorDirectionClass(item)}>{getFactorDirectionLabel(item)}</span>
                                                     <div className="factor-board-factor-meta">
                                                         <span className="factor-board-link" onClick={() => setSelectedFactor(item.factor_name)}>{item.factor_name}</span>
-                                                        <span className="factor-board-subtle">{item.universe_name || '\u9ed8\u8ba4\u80a1\u7968\u6c60'}{' · 高低分位差 '}{formatPct(getSpreadExcess(item))}{' · 最新 '}{item.latest_trade_date || '-'}</span>
+                                                        <span className="factor-board-subtle">{item.universe_name || '默认股票池'}{' · 高低分位差 '}{formatPct(getSpreadExcess(item))}{' · 最新 '}{item.latest_trade_date || '-'}</span>
                                                     </div>
                                                 </div>
                                             </td>
@@ -5551,6 +6632,7 @@ function FactorBoardPage({ showToast }) {
                                             <td>{formatPct(item.max_quantile_turnover)}</td>
                                             <td>{item.latest_trade_date || '-'}</td>
                                             <td className="factor-board-row-action">
+                                                <button className="btn btn-secondary factor-board-detail-btn" style={{marginRight:8}} onClick={() => openStrategyFromFactor(item.factor_name, item, null)}>生成策略</button>
                                                 <button className="btn btn-secondary factor-board-detail-btn" onClick={() => setSelectedFactor(item.factor_name)}>查看详情</button>
                                             </td>
                                         </tr>
@@ -5567,37 +6649,37 @@ function FactorBoardPage({ showToast }) {
                     <div className="factor-board-modal-card" onClick={e => e.stopPropagation()}>
                         <div className="factor-board-modal-head">
                             <div>
-                                <div className="factor-board-modal-title">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u7ba1\u7406'}</div>
-                                <div className="factor-board-modal-copy">{'\u641c\u7d22\u80a1\u7968\u3001\u4fdd\u5b58\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u5e76\u5728\u5206\u6790\u65f6\u590d\u7528\u3002'}</div>
+                                <div className="factor-board-modal-title">{'自定义股票池管理'}</div>
+                                <div className="factor-board-modal-copy">{'搜索股票、保存自定义股票池，并在分析时复用。'}</div>
                             </div>
-                            <button className="btn btn-secondary" onClick={() => setShowPoolManager(false)}>{'\u5173\u95ed'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowPoolManager(false)}>{'关闭'}</button>
                         </div>
                         <section className="card space-y factor-board-panel">
                             <div className="factor-board-toolbar">
                                 <div>
-                                    <div className="card-title" style={{marginBottom: 6}}>{'\u80a1\u7968\u6c60\u7f16\u8f91\u5668'}</div>
-                                    <div className="factor-board-subtle">{'\u53ef\u65b0\u5efa\u3001\u7f16\u8f91\u3001\u5220\u9664\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div>
+                                    <div className="card-title" style={{marginBottom: 6}}>{'股票池编辑器'}</div>
+                                    <div className="factor-board-subtle">{'可新建、编辑、删除自定义股票池。'}</div>
                                 </div>
                                 <div className="factor-board-toolbar-right">
-                                    <button className="btn btn-secondary" onClick={resetPoolForm}>{'\u65b0\u5efa'}</button>
-                                    <button className="btn btn-primary" onClick={savePool} disabled={poolSaving}>{poolSaving ? '\u4fdd\u5b58\u4e2d...' : (poolForm.id ? '\u66f4\u65b0\u80a1\u7968\u6c60' : '\u4fdd\u5b58\u80a1\u7968\u6c60')}</button>
-                                    {poolForm.id ? <button className="btn btn-secondary" onClick={deletePool} disabled={poolDeleting}>{poolDeleting ? '\u5220\u9664\u4e2d...' : '\u5220\u9664'}</button> : null}
+                                    <button className="btn btn-secondary" onClick={resetPoolForm}>{'新建'}</button>
+                                    <button className="btn btn-primary" onClick={savePool} disabled={poolSaving}>{poolSaving ? '保存中...' : (poolForm.id ? '更新股票池' : '保存股票池')}</button>
+                                    {poolForm.id ? <button className="btn btn-secondary" onClick={deletePool} disabled={poolDeleting}>{poolDeleting ? '删除中...' : '删除'}</button> : null}
                                 </div>
                             </div>
                             <div className="grid-2">
-                                <div className="field"><label className="label">{'\u80a1\u7968\u6c60\u540d\u79f0'}</label><input className="input" value={poolForm.name} placeholder="\u4f8b\u5982\uff1a\u6d88\u8d39\u9f99\u5934\u6c60" onChange={e => setPoolForm({ ...poolForm, name: e.target.value })} /></div>
-                                <div className="field"><label className="label">{'\u6210\u5206\u6570\u91cf'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{(poolForm.stock_items || []).length}{' \u53ea\u80a1\u7968'}</span></div></div>
+                                <div className="field"><label className="label">{'股票池名称'}</label><input className="input" value={poolForm.name} placeholder="例如：消费龙头池" onChange={e => setPoolForm({ ...poolForm, name: e.target.value })} /></div>
+                                <div className="field"><label className="label">{'成分数量'}</label><div className="factor-board-status"><span className="factor-board-dot"></span><span>{(poolForm.stock_items || []).length}{' 只股票'}</span></div></div>
                             </div>
-                            <div className="field"><label className="label">{'\u8bf4\u660e'}</label><textarea className="input" rows="2" value={poolForm.description} placeholder="\u8bb0\u5f55\u8be5\u80a1\u7968\u6c60\u7684\u7814\u7a76\u4e3b\u9898\u6216\u9009\u80a1\u903b\u8f91" onChange={e => setPoolForm({ ...poolForm, description: e.target.value })}></textarea></div>
-                            <div className="field"><label className="label">{'\u6dfb\u52a0\u80a1\u7968'}</label><div className="stock-search-wrap"><input className="input" value={stockKeyword} placeholder="\u8f93\u5165\u80a1\u7968\u4ee3\u7801\u6216\u540d\u79f0" onChange={e => setStockKeyword(e.target.value)} onFocus={() => stockResults.length > 0 && setShowStockResults(true)} />{showStockResults && stockResults.length > 0 ? <div className="stock-search-dropdown">{stockResults.map(item => <div key={item.ts_code} className="stock-search-item" onMouseDown={() => addStockToPool(item)}><span>{item.name}</span><span style={{color:'var(--text-500)'}}>{item.ts_code}</span></div>)}</div> : null}</div></div>
-                            <div className="factor-board-list" style={{maxHeight: 220, overflowY: 'auto'}}>{(poolForm.stock_items || []).length === 0 ? <div className="factor-board-empty">{'\u5f53\u524d\u80a1\u7968\u6c60\u8fd8\u6ca1\u6709\u80a1\u7968\uff0c\u8bf7\u5148\u641c\u7d22\u5e76\u6dfb\u52a0\u3002'}</div> : (poolForm.stock_items || []).map((item, idx) => <div key={item.ts_code + '-' + idx} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{item.name || item.ts_code}</div><div className="factor-board-subtle">{item.ts_code}</div></div><button className="btn-link" onClick={() => removeStockFromPool(item.ts_code)}>{'\u79fb\u9664'}</button></div>)}</div>
+                            <div className="field"><label className="label">{'说明'}</label><textarea className="input" rows="2" value={poolForm.description} placeholder="记录该股票池的研究主题或选股逻辑" onChange={e => setPoolForm({ ...poolForm, description: e.target.value })}></textarea></div>
+                            <div className="field"><label className="label">{'添加股票'}</label><div className="stock-search-wrap"><input className="input" value={stockKeyword} placeholder="输入股票代码或名称" onChange={e => setStockKeyword(e.target.value)} onFocus={() => stockResults.length > 0 && setShowStockResults(true)} />{showStockResults && stockResults.length > 0 ? <div className="stock-search-dropdown">{stockResults.map(item => <div key={item.ts_code} className="stock-search-item" onMouseDown={() => addStockToPool(item)}><span>{item.name}</span><span style={{color:'var(--text-500)'}}>{item.ts_code}</span></div>)}</div> : null}</div></div>
+                            <div className="factor-board-list" style={{maxHeight: 220, overflowY: 'auto'}}>{(poolForm.stock_items || []).length === 0 ? <div className="factor-board-empty">{'当前股票池还没有股票，请先搜索并添加。'}</div> : (poolForm.stock_items || []).map((item, idx) => <div key={item.ts_code + '-' + idx} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{item.name || item.ts_code}</div><div className="factor-board-subtle">{item.ts_code}</div></div><button className="btn-link" onClick={() => removeStockFromPool(item.ts_code)}>{'移除'}</button></div>)}</div>
                         </section>
                         <section className="card space-y factor-board-panel">
                             <div>
-                                <div className="card-title" style={{marginBottom: 6}}>{'\u5df2\u4fdd\u5b58\u80a1\u7968\u6c60'}</div>
-                                <div className="factor-board-subtle">{'\u70b9\u51fb\u201c\u7528\u4e8e\u5206\u6790\u201d\u5373\u53ef\u5207\u6362\u5230\u8be5\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div>
+                                <div className="card-title" style={{marginBottom: 6}}>{'已保存股票池'}</div>
+                                <div className="factor-board-subtle">{'点击“用于分析”即可切换到该自定义股票池。'}</div>
                             </div>
-                            <div className="factor-board-list" style={{maxHeight: 240, overflowY: 'auto'}}>{(universeOptions.custom_pools || []).length === 0 ? <div className="factor-board-empty">{'\u6682\u65e0\u5df2\u4fdd\u5b58\u7684\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\u3002'}</div> : (universeOptions.custom_pools || []).map(pool => <div key={pool.id} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{pool.name}</div><div className="factor-board-subtle">{pool.stock_count}{' \u53ea\u80a1\u7968 \u00b7 '}{pool.description || '\u672a\u586b\u5199\u8bf4\u660e'}</div></div><div className="factor-board-toolbar-right"><button className="btn-link" onClick={() => { setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(pool.id) })); setShowPoolManager(false); }}>{'\u7528\u4e8e\u5206\u6790'}</button><button className="btn-link" onClick={() => editPool(pool)}>{'\u7f16\u8f91'}</button></div></div>)}</div>
+                            <div className="factor-board-list" style={{maxHeight: 240, overflowY: 'auto'}}>{(universeOptions.custom_pools || []).length === 0 ? <div className="factor-board-empty">{'暂无已保存的自定义股票池。'}</div> : (universeOptions.custom_pools || []).map(pool => <div key={pool.id} className="factor-board-list-item"><div><div style={{fontWeight: 600, color: '#f8fafc'}}>{pool.name}</div><div className="factor-board-subtle">{pool.stock_count}{' 只股票 · '}{pool.description || '未填写说明'}</div></div><div className="factor-board-toolbar-right"><button className="btn-link" onClick={() => { setAnalysisForm(prev => ({ ...prev, universe_type: 'custom', custom_pool_id: String(pool.id) })); setShowPoolManager(false); }}>{'用于分析'}</button><button className="btn-link" onClick={() => editPool(pool)}>{'编辑'}</button></div></div>)}</div>
                         </section>
                     </div>
                 </div>
@@ -5609,18 +6691,18 @@ function FactorBoardPage({ showToast }) {
                         <div className="factor-board-modal-head">
                             <div>
                                 <div className="factor-board-modal-title">{selectedFactor}</div>
-                                <div className="factor-board-modal-copy">{'\u67e5\u770b\u8be5\u56e0\u5b50\u7684\u6700\u65b0\u6279\u6b21\u8868\u73b0\u3001\u5206\u4f4d\u6536\u76ca\u66f2\u7ebf\u3001Alpha191 \u516c\u5f0f\u4e0e\u5bf9\u5e94\u6301\u4ed3\u3002'}</div>
+                                <div className="factor-board-modal-copy">{'查看该因子的最新批次表现、分位收益曲线、Alpha191 公式与对应持仓。'}</div>
                             </div>
-                            <button className="btn btn-secondary" onClick={() => setSelectedFactor(null)}>{'\u5173\u95ed'}</button>
+                            <div className="factor-board-toolbar-right"><button className="btn btn-primary" onClick={() => openStrategyFromFactor(selectedFactor, latestResult, detail.info)}>生成策略草稿</button><button className="btn btn-secondary" onClick={() => setSelectedFactor(null)}>{'关闭'}</button></div>
                         </div>
-                        {detailLoading ? <div className="factor-board-empty">{'\u6b63\u5728\u52a0\u8f7d\u56e0\u5b50\u8be6\u60c5...'}</div> : (
+                        {detailLoading ? <div className="factor-board-empty">{'正在加载因子详情...'}</div> : (
                             <div className="factor-board-modal-grid">
                                 <div className="factor-board-modal-stack">
                                     <section className="factor-board-chart-wrap">
                                         <div className="factor-board-toolbar">
                                             <div>
-                                                <div className="card-title" style={{marginBottom: 6}}>{'\u6536\u76ca\u66f2\u7ebf'}</div>
-                                                <div className="factor-board-subtle">{'\u5347\u7ea7\u4e3a\u591a\u5206\u4f4d\u540c\u5c4f\u5bf9\u6bd4\uff0c\u5e76\u652f\u6301\u6309\u533a\u95f4\u5207\u6362\u7814\u7a76\u7a97\u53e3\u3002'}</div>
+                                                <div className="card-title" style={{marginBottom: 6}}>{'收益曲线'}</div>
+                                                <div className="factor-board-subtle">{'升级为多分位同屏对比，并支持按区间切换研究窗口。'}</div>
                                             </div>
                                         </div>
                                         {chartHasData ? (
@@ -5634,10 +6716,10 @@ function FactorBoardPage({ showToast }) {
                                                 spreadSeries={spreadSeries}
                                                 spreadReturnPct={spreadReturnPct}
                                             />
-                                        ) : <div className="factor-board-empty">{'\u6682\u65e0\u8db3\u591f\u7684\u66f2\u7ebf\u6570\u636e'}</div>}
+                                        ) : <div className="factor-board-empty">{'暂无足够的曲线数据'}</div>}
                                     </section>
                                     <section className="card space-y">
-                                        <div className="card-title" style={{marginBottom: 6}}>{'\u6700\u65b0\u7ee9\u6548\u5feb\u7167'}</div>
+                                        <div className="card-title" style={{marginBottom: 6}}>{'最新绩效快照'}</div>
                                         <div className="factor-board-grid">
                                             <div className="metric-card compact"><div className="metric-label">{'高分位超额'}</div><div className={'metric-value ' + metricTextClass(latestResult && latestResult.max_quantile_excess)}>{formatPct(latestResult && latestResult.max_quantile_excess)}</div></div>
                                             <div className="metric-card compact"><div className="metric-label">{'低分位超额'}</div><div className={'metric-value ' + metricTextClass(latestResult && latestResult.min_quantile_excess)}>{formatPct(latestResult && latestResult.min_quantile_excess)}</div></div>
@@ -5650,62 +6732,62 @@ function FactorBoardPage({ showToast }) {
                                     <section className="factor-board-research-panel">
                                         <div className="factor-board-research-head">
                                             <div>
-                                                <div className="factor-board-research-kicker">{'\u7814\u7a76\u6458\u8981'}</div>
+                                                <div className="factor-board-research-kicker">{'研究摘要'}</div>
                                                 <div className="factor-board-research-title">{selectedFactor}</div>
                                                 <div className="factor-board-research-copy">{infoDescription}</div>
                                             </div>
                                             <span className={getFactorDirectionClass(latestResult)}>{getFactorDirectionLabel(latestResult)}</span>
                                         </div>
                                         <div className="factor-board-research-grid">
-                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'\u6700\u65b0\u4ea4\u6613\u65e5'}</div><div className="factor-board-research-value">{latestTradeDateLabel}</div></div>
-                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'\u9009\u4e2d\u5206\u4f4d'}</div><div className="factor-board-research-value">{'Q'}{detail.selectedQuantile}{' / '}{quantileCount}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'最新交易日'}</div><div className="factor-board-research-value">{latestTradeDateLabel}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'选中分位'}</div><div className="factor-board-research-value">{'Q'}{detail.selectedQuantile}{' / '}{quantileCount}</div></div>
                                             <div className="factor-board-research-item"><div className="factor-board-research-label">{'高分位超额'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.max_quantile_excess)}>{formatPct(latestResult && latestResult.max_quantile_excess)}</div></div>
                                             <div className="factor-board-research-item"><div className="factor-board-research-label">{'低分位超额'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.min_quantile_excess)}>{formatPct(latestResult && latestResult.min_quantile_excess)}</div></div>
-                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'IC \u5747\u503c'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.ic_mean)}>{formatNum(latestResult && latestResult.ic_mean)}</div></div>
+                                            <div className="factor-board-research-item"><div className="factor-board-research-label">{'IC 均值'}</div><div className={'factor-board-research-value ' + metricTextClass(latestResult && latestResult.ic_mean)}>{formatNum(latestResult && latestResult.ic_mean)}</div></div>
                                         </div>
                                         <div className="factor-board-tagrow">
                                             <span className="factor-board-tag">{activeUniverseLabel}</span>
-                                            <span className="factor-board-tag">{'\u533a\u95f4 '}{detail.rangeKey}</span>
-                                            <span className="factor-board-tag">{'\u8986\u76d6\u7387 '}{formatPct(latestResult && latestResult.coverage_ratio)}</span>
-                                            <span className="factor-board-tag">{'\u6362\u624b '}{formatPct(latestResult && latestResult.max_quantile_turnover)}</span>
+                                            <span className="factor-board-tag">{'区间 '}{detail.rangeKey}</span>
+                                            <span className="factor-board-tag">{'覆盖率 '}{formatPct(latestResult && latestResult.coverage_ratio)}</span>
+                                            <span className="factor-board-tag">{'换手 '}{formatPct(latestResult && latestResult.max_quantile_turnover)}</span>
                                         </div>
                                     </section>
                                     <section className="card space-y">
-                                        <div className="card-title" style={{marginBottom: 6}}>{'\u56e0\u5b50\u4ecb\u7ecd'}</div>
+                                        <div className="card-title" style={{marginBottom: 6}}>{'因子介绍'}</div>
                                         <div className="factor-board-desc-box">{infoDescription}</div>
                                     </section>
                                     <section className="card space-y">
-                                        <div className="card-title" style={{marginBottom: 6}}>{'\u7ecf\u6d4e\u5b66\u542b\u4e49'}</div>
+                                        <div className="card-title" style={{marginBottom: 6}}>{'经济学含义'}</div>
                                         <div className="factor-board-desc-box">{economicMeaning}</div>
                                     </section>
                                     <section className="card space-y">
                                         <div className="factor-board-section-head">
-                                            <div className="card-title" style={{marginBottom: 6}}>{'Alpha191 \u516c\u5f0f'}</div>
-                                            <div className="factor-board-formula-meta">{'\u771f\u5b9e\u53ef\u6267\u884c\u7248\u672c'}</div>
+                                            <div className="card-title" style={{marginBottom: 6}}>{'Alpha191 公式'}</div>
+                                            <div className="factor-board-formula-meta">{'真实可执行版本'}</div>
                                         </div>
-                                        <div className="factor-board-formula-title">{'\u516c\u5f0f\u4e0e\u53d8\u91cf\u7ed3\u6784'}</div>
-                                        <pre className="factor-board-code">{detail.info && detail.info.formula ? detail.info.formula : '\u6682\u65e0\u516c\u5f0f'}</pre>
+                                        <div className="factor-board-formula-title">{'公式与变量结构'}</div>
+                                        <pre className="factor-board-code">{detail.info && detail.info.formula ? detail.info.formula : '暂无公式'}</pre>
                                     </section>
                                     <section className="card space-y">
                                         <div className="factor-board-toolbar">
                                             <div>
-                                                <div className="card-title" style={{marginBottom: 6}}>{'\u6700\u65b0\u6301\u4ed3'}</div>
-                                                <div className="factor-board-subtle">{'\u6700\u65b0\u4ea4\u6613\u65e5 '}{latestTradeDateLabel}</div>
+                                                <div className="card-title" style={{marginBottom: 6}}>{'最新持仓'}</div>
+                                                <div className="factor-board-subtle">{'最新交易日 '}{latestTradeDateLabel}</div>
                                             </div>
                                             <div className="factor-board-subtle">{'Q'}{detail.selectedQuantile}{' / '}{quantileCount}</div>
                                         </div>
                                         <div className="factor-board-holdings-summary">
-                                            <div className="factor-board-holdings-stat"><span className="label">{'\u6301\u4ed3\u6837\u672c'}</span><span className="value">{currentHoldings.length}</span></div>
-                                            <div className="factor-board-holdings-stat"><span className="label">{'\u5e73\u5747\u6743\u91cd'}</span><span className="value">{formatRate(avgHoldingWeight)}</span></div>
-                                            <div className="factor-board-holdings-stat"><span className="label">{'\u6700\u9ad8\u6743\u91cd'}</span><span className="value">{topHolding ? topHolding.ts_code : '-'}</span></div>
+                                            <div className="factor-board-holdings-stat"><span className="label">{'持仓样本'}</span><span className="value">{currentHoldings.length}</span></div>
+                                            <div className="factor-board-holdings-stat"><span className="label">{'平均权重'}</span><span className="value">{formatRate(avgHoldingWeight)}</span></div>
+                                            <div className="factor-board-holdings-stat"><span className="label">{'最高权重'}</span><span className="value">{topHolding ? topHolding.ts_code : '-'}</span></div>
                                         </div>
-                                        {currentHoldings.length === 0 ? <div className="factor-board-empty">{'\u5f53\u524d\u5206\u4f4d\u6682\u65e0\u6301\u4ed3\u6837\u672c'}</div> : (
+                                        {currentHoldings.length === 0 ? <div className="factor-board-empty">{'当前分位暂无持仓样本'}</div> : (
                                             <div className="factor-board-list">
                                                 {currentHoldings.map((item, idx) => (
                                                     <div key={item.ts_code + '-' + idx} className="factor-board-list-item">
                                                         <div>
                                                             <div style={{fontWeight: 600, color: '#f8fafc'}}>{item.ts_code}</div>
-                                                            <div className="factor-board-subtle">{'\u56e0\u5b50\u503c '}{formatNum(item.factor_value)}{' \u00b7 \u6743\u91cd '}{formatRate(item.weight)}</div>
+                                                            <div className="factor-board-subtle">{'因子值 '}{formatNum(item.factor_value)}{' · 权重 '}{formatRate(item.weight)}</div>
                                                         </div>
                                                         <div className="text-xs text-muted">{'Q'}{item.quantile}</div>
                                                     </div>
@@ -5767,13 +6849,13 @@ function App() {
             </header>
             <main className="main">
                 {page === 'settings' && <SettingsPage showToast={showToast} />}
-                {page === 'strategy' && <StrategyPage showToast={showToast} />}
-                {page === 'backtest' && <BacktestPage showToast={showToast} />}
+                {page === 'strategy' && <StrategyPage showToast={showToast} openBacktestWithStrategy={() => setPage('backtest')} />}
+                {page === 'backtest' && <BacktestPage showToast={showToast} openHistoryWithResult={() => setPage('history')} />}
                 {page === 'portfolio' && <PortfolioPage showToast={showToast} />}
                 {page === 'market' && <MarketPage showToast={showToast} />}
                 {page === 'factor' && <FactorPage showToast={showToast} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
-                {page === 'factorboard' && <FactorBoardPage showToast={showToast} />}
+                {page === 'factorboard' && <FactorBoardPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}
                 {page === 'history' && <HistoryPage showToast={showToast} />}
                 {page === 'help' && <HelpPage showToast={showToast} />}

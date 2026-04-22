@@ -9,6 +9,7 @@ __pycache__/
 .dbmanager_venv/
 venv/
 env/
+.venv/
 
 # Databases and caches
 qtsys.db

@@ -311,6 +311,53 @@ async def get_universe_options(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/system_universe_members")
+async def get_system_universe_members(
+    code: str = Query("000905.SH"),
+    db: AsyncSession = Depends(get_db),
+):
+    universe_code = str(code or "000905.SH").strip().upper()
+    universe_map = {item["code"]: item for item in get_system_universes()}
+    universe = universe_map.get(universe_code)
+    if not universe:
+        raise HTTPException(status_code=404, detail="系统股票池不存在")
+
+    client = await require_tushare_client(db)
+    end_date = datetime.now().strftime("%Y%m%d")
+    index_weight = pd.DataFrame()
+    for lookback_days in (45, 120, 365):
+        start_date = (pd.Timestamp.today() - pd.Timedelta(days=lookback_days)).strftime("%Y%m%d")
+        candidate = client.get_index_weight(universe_code, start_date, end_date)
+        if candidate is not None and not candidate.empty:
+            index_weight = candidate
+            break
+
+    if index_weight is None or index_weight.empty:
+        raise HTTPException(status_code=404, detail="未获取到系统股票池成分数据")
+
+    frame = index_weight.copy()
+    frame["trade_date"] = frame["trade_date"].astype(str).str.replace("-", "", regex=False).str[:8]
+    frame["con_code"] = frame["con_code"].astype(str).str.strip().str.upper()
+    frame["weight"] = pd.to_numeric(frame.get("weight", 0), errors="coerce").fillna(0.0)
+    latest_trade_date = str(frame["trade_date"].max() or "")
+    latest = frame[frame["trade_date"] == latest_trade_date].copy()
+    latest = latest.sort_values(["weight", "con_code"], ascending=[False, True])
+    stock_items = [
+        {"ts_code": str(row.con_code).strip(), "name": ""}
+        for row in latest.itertuples(index=False)
+        if str(row.con_code).strip()
+    ]
+
+    return {
+        "code": universe_code,
+        "name": universe.get("name") or universe_code,
+        "benchmark_code": universe.get("benchmark_code") or universe_code,
+        "trade_date": latest_trade_date,
+        "stock_items": stock_items,
+        "stock_count": len(stock_items),
+    }
+
+
 @router.get("/custom_pools")
 async def list_custom_pools(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(StockPool).order_by(StockPool.updated_at.desc(), StockPool.id.desc()))

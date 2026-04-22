@@ -7,13 +7,14 @@ QTsys 是一个面向量化研究与回测的本地化系统，集成了数据�
 ### 1. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ### 2. 启动系统
 
 ```bash
-python main.py
+.\.venv\Scripts\python.exe main.py
 ```
 
 启动后访问：
@@ -21,7 +22,37 @@ python main.py
 - 本地地址：`http://127.0.0.1:8000`
 - 局域网地址：`http://0.0.0.0:8000`
 
-### 3. 首次使用建议顺序
+### 3. 在 VSCode 内实时预览页面
+
+项目已预置 Live Server 工作区配置，前端可直接在 VSCode 内左右分栏调试：
+
+1. 在 VSCode 中打开本项目根目录 `QTsys`
+2. 首次按 `Ctrl+Shift+P`，执行 `Python: Select Interpreter`，选择 `.venv\Scripts\python.exe`
+3. 执行任务 `Terminal -> Run Task -> QTsys: 启动后端`
+4. 在资源管理器中选中根目录 `index.html`
+5. 点击右下角 `Go Live`
+6. 按 `Ctrl+Shift+P`，执行 `Simple Browser: Show`
+7. 输入 `http://127.0.0.1:5500/index.html`
+8. 将 Simple Browser 标签拖到右侧编辑器组，即可左侧看代码、右侧看页面
+
+说明：
+
+- Live Server 端口固定为 `5500`
+- `/api` 请求已自动代理到后端 `http://127.0.0.1:8000`
+- 若修改前端 `static/index.html`，右侧预览会自动刷新
+- 工作区默认解释器为 `.venv\Scripts\python.exe`
+
+### 为什么使用 `.venv`
+
+项目依赖包含 `fastapi`、`sqlalchemy`、`pydantic`、`numpy` 等固定版本。若安装到全局或 Anaconda base 环境，容易出现：
+
+- 缺包，例如 `ModuleNotFoundError: sqlalchemy`
+- 版本冲突，影响其他项目
+- VSCode 任务、终端、调试器使用了不同解释器
+
+因此本项目默认使用仓库内独立虚拟环境 `.venv`
+
+### 4. 首次使用建议顺序
 
 1. 进入“设置”页配置 `Tushare Token`
 2. 如需使用因子看板，配置 MySQL 连接
@@ -31,6 +62,7 @@ python main.py
 ## 核心功能
 
 - 策略管理：创建、编辑、保存与回测交易策略
+- AI 策略助手：对话式生成量化策略，并直接保存到策略库
 - 回测分析：收益、回撤、风险指标、归因与组合分析
 - 因子研究：因子表达式、工作流、Alpha191 模板加载
 - 因子看板：Alpha191 批量回测、收益总览、分位收益曲线、因子详情
@@ -60,6 +92,7 @@ python main.py
 | 项目 | 作用 | 是否必需 |
 |---|---|---|
 | `Tushare Token` | 获取行情、指数成分、基础证券数据 | 是 |
+| `LLM API Key / Base URL / Model` | AI 策略助手、因子挖掘、新闻分析 | 使用 AI 功能时必需 |
 | SQLite | 系统主库，保存设置、业务元数据 | 是 |
 | MySQL | 因子看板行情缓存与分析结果库 | 因子看板必需 |
 
@@ -91,6 +124,7 @@ python main.py
 - `docs/quick_start.md`
 - `docs/project_structure.md`
 - `docs/factor_board_guide.md`
+- `docs/ai_strategy_assistant.md`
 - `docs/delivery_summary.md`
 
 ## 常见问题
@@ -120,3 +154,14 @@ python main.py
 - MySQL 连接失败
 - 自定义股票池为空
 - 当前已有分析任务正在运行
+
+### 5. AI 策略助手无法生成策略
+
+优先检查：
+
+- 设置页是否已保存 `API Key`、`接口地址`、`模型名称`
+- 所填地址是否是可访问的 OpenAI 兼容 `chat/completions` 接口或其根路径
+- 当前网络是否允许访问该模型服务
+- 返回错误是否提示 404/403：这通常说明地址路径不兼容，而不是系统内部错误
+
+针对本次 FoxCode / NewCLI 渠道的实测可用配置，见 `docs/ai_strategy_assistant.md`

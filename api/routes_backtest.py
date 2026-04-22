@@ -6,21 +6,27 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
-from typing import Any
+from pydantic import BaseModel, Field
+from typing import Any, Optional
 from database.connection import get_db
 from database.models import Settings, Strategy, BacktestResult
 from data.tushare_client import TushareClient
 from data.data_cache import DataCache
 from engine.backtest_engine import BacktestEngine
 from strategy.strategy_loader import load_strategy
-from services.backtest_service import run_backtest_workflow
+from services.backtest_service import resolve_backtest_universe, run_backtest_workflow
+from services.settings_service import get_or_create_settings
 
 router = APIRouter(prefix="/api/backtest", tags=["backtest"])
 
 
 class BacktestRequest(BaseModel):
     strategy_id: int
+    universe_type: Optional[str] = None
+    universe_code: Optional[str] = None
+    universe_name: Optional[str] = None
+    custom_pool_id: Optional[int] = None
+    stock_items: list[dict[str, Any]] = Field(default_factory=list)
     universe: list[str]  # 股票代码列表
     start_date: str       # YYYYMMDD
     end_date: str
@@ -43,6 +49,11 @@ async def run_backtest(req: BacktestRequest, db: AsyncSession = Depends(get_db))
             benchmark=req.benchmark,
             max_position_pct=req.max_position_pct,
             max_drawdown_limit=req.max_drawdown_limit,
+            universe_type=req.universe_type,
+            universe_code=req.universe_code,
+            universe_name=req.universe_name,
+            custom_pool_id=req.custom_pool_id,
+            stock_items=req.stock_items,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -101,6 +112,11 @@ async def get_result(result_id: int, db: AsyncSession = Depends(get_db)):
 class OptimizeRequest(BaseModel):
     strategy_id: int
     universe: list[str]
+    universe_type: Optional[str] = None
+    universe_code: Optional[str] = None
+    universe_name: Optional[str] = None
+    custom_pool_id: Optional[int] = None
+    stock_items: list[dict[str, Any]] = Field(default_factory=list)
     start_date: str
     end_date: str
     param_grid: dict[str, list[Any]]
@@ -111,8 +127,7 @@ class OptimizeRequest(BaseModel):
 @router.post("/optimize")
 async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
     """网格搜索策略参数优化"""
-    result = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = result.scalar_one_or_none()
+    settings = await get_or_create_settings(db)
     if not settings or not settings.tushare_token:
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
 
@@ -126,12 +141,22 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
     client = TushareClient(settings.tushare_token)
     from data.data_cache import make_mysql_conn
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
+    resolved_universe = await resolve_backtest_universe(
+        db,
+        settings,
+        universe=req.universe,
+        universe_type=req.universe_type,
+        universe_code=req.universe_code,
+        universe_name=req.universe_name,
+        custom_pool_id=req.custom_pool_id,
+        stock_items=req.stock_items,
+    )
 
     results = await asyncio.to_thread(
         grid_search,
         strategy_code=strategy.code,
         param_grid=req.param_grid,
-        universe=req.universe,
+        universe=resolved_universe["codes"],
         start_date=req.start_date,
         end_date=req.end_date,
         cache=cache,
@@ -150,6 +175,11 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
 class WalkForwardRequest(BaseModel):
     strategy_id: int
     universe: list[str]
+    universe_type: Optional[str] = None
+    universe_code: Optional[str] = None
+    universe_name: Optional[str] = None
+    custom_pool_id: Optional[int] = None
+    stock_items: list[dict[str, Any]] = Field(default_factory=list)
     start_date: str
     end_date: str
     param_grid: dict[str, list[Any]]
@@ -162,8 +192,7 @@ class WalkForwardRequest(BaseModel):
 @router.post("/walk_forward")
 async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depends(get_db)):
     """Walk-Forward滚动验证 - 检测策略过拟合"""
-    result = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = result.scalar_one_or_none()
+    settings = await get_or_create_settings(db)
     if not settings or not settings.tushare_token:
         raise HTTPException(status_code=400, detail="请先配置Tushare Token")
 
@@ -177,12 +206,22 @@ async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depe
     client = TushareClient(settings.tushare_token)
     from data.data_cache import make_mysql_conn
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
+    resolved_universe = await resolve_backtest_universe(
+        db,
+        settings,
+        universe=req.universe,
+        universe_type=req.universe_type,
+        universe_code=req.universe_code,
+        universe_name=req.universe_name,
+        custom_pool_id=req.custom_pool_id,
+        stock_items=req.stock_items,
+    )
 
     wf_result = await asyncio.to_thread(
         walk_forward,
         strategy_code=strategy.code,
         param_grid=req.param_grid,
-        universe=req.universe,
+        universe=resolved_universe["codes"],
         full_start=req.start_date,
         full_end=req.end_date,
         cache=cache,

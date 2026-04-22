@@ -216,29 +216,24 @@ async def analyze_with_llm(
     api_key: str, base_url: str, model: str,
 ) -> dict:
     """使用LLM进行深度分析"""
-    import aiohttp
     import json
+    from services.llm_gateway import chat_complete_text
 
     prompt = LLM_ANALYSIS_PROMPT.format(title=title, summary=summary[:300])
-    url = base_url.rstrip("/") + "/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3, "max_tokens": 500,
-    }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload,
-                                    timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status != 200:
-                    return {}
-                data = await resp.json()
-                text = data["choices"][0]["message"]["content"]
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                if start >= 0 and end > start:
-                    return json.loads(text[start:end])
+        result = await chat_complete_text(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=500,
+        )
+        text = result["content"]
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
     except Exception:
         logger.exception("LLM分析异常")
     return {}

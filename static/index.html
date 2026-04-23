@@ -1853,6 +1853,7 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
     const [factorCatalog, setFactorCatalog] = useState([]);
     const [factorSearch, setFactorSearch] = useState('');
     const [includeMarketContext, setIncludeMarketContext] = useState(true);
+    const [deleteTarget, setDeleteTarget] = useState(null);
     const selectedIdRef = useRef(null);
     const pendingBacktestContextRef = useRef(null);
     const [aiMessages, setAiMessages] = useState([
@@ -2009,24 +2010,36 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
 
     const delStrategy = async (id) => {
         if (deletingId === id) return;
-        if (!window.confirm('确认删除该策略吗？删除后不会自动恢复。')) return;
         setDeletingId(id);
         try {
             await api.remove('/api/strategies/' + id);
             clearStrategyBacktestContext(id);
-            setStrategies(prev => prev.filter(item => item.id !== id));
+            const nextStrategies = strategies.filter(item => item.id !== id);
+            setStrategies(nextStrategies);
             if (selected && selected.id === id) {
-                setSelected(null);
-                setName('');
-                setDesc('');
-                setCode('');
+                const nextSelected = nextStrategies[0] || null;
+                setSelected(nextSelected);
+                setName(nextSelected ? (nextSelected.name || '') : '');
+                setDesc(nextSelected ? (nextSelected.description || '') : '');
+                setCode(nextSelected ? (nextSelected.code || '') : '');
+                selectedIdRef.current = nextSelected ? nextSelected.id : null;
             }
+            setDeleteTarget(null);
             await load();
             showToast('策略已删除', 'success');
         } catch (e) {
             showToast((e && e.detail) || '删除策略失败', 'error');
         }
         setDeletingId(null);
+    };
+
+    const requestDeleteStrategy = (strategy, event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        if (!strategy || !strategy.id) return;
+        setDeleteTarget(strategy);
     };
 
     const insertFactorSnippet = (factor, mode) => {
@@ -2143,7 +2156,7 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
                             <div className="strategy-item-name">{strategy.name}</div>
                             <div className="strategy-item-desc">#{strategy.id}</div>
                             <div className="strategy-item-desc">{strategy.description || '暂无描述'}</div>
-                            <button className="btn-danger mt-2" disabled={deletingId === strategy.id} onClick={(e) => { e.stopPropagation(); delStrategy(strategy.id); }}>
+                            <button type="button" className="btn-danger mt-2" disabled={deletingId === strategy.id} onClick={(e) => requestDeleteStrategy(strategy, e)}>
                                 {deletingId === strategy.id ? '删除中...' : '删除'}
                             </button>
                         </div>
@@ -2313,6 +2326,30 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
                     </button>
                 </div>
             </div>
+            {deleteTarget ? (
+                <div className="factor-board-modal" onClick={() => setDeleteTarget(null)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()} style={{maxWidth: 520}}>
+                        <div className="factor-board-modal-head" style={{marginBottom: 12}}>
+                            <div>
+                                <div className="factor-board-modal-title" style={{fontSize: 22}}>确认删除策略</div>
+                                <div className="factor-board-modal-copy" style={{marginTop: 8}}>
+                                    将要删除策略：{deleteTarget.name || `#${deleteTarget.id}`}。删除后不会自动恢复，相关联的本地回测上下文也会一并清除。
+                                </div>
+                            </div>
+                        </div>
+                        <div className="strategy-mini-card" style={{marginBottom: 16}}>
+                            <div className="strategy-mini-label">策略信息</div>
+                            <div className="strategy-mini-value">#{deleteTarget.id} · {deleteTarget.description || '暂无描述'}</div>
+                        </div>
+                        <div className="strategy-toolbar-actions" style={{justifyContent: 'flex-end'}}>
+                            <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)} disabled={deletingId === deleteTarget.id}>取消</button>
+                            <button type="button" className="btn btn-primary" onClick={() => delStrategy(deleteTarget.id)} disabled={deletingId === deleteTarget.id}>
+                                {deletingId === deleteTarget.id ? '删除中...' : '确认删除'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -8456,7 +8493,31 @@ function FactorBoardPage({ showToast, openStrategyWorkspace }) {
 
 /* ===== Main App ===== */
 function App() {
-    const [page, setPage] = useState('backtest');
+    const pageNavItems = [
+        { key: 'backtest', label: '回测' },
+        { key: 'strategy', label: '策略' },
+        { key: 'portfolio', label: '组合' },
+        { key: 'market', label: '看盘' },
+        { key: 'factor', label: '因子' },
+        { key: 'workflow', label: '因子工作流' },
+        { key: 'factorboard', label: '因子看板' },
+        { key: 'news', label: '新闻' },
+        { key: 'history', label: '历史' },
+        { key: 'settings', label: '设置' },
+        { key: 'help', label: '帮助' },
+    ];
+    const resolveInitialPage = () => {
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const pageParam = params.get('page');
+            const hashPage = (window.location.hash || '').replace(/^#/, '');
+            const allowed = new Set(pageNavItems.map(item => item.key));
+            if (pageParam && allowed.has(pageParam)) return pageParam;
+            if (hashPage && allowed.has(hashPage)) return hashPage;
+        } catch (_) {}
+        return 'backtest';
+    };
+    const [page, setPage] = useState(resolveInitialPage);
     const [toast, setToast] = useState(null);
     const [sysVersion, setSysVersion] = useState('');
     const showToast = (message, type) => setToast({ message, type: type || 'info' });
@@ -8464,6 +8525,15 @@ function App() {
     useEffect(() => {
         api.get('/api/system/version').then(v => setSysVersion(v.version || '')).catch(() => {});
     }, []);
+
+    useEffect(() => {
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', page);
+            url.hash = page;
+            window.history.replaceState({}, '', url.toString());
+        } catch (_) {}
+    }, [page]);
 
     const navItems = [
         { key: 'backtest', label: '回测' },

@@ -1,0 +1,89 @@
+Create a premium dark-theme software architecture diagram for a quantitative trading platform named QTsys.
+
+Style:
+- modern enterprise technical infographic
+- polished UI presentation quality
+- dark navy background with blue, cyan, and violet accents
+- clean geometry, soft glow, thin connector arrows
+- highly legible labels
+- no watermark
+- English only
+
+Layout:
+- horizontal layered architecture, widescreen 1536x1024
+- clear sections with rounded cards
+- directional arrows from top to bottom and left to right
+
+Title:
+- QTsys Quant Research & Trading Platform
+
+Layer 1: Frontend
+- Browser UI
+- static/index.html
+- React UI
+- Recharts
+- CodeMirror
+- Main modules: Strategy, Backtest, Factor Board, Factor Library, Market, News, Settings, AI Strategy
+
+Layer 2: API / Application Entry
+- main.py
+- FastAPI
+- routes_strategy.py
+- routes_backtest.py
+- routes_factor.py
+- routes_factor_board.py
+- routes_market.py
+- routes_news.py
+- routes_settings.py
+
+Layer 3: Services
+- strategy_ai_service.py
+- backtest_service.py
+- factor_service.py
+- factor_board_service.py
+- factor_catalog_service.py
+- settings_service.py
+- llm_gateway.py
+
+Layer 4: Core Engine
+- backtest_engine.py
+- broker.py
+- portfolio.py
+- risk.py
+- metrics.py
+- optimizer.py
+- factor_engine.py
+- factor_board_analyzer.py
+
+Layer 5: Data & Persistence
+- database models
+- SQLite primary database
+- runtime/data/cache
+- data_cache.py
+- tushare_client.py
+- optional MySQL quote cache
+
+Side domain assets:
+- Alpha191 factor library
+- builtin strategy library
+- custom strategy workspace
+- news scraper and analyzer
+
+External systems on the right side:
+- Tushare Market Data
+- LLM / AI Gateway
+- Image API
+- Web News Sources
+
+Data flow:
+- Frontend -> API -> Services -> Core Engine -> Data
+- Services <-> Alpha191 factor library
+- Services <-> builtin strategy library
+- Services <-> external systems
+- Data cache feeds factor board and backtest engine
+
+Constraints:
+- do not invent modules
+- keep labels concise and accurate
+- make architecture relationships visually obvious
+- text must be readable

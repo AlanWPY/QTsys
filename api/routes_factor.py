@@ -13,6 +13,7 @@ from database.models import Settings, Factor, FactorResult
 from factor.builtin_factors import BUILTIN_FACTORS
 from factor.alpha191_templates import get_alpha191_formula
 from factor.expression_to_graph import ExpressionToGraph
+from services.factor_catalog_service import load_factor_catalog
 from services.factor_service import evaluate_factor_workflow, mine_gp_workflow
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
@@ -65,6 +66,11 @@ async def list_factors(db: AsyncSession = Depends(get_db)):
         }
         for f in factors
     ]
+
+
+@router.get("/catalog")
+async def get_factor_catalog(db: AsyncSession = Depends(get_db)):
+    return {"factors": await load_factor_catalog(db)}
 
 
 @router.post("")

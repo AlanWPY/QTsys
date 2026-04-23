@@ -36,10 +36,11 @@ def normalize_base_url(base_url: str) -> str:
         return trimmed
     parsed = urlparse(trimmed)
     if parsed.netloc == "code.newcli.com":
-        parts = [part for part in parsed.path.split("/") if part]
-        if parts:
-            provider = parts[0]
-            return f"{parsed.scheme}://{parsed.netloc}/{provider}/v1"
+        normalized_path = parsed.path.rstrip("/")
+        if normalized_path.endswith("/v1"):
+            return f"{parsed.scheme}://{parsed.netloc}{normalized_path}"
+        if normalized_path:
+            return f"{parsed.scheme}://{parsed.netloc}{normalized_path}/v1"
         return f"{parsed.scheme}://{parsed.netloc}/v1"
     if trimmed.endswith("/chat/completions"):
         return trimmed[: -len("/chat/completions")]
@@ -62,6 +63,14 @@ def build_models_url(base_url: str) -> str:
     if normalized.endswith("/models"):
         return normalized
     return normalized.rstrip("/") + "/models"
+
+
+def is_newcli_claude_base(base_url: str) -> bool:
+    parsed = urlparse((base_url or "").strip())
+    if parsed.netloc != "code.newcli.com":
+        return False
+    path = parsed.path.rstrip("/")
+    return path == "/claude" or path.startswith("/claude/")
 
 
 async def list_models(api_key: str, base_url: str) -> list[str]:
@@ -110,6 +119,25 @@ def _coerce_message_content(content: Any) -> str:
     return str(content or "").strip()
 
 
+def _extract_system_and_messages(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]:
+    system_parts: list[str] = []
+    converted: list[dict[str, str]] = []
+    for item in messages:
+        role = (item.get("role") or "user").strip()
+        content = _coerce_message_content(item.get("content"))
+        if not content:
+            continue
+        if role == "system":
+            system_parts.append(content)
+            continue
+        if role not in {"user", "assistant"}:
+            role = "user"
+        converted.append({"role": role, "content": content})
+    if not converted:
+        converted.append({"role": "user", "content": "Hello"})
+    return "\n\n".join(system_parts).strip(), converted
+
+
 def resolve_model_candidates(model: str, available_models: list[str] | None = None) -> list[str]:
     requested = (model or "").strip()
     available = available_models or []
@@ -138,49 +166,90 @@ async def chat_complete_text(
     max_tokens: int = 2000,
 ) -> dict[str, Any]:
     normalized_base = normalize_base_url(base_url)
-    url = build_chat_completions_url(normalized_base)
-    available_models = await list_models(api_key, normalized_base)
+    use_anthropic_messages = is_newcli_claude_base(base_url)
+    url = normalized_base.rstrip("/") + "/messages" if use_anthropic_messages else build_chat_completions_url(normalized_base)
+    available_models = [] if use_anthropic_messages else await list_models(api_key, normalized_base)
     model_candidates = resolve_model_candidates(model, available_models)
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    headers = (
+        {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        if use_anthropic_messages
+        else {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+    )
     timeout = aiohttp.ClientTimeout(total=120)
     last_error = "未知错误"
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        for candidate_model in model_candidates:
-            payload = {
+    def payload_variants(candidate_model: str) -> list[dict[str, Any]]:
+        if use_anthropic_messages:
+            system_text, anthropic_messages = _extract_system_and_messages(messages)
+            base_payload = {
                 "model": candidate_model,
-                "messages": messages,
-                "temperature": temperature,
+                "messages": anthropic_messages,
                 "max_tokens": max_tokens,
             }
-            try:
-                async with session.post(url, headers=headers, json=payload) as resp:
-                    body = await resp.text()
-                    if resp.status != 200:
-                        last_error = f"HTTP {resp.status} - {body[:400]}"
-                        continue
-                    data = json.loads(body)
-                    choices = data.get("choices") or []
-                    if not choices:
-                        last_error = "返回结果中没有 choices"
-                        continue
-                    message = choices[0].get("message") or {}
-                    content = _coerce_message_content(message.get("content"))
-                    if not content:
-                        last_error = "返回结果中没有 message.content"
-                        continue
-                    return {
-                        "content": content,
-                        "model": data.get("model") or candidate_model,
-                        "base_url": normalized_base,
-                        "available_models": available_models,
-                    }
-            except Exception as exc:
-                last_error = str(exc)
+            variants = [
+                {**base_payload, "system": system_text} if system_text else base_payload,
+                {**base_payload, "system": system_text, "temperature": temperature} if system_text else {**base_payload, "temperature": temperature},
+            ]
+        else:
+            base_payload = {
+                "model": candidate_model,
+                "messages": messages,
+            }
+            variants = [
+                {**base_payload, "temperature": temperature, "max_tokens": max_tokens},
+                {**base_payload, "max_tokens": max_tokens},
+                {**base_payload, "max_completion_tokens": max_tokens},
+                base_payload,
+            ]
+        deduped: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in variants:
+            marker = json.dumps(item, ensure_ascii=False, sort_keys=True)
+            if marker in seen:
                 continue
+            seen.add(marker)
+            deduped.append(item)
+        return deduped
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for candidate_model in model_candidates:
+            for payload in payload_variants(candidate_model):
+                try:
+                    async with session.post(url, headers=headers, json=payload) as resp:
+                        body = await resp.text()
+                        if resp.status != 200:
+                            last_error = f"HTTP {resp.status} - {body[:400]}"
+                            continue
+                        data = json.loads(body)
+                        if use_anthropic_messages:
+                            blocks = data.get("content") or []
+                            content = _coerce_message_content([item.get("text", "") for item in blocks if item.get("type") == "text"])
+                        else:
+                            choices = data.get("choices") or []
+                            if not choices:
+                                last_error = "返回结果中没有 choices"
+                                continue
+                            message = choices[0].get("message") or {}
+                            content = _coerce_message_content(message.get("content"))
+                        if not content:
+                            last_error = "返回结果中没有可解析文本"
+                            continue
+                        return {
+                            "content": content,
+                            "model": data.get("model") or candidate_model,
+                            "base_url": normalized_base,
+                            "available_models": available_models,
+                        }
+                except Exception as exc:
+                    last_error = str(exc)
+                    continue
 
     raise RuntimeError(
         f"LLM 调用失败：已尝试 {url}，模型候选 {model_candidates[:6]}，最后错误：{last_error}"

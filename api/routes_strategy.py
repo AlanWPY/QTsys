@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db
 from database.models import Strategy
 from services.strategy_ai_service import STRATEGY_AI_SKILLS, generate_strategy_with_ai
+from services.text_normalizer import normalize_text_payload, repair_text
 from strategy.builtin.bollinger_breakout import BOLLINGER_BREAKOUT_CODE
 from strategy.builtin.ma_cross import MA_CROSS_CODE
 from strategy.builtin.macd_signal import MACD_SIGNAL_CODE
@@ -104,14 +105,14 @@ class StrategyAIGenerateRequest(BaseModel):
 
 
 def _strategy_to_dict(strategy: Strategy) -> dict[str, Any]:
-    return {
+    return normalize_text_payload({
         "id": strategy.id,
-        "name": strategy.name,
-        "description": strategy.description or "",
+        "name": repair_text(strategy.name),
+        "description": repair_text(strategy.description or ""),
         "code": strategy.code,
         "created_at": strategy.created_at.isoformat() if strategy.created_at else "",
         "updated_at": strategy.updated_at.isoformat() if strategy.updated_at else "",
-    }
+    })
 
 
 @router.get("/ai/skills")
@@ -140,14 +141,14 @@ async def generate_strategy_ai(
     if req.save:
         strategy_payload = result["strategy"]
         strategy = Strategy(
-            name=strategy_payload["name"],
-            description=strategy_payload["description"],
+            name=repair_text(strategy_payload["name"]),
+            description=repair_text(strategy_payload["description"]),
             code=strategy_payload["code"],
         )
         db.add(strategy)
         await db.commit()
         await db.refresh(strategy)
-        saved_strategy = {"id": strategy.id, "name": strategy.name}
+        saved_strategy = {"id": strategy.id, "name": repair_text(strategy.name)}
 
     return {
         **result,
@@ -173,11 +174,11 @@ async def get_strategy(strategy_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("")
 async def create_strategy(data: StrategyCreate, db: AsyncSession = Depends(get_db)):
-    strategy = Strategy(name=data.name, description=data.description, code=data.code)
+    strategy = Strategy(name=repair_text(data.name), description=repair_text(data.description), code=data.code)
     db.add(strategy)
     await db.commit()
     await db.refresh(strategy)
-    return {"id": strategy.id, "name": strategy.name}
+    return normalize_text_payload({"id": strategy.id, "name": repair_text(strategy.name)})
 
 
 @router.put("/{strategy_id}")
@@ -192,10 +193,10 @@ async def update_strategy(
         raise HTTPException(status_code=404, detail="策略不存在")
 
     for field, value in data.model_dump(exclude_none=True).items():
-        setattr(strategy, field, value)
+        setattr(strategy, field, repair_text(value) if field in {"name", "description"} and isinstance(value, str) else value)
     await db.commit()
     await db.refresh(strategy)
-    return {"id": strategy.id, "name": strategy.name}
+    return normalize_text_payload({"id": strategy.id, "name": repair_text(strategy.name)})
 
 
 @router.delete("/{strategy_id}")
@@ -207,7 +208,7 @@ async def delete_strategy(strategy_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.delete(strategy)
     await db.commit()
-    return {"message": "已删除"}
+    return {"message": "已删除", "id": strategy_id}
 
 
 @router.post("/init_builtin")

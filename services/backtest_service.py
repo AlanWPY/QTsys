@@ -11,8 +11,48 @@ from data.data_cache import DataCache, make_mysql_conn
 from data.tushare_client import TushareClient
 from engine.backtest_engine import BacktestEngine
 from services.factor_board_service import get_system_universes
+from services.factor_catalog_service import load_factor_catalog
 from services.settings_service import get_or_create_settings
 from strategy.strategy_loader import load_strategy
+
+
+def _detect_required_history_fields(strategy_code: str) -> set[str]:
+    required = set()
+    code = strategy_code or ""
+    for field in ("turnover_rate", "volume", "vol", "open", "high", "low", "close", "amount"):
+        if f"'{field}'" in code or f'"{field}"' in code:
+            required.add(field)
+    return required
+
+
+def infer_strategy_profile(strategy_code: str, resolved_codes: list[str]) -> dict:
+    code = (strategy_code or "").lower()
+    uses_universe = "context.universe" in code
+    has_rebalance = any(token in code for token in ["rebalance", "target_stocks", "select_count", "candidates", "sorted("])
+    has_single_asset_bias = any(token in code for token in ["holding_stock", "context.holding_stock"])
+    holds_many = any(token in code for token in ["max_positions", "target_weight", "order_target_percent"])
+
+    if uses_universe and (has_rebalance or holds_many):
+        strategy_type = "选股策略"
+    elif len(resolved_codes) <= 3 or has_single_asset_bias:
+        strategy_type = "择时策略"
+    else:
+        strategy_type = "混合策略"
+
+    execution_scope = "多标的" if len(resolved_codes) > 1 else "单标的"
+    notes = []
+    if uses_universe:
+        notes.append("使用 context.universe 作为股票池入口")
+    if has_rebalance:
+        notes.append("包含排序/调仓/候选集逻辑")
+    if has_single_asset_bias:
+        notes.append("包含单标的持仓控制逻辑")
+    return {
+        "strategy_type": strategy_type,
+        "execution_scope": execution_scope,
+        "universe_size": len(resolved_codes),
+        "notes": notes,
+    }
 
 
 def _normalize_codes(items: list[str]) -> list[str]:
@@ -104,14 +144,17 @@ async def resolve_backtest_universe(
         if not universe_meta:
             raise ValueError("系统股票池不存在")
         client = TushareClient(settings.tushare_token)
+        aux_cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
         end_date = pd.Timestamp.today().strftime("%Y%m%d")
-        index_weight = pd.DataFrame()
-        for lookback_days in (45, 120, 365):
-            start_date = (pd.Timestamp.today() - pd.Timedelta(days=lookback_days)).strftime("%Y%m%d")
-            candidate = client.get_index_weight(normalized_code, start_date, end_date)
-            if candidate is not None and not candidate.empty:
-                index_weight = candidate
-                break
+        start_date = (pd.Timestamp.today() - pd.Timedelta(days=365)).strftime("%Y%m%d")
+        try:
+            index_weight = aux_cache.get_index_weight(normalized_code, start_date, end_date)
+        finally:
+            if aux_cache.mysql:
+                try:
+                    aux_cache.mysql.close()
+                except Exception:
+                    pass
         if index_weight is None or index_weight.empty:
             raise ValueError("系统股票池暂无可用成分股")
         frame = index_weight.copy()
@@ -171,6 +214,7 @@ async def run_backtest_workflow(
         raise LookupError("策略不存在")
 
     init_func, handle_func = load_strategy(strategy.code)
+    required_fields = _detect_required_history_fields(strategy.code)
     resolved_universe = await resolve_backtest_universe(
         db,
         settings,
@@ -185,6 +229,7 @@ async def run_backtest_workflow(
 
     client = TushareClient(settings.tushare_token)
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
+    factor_catalog = await load_factor_catalog(db)
     engine = BacktestEngine(
         cache=cache,
         initial_cash=initial_cash,
@@ -204,6 +249,8 @@ async def run_backtest_workflow(
         initialize_func=init_func,
         handle_data_func=handle_func,
         benchmark=benchmark,
+        required_fields=required_fields,
+        factor_catalog=factor_catalog,
     )
     if "error" in result_data:
         raise ValueError(result_data["error"])
@@ -226,6 +273,8 @@ async def run_backtest_workflow(
     await db.commit()
     await db.refresh(bt_result)
 
+    strategy_profile = infer_strategy_profile(strategy.code, resolved_codes)
+
     return {
         "id": bt_result.id,
         "metrics": result_data["metrics"],
@@ -236,4 +285,6 @@ async def run_backtest_workflow(
         "benchmark_curve": result_data.get("benchmark_curve", []),
         "universe": resolved_universe["universe_label"],
         "resolved_universe_count": len(resolved_codes),
+        "strategy_profile": strategy_profile,
+        "factor_catalog_count": len(factor_catalog),
     }

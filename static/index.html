@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>QTsys - 量化交易回测系统 [Alpha191-v2.2-Fixed]</title>
+    <title>QTsys - 量化交易分析回测系统 v26.4.22</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/static/lib/codemirror.css">
     <link rel="stylesheet" href="/static/lib/dracula.css">
@@ -237,6 +237,12 @@ tr:hover td { background: var(--bg-600); }
 .strategy-ai-market-title { font-size: 12px; font-weight: 600; color: var(--text-200); line-height: 1.5; }
 .strategy-ai-market-meta { margin-top: 4px; font-size: 11px; color: var(--text-500); }
 .strategy-ai-market-summary { margin-top: 6px; font-size: 12px; color: var(--text-400); line-height: 1.6; }
+.strategy-factor-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.strategy-factor-item { padding: 10px 12px; border-radius: 12px; background: rgba(15,23,42,0.52); border: 1px solid rgba(148,163,184,0.08); }
+.strategy-factor-name { font-size: 13px; font-weight: 700; color: var(--text-100); }
+.strategy-factor-meta { margin-top: 4px; font-size: 11px; color: var(--text-500); }
+.strategy-factor-desc { margin-top: 6px; font-size: 12px; color: var(--text-400); line-height: 1.6; }
+.strategy-factor-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .strategy-editor-tip { display: flex; flex-wrap: wrap; gap: 10px; }
 .strategy-empty-hint { text-align: center; color: var(--text-500); font-size: 12px; padding: 24px 12px; }
 
@@ -307,13 +313,51 @@ tr:hover td { background: var(--bg-600); }
 .backtest-risk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .backtest-runbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .backtest-runhint { font-size: 12px; color: var(--text-500); }
+.insight-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; }
+.insight-card {
+    background: rgba(15, 23, 42, 0.66);
+    border: 1px solid rgba(148, 163, 184, 0.10);
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+.insight-title { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 10px; }
+.insight-copy { font-size: 12px; color: var(--text-400); line-height: 1.7; }
+.insight-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.insight-metric-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.04em; }
+.insight-metric-value { font-size: 18px; font-weight: 700; color: #f8fafc; margin-top: 5px; }
+.insight-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.insight-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #dbeafe;
+    background: rgba(59, 130, 246, 0.10);
+    border: 1px solid rgba(96, 165, 250, 0.16);
+}
+.insight-list { display: flex; flex-direction: column; gap: 10px; }
+.insight-list-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+.insight-list-item:last-child { border-bottom: none; padding-bottom: 0; }
+.insight-list-label { font-size: 12px; color: var(--text-400); }
+.insight-list-value { font-size: 13px; color: #f8fafc; font-weight: 600; text-align: right; }
 @media (max-width: 1080px) {
     .backtest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .backtest-risk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .backtest-pool-panel { grid-template-columns: 1fr; }
+    .insight-grid { grid-template-columns: 1fr; }
+    .insight-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
     .backtest-grid, .backtest-risk-grid { grid-template-columns: 1fr; }
+    .insight-metrics { grid-template-columns: 1fr; }
 }
 @media (max-width: 1280px) {
     .strategy-layout { grid-template-columns: 240px minmax(0, 1fr); }
@@ -330,6 +374,30 @@ tr:hover td { background: var(--bg-600); }
 .history-item { background: var(--bg-700); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
 .history-item:hover { background: var(--bg-600); }
 .history-return { font-size: 18px; font-weight: 700; }
+.history-toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+.history-filter-grid { display: grid; grid-template-columns: 1.2fr 160px 160px 160px; gap: 10px; width: 100%; }
+.history-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.history-mini-card { background: rgba(15, 23, 42, 0.66); border: 1px solid rgba(148, 163, 184, 0.10); border-radius: 14px; padding: 12px 14px; }
+.history-mini-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.05em; }
+.history-mini-value { margin-top: 6px; font-size: 18px; font-weight: 700; color: #f8fafc; }
+.history-mini-meta { margin-top: 4px; font-size: 12px; color: var(--text-400); }
+.history-item-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.history-item-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.history-chip { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; font-size: 11px; color: #dbeafe; background: rgba(59,130,246,0.10); border: 1px solid rgba(96,165,250,0.14); }
+.history-compare-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px; }
+.history-compare-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.history-leader-list { display: flex; flex-direction: column; gap: 10px; }
+.history-leader-item { padding: 10px 12px; border-radius: 12px; background: rgba(15, 23, 42, 0.60); border: 1px solid rgba(148, 163, 184, 0.08); }
+.history-leader-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.04em; }
+.history-leader-value { margin-top: 5px; font-size: 14px; font-weight: 700; color: #f8fafc; }
+.history-leader-meta { margin-top: 4px; font-size: 12px; color: var(--text-400); }
+@media (max-width: 1080px) {
+    .history-filter-grid, .history-summary-grid, .history-compare-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .history-compare-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+    .history-filter-grid, .history-summary-grid, .history-compare-summary { grid-template-columns: 1fr; }
+}
 
 /* ===== 日志 ===== */
 .log-panel { background: var(--bg-900); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.6; }
@@ -1044,7 +1112,7 @@ body::after {
     </script>
     <script type="text/babel">
 /** ===== React App ===== **/
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const { ComposedChart, AreaChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, Cell } = Recharts;
 
 const _rejectHttp = (r) => r.text().then(t => { try { return Promise.reject(JSON.parse(t)); } catch(_) { return Promise.reject({ detail: 'HTTP ' + r.status }); } });
@@ -1060,6 +1128,65 @@ const api = {
     }).then(r => r.ok ? r.json() : _rejectHttp(r)),
     remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.ok ? r.json() : _rejectHttp(r)),
 };
+
+function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-8') {
+    const blob = new Blob(['\uFEFF' + String(content || '')], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+}
+
+function exportCompareCSV(data) {
+    const metrics = Array.isArray(data && data.metrics) ? data.metrics : [];
+    const rows = [
+        ['策略名称', '总收益率(%)', '年化收益率(%)', 'Sharpe', '最大回撤(%)', '期末净值', '开始日期', '结束日期'],
+        ...metrics.map(item => {
+            const mt = item.metrics || {};
+            return [
+                repairMojibakeText(item.strategy_name || ''),
+                mt.total_return ?? '',
+                mt.annual_return ?? '',
+                mt.sharpe_ratio ?? '',
+                mt.max_drawdown ?? '',
+                item.final_value ?? '',
+                item.start_date ?? '',
+                item.end_date ?? '',
+            ];
+        }),
+    ];
+    downloadTextFile(`backtest_compare_${Date.now()}.csv`, rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+}
+
+function exportPortfolioCSV(data) {
+    const weights = (data && data.weights && data.weights.weights) || [];
+    const corrNames = (data && data.correlations && data.correlations.names) || [];
+    const corrMatrix = (data && data.correlations && data.correlations.correlation_matrix) || [];
+    const portfolioMetrics = (data && data.portfolio && data.portfolio.metrics) || {};
+    const sections = [];
+    sections.push(['组合指标', '值']);
+    Object.entries(portfolioMetrics).forEach(([key, value]) => sections.push([key, value]));
+    sections.push([]);
+    sections.push(['权重方法', (data && data.weights && data.weights.method) || '']);
+    sections.push(['策略名称', '权重']);
+    weights.forEach(item => sections.push([repairMojibakeText(item.name || ''), item.weight]));
+    sections.push([]);
+    if (corrNames.length && corrMatrix.length) {
+        sections.push(['相关性矩阵', ...corrNames.map(repairMojibakeText)]);
+        corrMatrix.forEach((row, index) => {
+            sections.push([repairMojibakeText(corrNames[index] || ''), ...row]);
+        });
+    }
+    downloadTextFile(`portfolio_analysis_${Date.now()}.csv`, sections.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+}
+
+function exportPortfolioJSON(data) {
+    downloadTextFile(`portfolio_analysis_${Date.now()}.json`, JSON.stringify(data || {}, null, 2), 'application/json;charset=utf-8');
+}
 
 
 const STRATEGY_TEMPLATE = [
@@ -1123,6 +1250,69 @@ function readHistoryFocus() {
 }
 function clearHistoryFocus() {
     try { localStorage.removeItem(HISTORY_FOCUS_KEY); } catch (_) {}
+}
+
+const PORTFOLIO_PREFILL_KEY = 'qtsys_portfolio_prefill';
+function pushPortfolioPrefill(payload) {
+    try {
+        localStorage.setItem(PORTFOLIO_PREFILL_KEY, JSON.stringify({ ...payload, updated_at: Date.now() }));
+        window.dispatchEvent(new CustomEvent('qtsys:portfolio-prefill'));
+    } catch (_) {}
+}
+function readPortfolioPrefill() {
+    try {
+        const raw = localStorage.getItem(PORTFOLIO_PREFILL_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_) { return null; }
+}
+function clearPortfolioPrefill() {
+    try { localStorage.removeItem(PORTFOLIO_PREFILL_KEY); } catch (_) {}
+}
+
+function repairMojibakeText(value) {
+    if (typeof value !== 'string' || !value) return value;
+    const score = (text) => {
+        const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+        const weird = (text.match(/[ÃÂÅÆÇÐÑØÙÚÛÜÝÞßà-áâãäåæçè-éêëì-ïðñò-öø-üýþÿ]/g) || []).length;
+        const replacement = (text.match(/�/g) || []).length;
+        const question = (text.match(/\?/g) || []).length;
+        return cjk * 3 - weird * 2 - replacement * 4 - question;
+    };
+    let best = value;
+    let bestScore = score(value);
+    try {
+        const bytes = Uint8Array.from([...value].map(ch => ch.charCodeAt(0)));
+        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        const decodedScore = score(decoded);
+        if (decodedScore > bestScore) {
+            best = decoded;
+            bestScore = decodedScore;
+        }
+    } catch (_) {}
+    return best;
+}
+
+const RESULT_META_KEY = 'qtsys_result_meta';
+function readResultMetaMap() {
+    try {
+        const raw = localStorage.getItem(RESULT_META_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) { return {}; }
+}
+function writeResultMetaMap(payload) {
+    try { localStorage.setItem(RESULT_META_KEY, JSON.stringify(payload || {})); } catch (_) {}
+}
+function getResultMeta(resultId) {
+    return readResultMetaMap()[String(resultId)] || { favorite: false, note: '' };
+}
+function saveResultMeta(resultId, nextMeta) {
+    if (!resultId) return;
+    const payload = readResultMetaMap();
+    payload[String(resultId)] = { ...(payload[String(resultId)] || {}), ...(nextMeta || {}), updated_at: Date.now() };
+    writeResultMetaMap(payload);
 }
 
 const STRATEGY_AI_PREFILL_KEY = 'qtsys_strategy_ai_prefill';
@@ -1656,8 +1846,12 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
     const [saving, setSaving] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
+    const [strategySearch, setStrategySearch] = useState('');
     const [aiSkills, setAiSkills] = useState([]);
     const [aiContext, setAiContext] = useState({ news_count: 0, news_items: [] });
+    const [factorCatalog, setFactorCatalog] = useState([]);
+    const [factorSearch, setFactorSearch] = useState('');
     const [includeMarketContext, setIncludeMarketContext] = useState(true);
     const selectedIdRef = useRef(null);
     const pendingBacktestContextRef = useRef(null);
@@ -1695,6 +1889,11 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
             .then(res => setAiSkills((res && res.skills) || []))
             .catch(() => setAiSkills([]));
     }, []);
+    useEffect(() => {
+        api.get('/api/factors/catalog')
+            .then(res => setFactorCatalog((res && res.factors) || []))
+            .catch(() => setFactorCatalog([]));
+    }, []);
 
     const selectStrategy = (strategy) => {
         setSelected(strategy);
@@ -1702,6 +1901,22 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
         setDesc(strategy.description || '');
         setCode(strategy.code || '');
     };
+
+    const filteredStrategies = useMemo(() => {
+        const keyword = String(strategySearch || '').trim().toLowerCase();
+        if (!keyword) return strategies;
+        return strategies.filter(item => {
+            const text = [item.id, item.name, item.description].join(' ').toLowerCase();
+            return text.includes(keyword);
+        });
+    }, [strategies, strategySearch]);
+    const filteredFactorCatalog = useMemo(() => {
+        const keyword = String(factorSearch || '').trim().toLowerCase();
+        if (!keyword) return factorCatalog.slice(0, 18);
+        return factorCatalog
+            .filter(item => [item.name, item.description, item.category, item.source, item.expression].join(' ').toLowerCase().includes(keyword))
+            .slice(0, 18);
+    }, [factorCatalog, factorSearch]);
 
     const bindStrategyBacktestContext = (strategyId, overrideContext) => {
         const resolved = normalizeBacktestContext(overrideContext || pendingBacktestContextRef.current);
@@ -1793,10 +2008,13 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
     };
 
     const delStrategy = async (id) => {
-        if (!confirm('确认删除该策略吗？')) return;
+        if (deletingId === id) return;
+        if (!window.confirm('确认删除该策略吗？删除后不会自动恢复。')) return;
+        setDeletingId(id);
         try {
             await api.remove('/api/strategies/' + id);
             clearStrategyBacktestContext(id);
+            setStrategies(prev => prev.filter(item => item.id !== id));
             if (selected && selected.id === id) {
                 setSelected(null);
                 setName('');
@@ -1808,6 +2026,18 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
         } catch (e) {
             showToast((e && e.detail) || '删除策略失败', 'error');
         }
+        setDeletingId(null);
+    };
+
+    const insertFactorSnippet = (factor, mode) => {
+        if (!factor || !factor.name) return;
+        const varPrefix = String(factor.name || 'factor').replace(/[^a-zA-Z0-9_]/g, '_') || 'factor';
+        const safeName = String(factor.name).replace(/'/g, "\\'");
+        const snippet = mode === 'history'
+            ? `\n# 因子历史：${factor.name}\nconst_${varPrefix}_hist = context.get_factor_history('${safeName}', ts_code, 20)\nif len(const_${varPrefix}_hist) < 5:\n    continue\n`
+            : `\n# 因子当前值：${factor.name}\nconst_${varPrefix} = context.get_factor('${safeName}', ts_code)\n`;
+        setCode(prev => `${prev || ''}${snippet}`);
+        showToast(`已插入因子模板：${factor.name}`, 'success');
     };
 
     const requestAI = async (saveDirect, promptOverride) => {
@@ -1894,24 +2124,28 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
                 <div className="strategy-sidebar-head">
                     <div>
                         <div className="strategy-sidebar-title">策略库</div>
-                        <div className="strategy-sidebar-subtitle">统一管理手工策略、内置模板和 AI 生成策略。</div>
+                        <div className="strategy-sidebar-subtitle">统一管理手工策略、内置模板和 AI 生成策略。当前共 {strategies.length} 个。</div>
                     </div>
                     <div className="flex gap-sm">
                         <button className="btn btn-primary flex-1 text-sm" onClick={newStrategy}>新建草稿</button>
                         <button className="btn btn-secondary flex-1 text-sm" onClick={initBuiltin}>加载内置</button>
                     </div>
                 </div>
+                <input className="input" value={strategySearch} onChange={e => setStrategySearch(e.target.value)} placeholder="按名称、描述或编号搜索策略" style={{marginBottom:12}} />
                 <div className="strategy-list">
-                    {strategies.length === 0 && <div className="strategy-empty-hint">当前还没有策略，可先新建或加载内置模板。</div>}
-                    {strategies.map(strategy => (
+                    {filteredStrategies.length === 0 && <div className="strategy-empty-hint">{strategies.length === 0 ? '当前还没有策略，可先新建或加载内置模板。' : '没有匹配的策略。'}</div>}
+                    {filteredStrategies.map(strategy => (
                         <div
                             key={strategy.id}
                             onClick={() => selectStrategy(strategy)}
                             className={'strategy-item' + (selected && selected.id === strategy.id ? ' selected' : '')}
                         >
                             <div className="strategy-item-name">{strategy.name}</div>
+                            <div className="strategy-item-desc">#{strategy.id}</div>
                             <div className="strategy-item-desc">{strategy.description || '暂无描述'}</div>
-                            <button className="btn-danger mt-2" onClick={(e) => { e.stopPropagation(); delStrategy(strategy.id); }}>删除</button>
+                            <button className="btn-danger mt-2" disabled={deletingId === strategy.id} onClick={(e) => { e.stopPropagation(); delStrategy(strategy.id); }}>
+                                {deletingId === strategy.id ? '删除中...' : '删除'}
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -1944,6 +2178,27 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
                     <div className="strategy-chip muted">模板要求：必须包含 initialize / handle_data</div>
                     <div className="strategy-chip muted">保存后可直接进入回测页面使用</div>
                     <div className="strategy-chip muted">AI 会自动进行本地模板校验</div>
+                    <div className="strategy-chip muted">支持直接调用因子库：context.get_factor / context.get_factor_history</div>
+                </div>
+                <div className="strategy-mini-card">
+                    <div className="strategy-mini-label">因子库助手</div>
+                    <div className="strategy-mini-value">策略代码和 AI 都可以直接复用因子库。搜索后可一键插入当前值或历史序列模板。</div>
+                    <input className="input" value={factorSearch} onChange={e => setFactorSearch(e.target.value)} placeholder="搜索因子名称、分类、表达式" style={{marginTop:10}} />
+                    <div className="strategy-factor-list" style={{marginTop:10}}>
+                        {filteredFactorCatalog.length === 0 ? (
+                            <div className="strategy-empty-hint">当前没有可展示的因子。</div>
+                        ) : filteredFactorCatalog.map(factor => (
+                            <div key={`${factor.source}-${factor.id}-${factor.name}`} className="strategy-factor-item">
+                                <div className="strategy-factor-name">{factor.name}</div>
+                                <div className="strategy-factor-meta">{[factor.category, factor.source, factor.expression].filter(Boolean).join(' · ')}</div>
+                                <div className="strategy-factor-desc">{factor.description || '暂无因子说明'}</div>
+                                <div className="strategy-factor-actions">
+                                    <button className="btn btn-secondary" type="button" style={{fontSize:12,padding:'4px 10px'}} onClick={() => insertFactorSnippet(factor, 'value')}>插入当前值</button>
+                                    <button className="btn btn-secondary" type="button" style={{fontSize:12,padding:'4px 10px'}} onClick={() => insertFactorSnippet(factor, 'history')}>插入历史序列</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <CodeEditor value={code} onChange={setCode} />
             </div>
@@ -1968,6 +2223,7 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
                             {skill.name}
                         </div>
                     ))}
+                    <div className="strategy-chip muted">可用因子 {factorCatalog.length} 个</div>
                 </div>
                 <div>
                     <div className="strategy-mini-label" style={{marginBottom:8}}>常用提示</div>
@@ -2064,7 +2320,6 @@ function StrategyPage({ showToast, openBacktestWithStrategy }) {
 function BacktestPage({ showToast, openHistoryWithResult }) {
     const [strategies, setStrategies] = useState([]);
     const [strategyId, setStrategyId] = useState('');
-    const [universe, setUniverse] = useState('000001.SZ');
     const [startDate, setStartDate] = useState('20230101');
     const [endDate, setEndDate] = useState('20231231');
     const [cash, setCash] = useState(1000000);
@@ -2077,23 +2332,107 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
     const [paramGrid, setParamGrid] = useState('{"short_period": [3, 5, 10], "long_period": [15, 20, 30]}');
     const [optimizing, setOptimizing] = useState(false);
     const [optimizeResults, setOptimizeResults] = useState(null);
-    // 风控参数
     const [maxPosPct, setMaxPosPct] = useState(0.25);
     const [maxDdLimit, setMaxDdLimit] = useState(0);
-    // Walk-Forward
     const [wfRunning, setWfRunning] = useState(false);
     const [wfResult, setWfResult] = useState(null);
     const [prefillInfo, setPrefillInfo] = useState(null);
     const [universeInputMode, setUniverseInputMode] = useState('codes');
     const [dateInputMode, setDateInputMode] = useState('manual');
     const [benchmarkInputMode, setBenchmarkInputMode] = useState('manual');
+    const [universeOptions, setUniverseOptions] = useState({ system_universes: [], custom_pools: [], unsupported_universes: [] });
+    const [systemUniverseCode, setSystemUniverseCode] = useState('000300.SH');
+    const [customPoolId, setCustomPoolId] = useState('');
+    const [codeList, setCodeList] = useState(['000001.SZ']);
+    const [codeDraft, setCodeDraft] = useState('');
+    const [showPoolManager, setShowPoolManager] = useState(false);
+    const [poolForm, setPoolForm] = useState({ id: null, name: '', description: '', stock_items: [] });
+    const [stockKeyword, setStockKeyword] = useState('');
+    const [stockResults, setStockResults] = useState([]);
+    const [showStockResults, setShowStockResults] = useState(false);
+    const [poolSaving, setPoolSaving] = useState(false);
+    const [poolDeleting, setPoolDeleting] = useState(false);
     const resultRef = useRef(null);
+    const lastAppliedSavedContextRef = useRef('');
+
+    const selectedSystemUniverse = (universeOptions.system_universes || []).find(item => item.code === systemUniverseCode) || null;
+    const selectedCustomPool = (universeOptions.custom_pools || []).find(item => String(item.id) === String(customPoolId)) || null;
+    const linkedPoolAvailable = !!(prefillInfo && prefillInfo.universe_type);
+    const universe = codeList.join(',');
+
+    const parseCodes = useCallback((text) => {
+        const seen = new Set();
+        return String(text || '')
+            .split(/[\s,，;；]+/)
+            .map(item => item.trim().toUpperCase())
+            .filter(item => {
+                if (!item || seen.has(item)) return false;
+                seen.add(item);
+                return true;
+            });
+    }, []);
+
+    const loadUniverseOptions = useCallback(async () => {
+        try {
+            const res = await api.get('/api/backtest/universe_options');
+            setUniverseOptions(res || { system_universes: [], custom_pools: [], unsupported_universes: [] });
+        } catch (_) {
+            try {
+                const res = await api.get('/api/factor_board/universe_options');
+                setUniverseOptions({ ...(res || { system_universes: [], custom_pools: [] }), unsupported_universes: [] });
+            } catch (_) {
+                setUniverseOptions({ system_universes: [], custom_pools: [], unsupported_universes: [] });
+            }
+        }
+    }, []);
 
     useEffect(() => {
         api.get('/api/strategies').then(s => {
             setStrategies(s);
             if (s.length > 0) setStrategyId(String(s[0].id));
         }).catch(() => {});
+        loadUniverseOptions();
+    }, [loadUniverseOptions]);
+
+    useEffect(() => {
+        if (!stockKeyword || stockKeyword.trim().length < 1) {
+            setStockResults([]);
+            setShowStockResults(false);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await api.get('/api/factor_board/stock_search?q=' + encodeURIComponent(stockKeyword.trim()));
+                setStockResults(Array.isArray(res) ? res : []);
+                setShowStockResults(true);
+            } catch (_) {
+                setStockResults([]);
+                setShowStockResults(false);
+            }
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [stockKeyword]);
+
+    const applyBacktestContext = useCallback((context, options = {}) => {
+        const normalized = normalizeBacktestContext(context);
+        if (!normalized) return;
+        const asPrefill = !!options.asPrefill;
+        if (normalized.benchmark) setBenchmark(normalized.benchmark);
+        if (normalized.start_date) setStartDate(normalized.start_date);
+        if (normalized.end_date) setEndDate(normalized.end_date);
+        if (normalized.stock_codes && normalized.stock_codes.length) setCodeList(normalized.stock_codes);
+        if (normalized.universe_type === 'system') {
+            setSystemUniverseCode(normalized.universe_code || '000300.SH');
+            setUniverseInputMode(asPrefill ? 'linked' : 'system');
+        } else if (normalized.universe_type === 'custom') {
+            setCustomPoolId(normalized.custom_pool_id ? String(normalized.custom_pool_id) : '');
+            setUniverseInputMode(asPrefill ? 'linked' : 'custom');
+        } else {
+            setUniverseInputMode('codes');
+        }
+        setDateInputMode(normalized.start_date || normalized.end_date ? 'source' : 'manual');
+        setBenchmarkInputMode(normalized.benchmark ? 'source' : 'manual');
+        setPrefillInfo(asPrefill ? normalized : null);
     }, []);
 
     const applyBacktestPrefill = useCallback((strategyList) => {
@@ -2103,15 +2442,8 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
         const exists = (list || []).some(item => String(item.id) === String(prefill.strategy_id));
         if (!exists) return;
         setStrategyId(String(prefill.strategy_id));
-        if (prefill.universe) setUniverse(prefill.universe);
-        if (prefill.benchmark) setBenchmark(prefill.benchmark);
-        if (prefill.start_date) setStartDate(prefill.start_date);
-        if (prefill.end_date) setEndDate(prefill.end_date);
-        setPrefillInfo(prefill);
-        setUniverseInputMode(prefill.universe_type ? 'pool' : 'codes');
-        setDateInputMode(prefill.start_date || prefill.end_date ? 'source' : 'manual');
-        setBenchmarkInputMode(prefill.benchmark ? 'source' : 'manual');
-    }, [strategies]);
+        applyBacktestContext(prefill, { asPrefill: true });
+    }, [strategies, applyBacktestContext]);
 
     useEffect(() => {
         applyBacktestPrefill(strategies);
@@ -2124,25 +2456,51 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
     }, [applyBacktestPrefill]);
 
     useEffect(() => {
+        if (!strategyId || prefillInfo) return;
+        const saved = normalizeBacktestContext(readStrategyBacktestContext(strategyId));
+        if (!saved) return;
+        const nextMarker = `${strategyId}:${saved.updated_at || ''}`;
+        if (lastAppliedSavedContextRef.current === nextMarker) return;
+        applyBacktestContext(saved, { asPrefill: false });
+        lastAppliedSavedContextRef.current = nextMarker;
+    }, [strategyId, prefillInfo, applyBacktestContext]);
+
+    useEffect(() => {
         if (!result || !resultRef.current) return;
         setTimeout(() => {
             try { resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
         }, 80);
     }, [result]);
 
-    const buildUniversePayload = () => {
-        const codes = universe.split(',').map(s => s.trim()).filter(Boolean);
-        const useDescriptor = !!(prefillInfo && prefillInfo.universe_type && universeInputMode === 'pool');
-        const payload = { universe: codes };
-        if (useDescriptor) {
-            payload.universe_type = prefillInfo.universe_type || '';
-            payload.universe_code = prefillInfo.universe_code || '';
-            payload.universe_name = prefillInfo.universe_name || '';
-            payload.custom_pool_id = prefillInfo.custom_pool_id || null;
-            payload.stock_items = Array.isArray(prefillInfo.stock_items) ? prefillInfo.stock_items : [];
+    useEffect(() => {
+        if (universeInputMode !== 'system') return;
+        if (benchmarkInputMode === 'manual') return;
+        if (selectedSystemUniverse && selectedSystemUniverse.benchmark_code) {
+            setBenchmark(selectedSystemUniverse.benchmark_code);
         }
-        return { codes, payload, useDescriptor };
-    };
+    }, [universeInputMode, selectedSystemUniverse, benchmarkInputMode]);
+
+    const addCodesToList = useCallback((text) => {
+        const incoming = parseCodes(text);
+        if (!incoming.length) return false;
+        setCodeList(prev => {
+            const merged = [...prev];
+            incoming.forEach(code => {
+                if (!merged.includes(code)) merged.push(code);
+            });
+            return merged;
+        });
+        return true;
+    }, [parseCodes]);
+
+    const addCodeDraft = useCallback((e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (addCodesToList(codeDraft)) setCodeDraft('');
+    }, [codeDraft, addCodesToList]);
+
+    const removeCodeFromList = useCallback((code) => {
+        setCodeList(prev => prev.filter(item => item !== code));
+    }, []);
 
     const restoreSourceDateRange = () => {
         if (prefillInfo && prefillInfo.start_date) setStartDate(prefillInfo.start_date);
@@ -2155,26 +2513,222 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
         setBenchmarkInputMode(prefillInfo && prefillInfo.benchmark ? 'source' : 'manual');
     };
 
+    const buildContextSnapshot = useCallback(() => {
+        const base = {
+            source: 'backtest',
+            source_label: '回测配置',
+            benchmark,
+            start_date: startDate,
+            end_date: endDate,
+        };
+        if (universeInputMode === 'linked' && linkedPoolAvailable) {
+            return normalizeBacktestContext({ ...prefillInfo, ...base, strategy_id: strategyId, strategy_name: prefillInfo && prefillInfo.strategy_name ? prefillInfo.strategy_name : '' });
+        }
+        if (universeInputMode === 'system') {
+            return normalizeBacktestContext({
+                ...base,
+                universe_type: 'system',
+                universe_code: (selectedSystemUniverse && selectedSystemUniverse.code) || systemUniverseCode,
+                universe_name: (selectedSystemUniverse && selectedSystemUniverse.name) || systemUniverseCode,
+                benchmark: benchmarkInputMode === 'manual' ? benchmark : ((selectedSystemUniverse && selectedSystemUniverse.benchmark_code) || benchmark),
+                stock_items: [],
+            });
+        }
+        if (universeInputMode === 'custom') {
+            return normalizeBacktestContext({
+                ...base,
+                universe_type: 'custom',
+                custom_pool_id: selectedCustomPool ? selectedCustomPool.id : null,
+                universe_code: selectedCustomPool ? `custom:${selectedCustomPool.id}` : 'custom',
+                universe_name: (selectedCustomPool && selectedCustomPool.name) || '自定义股票池',
+                stock_items: normalizeStockItems(selectedCustomPool && selectedCustomPool.stock_items ? selectedCustomPool.stock_items : []),
+            });
+        }
+        return normalizeBacktestContext({
+            ...base,
+            universe_type: '',
+            universe_name: '代码列表',
+            stock_items: codeList.map(code => ({ ts_code: code, name: '' })),
+        });
+    }, [benchmark, startDate, endDate, universeInputMode, linkedPoolAvailable, prefillInfo, strategyId, selectedSystemUniverse, systemUniverseCode, benchmarkInputMode, selectedCustomPool, codeList]);
+
+    const buildUniversePayload = useCallback(() => {
+        if (universeInputMode === 'linked' && linkedPoolAvailable) {
+            return {
+                payload: {
+                    universe: parseCodes(prefillInfo && prefillInfo.universe ? prefillInfo.universe : ''),
+                    universe_type: prefillInfo.universe_type || '',
+                    universe_code: prefillInfo.universe_code || '',
+                    universe_name: prefillInfo.universe_name || '',
+                    custom_pool_id: prefillInfo.custom_pool_id || null,
+                    stock_items: Array.isArray(prefillInfo.stock_items) ? prefillInfo.stock_items : [],
+                },
+            };
+        }
+        if (universeInputMode === 'system') {
+            const systemMeta = selectedSystemUniverse || { code: systemUniverseCode, name: systemUniverseCode };
+            return {
+                payload: {
+                    universe: [],
+                    universe_type: 'system',
+                    universe_code: systemMeta.code,
+                    universe_name: systemMeta.name,
+                    custom_pool_id: null,
+                    stock_items: [],
+                },
+            };
+        }
+        if (universeInputMode === 'custom') {
+            if (!selectedCustomPool) {
+                throw new Error('请选择自定义股票池');
+            }
+            return {
+                payload: {
+                    universe: [],
+                    universe_type: 'custom',
+                    universe_code: `custom:${selectedCustomPool.id}`,
+                    universe_name: selectedCustomPool.name || '自定义股票池',
+                    custom_pool_id: selectedCustomPool.id,
+                    stock_items: normalizeStockItems(selectedCustomPool.stock_items || []),
+                },
+            };
+        }
+        return { payload: { universe: codeList.slice() } };
+    }, [universeInputMode, linkedPoolAvailable, prefillInfo, selectedSystemUniverse, systemUniverseCode, selectedCustomPool, codeList, parseCodes]);
+
+    const persistCurrentContext = useCallback(() => {
+        const snapshot = buildContextSnapshot();
+        if (!snapshot) return;
+        if (strategyId) saveStrategyBacktestContext(strategyId, snapshot);
+        pushBacktestPrefill({
+            strategy_id: String(strategyId || ''),
+            strategy_name: (strategies.find(item => String(item.id) === String(strategyId)) || {}).name || '',
+            ...snapshot,
+        });
+    }, [buildContextSnapshot, strategyId, strategies]);
+
+    const addStockToPool = (item) => {
+        if (!item || !item.ts_code) return;
+        if ((poolForm.stock_items || []).some(existing => existing.ts_code === item.ts_code)) {
+            showToast('该股票已在自定义股票池中', 'error');
+            return;
+        }
+        setPoolForm(prev => ({
+            ...prev,
+            stock_items: [...(prev.stock_items || []), { ts_code: item.ts_code, name: item.name || '' }],
+        }));
+        setStockKeyword('');
+        setStockResults([]);
+        setShowStockResults(false);
+    };
+
+    const removeStockFromPool = (tsCode) => {
+        setPoolForm(prev => ({
+            ...prev,
+            stock_items: (prev.stock_items || []).filter(item => item.ts_code !== tsCode),
+        }));
+    };
+
+    const editPool = (pool) => {
+        setPoolForm({
+            id: pool.id,
+            name: pool.name || '',
+            description: pool.description || '',
+            stock_items: normalizeStockItems(pool.stock_items || []),
+        });
+        setCustomPoolId(String(pool.id));
+        setUniverseInputMode('custom');
+        setShowPoolManager(true);
+    };
+
+    const resetPoolForm = () => {
+        setPoolForm({ id: null, name: '', description: '', stock_items: [] });
+        setStockKeyword('');
+        setStockResults([]);
+        setShowStockResults(false);
+    };
+
+    const savePool = async () => {
+        if (!poolForm.name.trim()) {
+            showToast('请输入股票池名称', 'error');
+            return;
+        }
+        if ((poolForm.stock_items || []).length === 0) {
+            showToast('请至少添加一只股票', 'error');
+            return;
+        }
+        setPoolSaving(true);
+        try {
+            const payload = {
+                name: poolForm.name.trim(),
+                description: poolForm.description || '',
+                stock_items: normalizeStockItems(poolForm.stock_items || []),
+            };
+            const res = poolForm.id
+                ? await api.put('/api/factor_board/custom_pools/' + poolForm.id, payload)
+                : await api.post('/api/factor_board/custom_pools', payload);
+            showToast(poolForm.id ? '自定义股票池已更新' : '自定义股票池已保存', 'success');
+            await loadUniverseOptions();
+            setCustomPoolId(String(res.id));
+            setUniverseInputMode('custom');
+            setPoolForm({
+                id: res.id,
+                name: res.name || '',
+                description: res.description || '',
+                stock_items: normalizeStockItems(res.stock_items || []),
+            });
+        } catch (e) {
+            showToast((e && e.detail) || '保存自定义股票池失败', 'error');
+        }
+        setPoolSaving(false);
+    };
+
+    const deletePool = async () => {
+        if (!poolForm.id) return;
+        setPoolDeleting(true);
+        try {
+            await api.remove('/api/factor_board/custom_pools/' + poolForm.id);
+            showToast('自定义股票池已删除', 'success');
+            if (String(customPoolId) === String(poolForm.id)) setCustomPoolId('');
+            resetPoolForm();
+            await loadUniverseOptions();
+        } catch (e) {
+            showToast((e && e.detail) || '删除自定义股票池失败', 'error');
+        }
+        setPoolDeleting(false);
+    };
+
     const runBacktest = async () => {
         if (!strategyId) { showToast('请选择策略', 'error'); return; }
-        setRunning(true); setResult(null); setLogs([]);
+        if (universeInputMode === 'codes' && codeList.length === 0) { showToast('请先添加至少一只股票', 'error'); return; }
+        if (universeInputMode === 'custom' && !selectedCustomPool) { showToast('请选择自定义股票池', 'error'); return; }
+        persistCurrentContext();
+        setRunning(true);
+        setResult(null);
+        setLogs([]);
         try {
             const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/run', {
                 strategy_id: parseInt(strategyId),
                 ...universePayload.payload,
-                start_date: startDate, end_date: endDate,
-                initial_cash: cash, benchmark,
+                start_date: startDate,
+                end_date: endDate,
+                initial_cash: cash,
+                benchmark,
                 max_position_pct: maxPosPct,
                 max_drawdown_limit: maxDdLimit,
             });
-            setResult(res); setLogs(res.logs || []);
+            setResult(res);
+            setLogs(res.logs || []);
             setResultTab('chart');
             if (res && res.id) pushHistoryFocus({ result_id: res.id, tab: 'chart' });
             showToast('回测完成', 'success');
-        } catch (e) { showToast(e.detail || '回测失败', 'error'); }
+        } catch (e) {
+            showToast((e && e.detail) || e.message || '回测失败', 'error');
+        }
         setRunning(false);
     };
+
     const openResultInHistory = () => {
         if (!result || !result.id) {
             showToast('请先运行回测并生成结果', 'error');
@@ -2187,40 +2741,57 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
     const runOptimize = async () => {
         if (!strategyId) { showToast('请选择策略', 'error'); return; }
         let grid;
-        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误，请输入有效 JSON', 'error'); return; }
-        setOptimizing(true); setOptimizeResults(null);
+        try { grid = JSON.parse(paramGrid); } catch { showToast('参数网格格式错误，请输入有效 JSON', 'error'); return; }
+        if (universeInputMode === 'codes' && codeList.length === 0) { showToast('请先添加至少一只股票', 'error'); return; }
+        persistCurrentContext();
+        setOptimizing(true);
+        setOptimizeResults(null);
         try {
             const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/optimize', {
                 strategy_id: parseInt(strategyId),
                 ...universePayload.payload,
-                start_date: startDate, end_date: endDate,
-                initial_cash: cash, benchmark, param_grid: grid,
+                start_date: startDate,
+                end_date: endDate,
+                initial_cash: cash,
+                benchmark,
+                param_grid: grid,
             });
             setOptimizeResults(res.results);
             showToast(`优化完成，共 ${res.results.length} 组参数`, 'success');
-        } catch (e) { showToast(e.detail || '优化失败', 'error'); }
+        } catch (e) {
+            showToast((e && e.detail) || e.message || '优化失败', 'error');
+        }
         setOptimizing(false);
     };
 
     const runWalkForward = async () => {
         if (!strategyId) { showToast('请选择策略', 'error'); return; }
         let grid;
-        try { grid = JSON.parse(paramGrid); } catch { showToast('参数格式错误', 'error'); return; }
-        setWfRunning(true); setWfResult(null);
+        try { grid = JSON.parse(paramGrid); } catch { showToast('参数网格格式错误', 'error'); return; }
+        if (universeInputMode === 'codes' && codeList.length === 0) { showToast('请先添加至少一只股票', 'error'); return; }
+        persistCurrentContext();
+        setWfRunning(true);
+        setWfResult(null);
         try {
             const universePayload = buildUniversePayload();
             const res = await api.post('/api/backtest/walk_forward', {
                 strategy_id: parseInt(strategyId),
                 ...universePayload.payload,
-                start_date: startDate, end_date: endDate,
-                param_grid: grid, benchmark,
+                start_date: startDate,
+                end_date: endDate,
+                param_grid: grid,
+                benchmark,
             });
             setWfResult(res);
             showToast('Walk-Forward 验证完成', 'success');
-        } catch (e) { showToast(e.detail || 'Walk-Forward 验证失败', 'error'); }
+        } catch (e) {
+            showToast((e && e.detail) || e.message || 'Walk-Forward 验证失败', 'error');
+        }
         setWfRunning(false);
     };
+
+    const unsupportedLabels = (universeOptions.unsupported_universes || []).map(item => `${item.name}：${item.reason}`);
 
     return (
         <div className="fade-in space-y">
@@ -2228,68 +2799,697 @@ function BacktestPage({ showToast, openHistoryWithResult }) {
                 <div className="card" style={{padding:'12px 16px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
                         <div>
-                            <div style={{fontSize:12,color:'var(--text-500)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{'\u7b56\u7565\u5df2\u63a5\u5165\u56de\u6d4b'}</div>
-                            <div style={{fontSize:15,fontWeight:700,color:'var(--text-100)',marginTop:4}}>{prefillInfo.strategy_name || `\u7b56\u7565 #${prefillInfo.strategy_id}`}</div>
-                            <div style={{fontSize:12,color:'var(--text-400)',marginTop:4}}>{'\u5df2\u81ea\u52a8\u5e26\u5165\u7b56\u7565\u3001\u57fa\u51c6\u548c\u80a1\u7968\u6c60\u6765\u6e90\uff0c\u53ef\u76f4\u63a5\u8fd0\u884c\u56de\u6d4b\uff0c\u4e5f\u53ef\u4ee5\u5148\u505a\u624b\u52a8\u8986\u76d6\u540e\u518d\u8fd0\u884c\u3002'}</div>
+                            <div style={{fontSize:12,color:'var(--text-500)',textTransform:'uppercase',letterSpacing:'0.06em'}}>策略联动回测</div>
+                            <div style={{fontSize:15,fontWeight:700,color:'var(--text-100)',marginTop:4}}>{prefillInfo.strategy_name || `策略 #${prefillInfo.strategy_id}`}</div>
+                            <div style={{fontSize:12,color:'var(--text-400)',marginTop:4}}>已带入上一次或外部联动的回测上下文；你可以继续使用“联动股票池”，也可以切换到系统池、自定义池或代码列表。</div>
                         </div>
-                        <button className="btn btn-secondary" onClick={() => { setPrefillInfo(null); setUniverseInputMode('codes'); setDateInputMode('manual'); setBenchmarkInputMode('manual'); clearBacktestPrefill(); }}>{'\u5173\u95ed\u63d0\u793a'}</button>
+                        <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); setPrefillInfo(null); setUniverseInputMode('codes'); setDateInputMode('manual'); setBenchmarkInputMode('manual'); clearBacktestPrefill(); }}>关闭提示</button>
                     </div>
                 </div>
             ) : null}
-            <BacktestForm strategies={strategies} strategyId={strategyId} setStrategyId={setStrategyId}
-                universe={universe} setUniverse={setUniverse} startDate={startDate} setStartDate={setStartDate}
-                endDate={endDate} setEndDate={setEndDate} cash={cash} setCash={setCash}
-                benchmark={benchmark} setBenchmark={setBenchmark} running={running} onRun={runBacktest}
-                maxPosPct={maxPosPct} setMaxPosPct={setMaxPosPct} maxDdLimit={maxDdLimit} setMaxDdLimit={setMaxDdLimit}
-                prefillInfo={prefillInfo} universeInputMode={universeInputMode} setUniverseInputMode={setUniverseInputMode} dateInputMode={dateInputMode} setDateInputMode={setDateInputMode} benchmarkInputMode={benchmarkInputMode} setBenchmarkInputMode={setBenchmarkInputMode} restoreSourceDateRange={restoreSourceDateRange} restoreSourceBenchmark={restoreSourceBenchmark} />
+
+            <BacktestForm
+                strategies={strategies}
+                strategyId={strategyId}
+                setStrategyId={setStrategyId}
+                running={running}
+                onRun={runBacktest}
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
+                cash={cash}
+                setCash={setCash}
+                benchmark={benchmark}
+                setBenchmark={setBenchmark}
+                maxPosPct={maxPosPct}
+                setMaxPosPct={setMaxPosPct}
+                maxDdLimit={maxDdLimit}
+                setMaxDdLimit={setMaxDdLimit}
+                prefillInfo={prefillInfo}
+                linkedPoolAvailable={linkedPoolAvailable}
+                universeInputMode={universeInputMode}
+                setUniverseInputMode={setUniverseInputMode}
+                dateInputMode={dateInputMode}
+                setDateInputMode={setDateInputMode}
+                benchmarkInputMode={benchmarkInputMode}
+                setBenchmarkInputMode={setBenchmarkInputMode}
+                restoreSourceDateRange={restoreSourceDateRange}
+                restoreSourceBenchmark={restoreSourceBenchmark}
+                universeOptions={universeOptions}
+                systemUniverseCode={systemUniverseCode}
+                setSystemUniverseCode={setSystemUniverseCode}
+                customPoolId={customPoolId}
+                setCustomPoolId={setCustomPoolId}
+                selectedSystemUniverse={selectedSystemUniverse}
+                selectedCustomPool={selectedCustomPool}
+                codeList={codeList}
+                codeDraft={codeDraft}
+                setCodeDraft={setCodeDraft}
+                addCodeDraft={addCodeDraft}
+                removeCodeFromList={removeCodeFromList}
+                unsupportedLabels={unsupportedLabels}
+                openPoolManager={() => setShowPoolManager(true)}
+                resetPoolForm={resetPoolForm}
+                editPool={editPool}
+            />
+
             <div className="card space-y">
                 <div className="flex items-center justify-between">
-                    <div className="card-title" style={{marginBottom:0}}>{'\u53c2\u6570\u4f18\u5316'}</div>
-                    <button className="btn btn-secondary" onClick={() => setShowOptimizer(!showOptimizer)}>
-                        {showOptimizer ? '\u6536\u8d77' : '\u5c55\u5f00'}
+                    <div className="card-title" style={{marginBottom:0}}>参数优化</div>
+                    <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); setShowOptimizer(!showOptimizer); }}>
+                        {showOptimizer ? '收起' : '展开'}
                     </button>
                 </div>
                 {showOptimizer && (
                     <div className="space-y">
                         <div className="backtest-pool-panel" style={{padding:'14px 16px'}}>
                             <div>
-                                <div className="backtest-pool-title">{'\u5f53\u524d\u4f18\u5316\u4e0a\u4e0b\u6587'}</div>
-                                <div className="backtest-pool-copy">{'\u4f18\u5316\u548c Walk-Forward \u4f1a\u7ee7\u627f\u5f53\u524d\u9875\u9762\u4e2d\u7684\u80a1\u7968\u6c60\u3001\u65f6\u95f4\u533a\u95f4\u548c\u57fa\u51c6\u8bbe\u7f6e\u3002'}</div>
+                                <div className="backtest-pool-title">当前优化上下文</div>
+                                <div className="backtest-pool-copy">参数优化和 Walk-Forward 会继承当前页中的股票池、回测区间和基准设置。</div>
                             </div>
                             <div className="backtest-pool-meta" style={{justifyContent:'flex-end'}}>
-                                <span className="backtest-badge">{universeInputMode === 'pool' ? '\u80a1\u7968\u6c60\u6a21\u5f0f' : '\u4ee3\u7801\u5217\u8868\u6a21\u5f0f'}</span>
-                                <span className="backtest-badge">{dateInputMode === 'source' ? '\u533a\u95f4\u8ddf\u968f\u6765\u6e90' : '\u533a\u95f4\u624b\u52a8\u8986\u76d6'}</span>
-                                <span className="backtest-badge">{benchmarkInputMode === 'source' ? '\u57fa\u51c6\u8ddf\u968f\u6765\u6e90' : '\u57fa\u51c6\u624b\u52a8\u8986\u76d6'}</span>
-                                {prefillInfo && prefillInfo.stock_count ? <span className="backtest-badge">{prefillInfo.stock_count}{'\u53ea\u80a1\u7968'}</span> : null}
+                                <span className="backtest-badge">{universeInputMode === 'codes' ? '代码列表' : universeInputMode === 'system' ? '系统股票池' : universeInputMode === 'custom' ? '自定义股票池' : '联动股票池'}</span>
+                                <span className="backtest-badge">{dateInputMode === 'source' ? '区间跟随来源' : '区间手动覆盖'}</span>
+                                <span className="backtest-badge">{benchmarkInputMode === 'source' ? '基准跟随来源' : '基准手动覆盖'}</span>
+                                {universeInputMode === 'codes' ? <span className="backtest-badge">{codeList.length}只股票</span> : null}
                             </div>
                         </div>
-                        <div className="field"><label className="label">{'\u53c2\u6570\u7f51\u683c\uff08JSON \u683c\u5f0f\uff09'}</label><textarea className="input" rows={3} value={paramGrid} onChange={e => setParamGrid(e.target.value)} style={{fontFamily:'monospace',fontSize:13}} /></div>
-                        <div className="flex gap-sm"><button className="btn btn-primary" onClick={runOptimize} disabled={optimizing}>{optimizing ? <><span className="spinner"/> {'\u4f18\u5316\u4e2d...'}</> : '\u5f00\u59cb\u7f51\u683c\u641c\u7d22'}</button><button className="btn btn-secondary" onClick={runWalkForward} disabled={wfRunning}>{wfRunning ? <><span className="spinner"/> {'\u9a8c\u8bc1\u4e2d...'}</> : 'Walk-Forward \u9a8c\u8bc1'}</button></div>
-                        {optimizeResults && optimizeResults.length > 0 && (<div className="table-wrap"><table><thead><tr><th>{'\u6392\u540d'}</th><th>{'\u53c2\u6570'}</th><th style={{textAlign:'right'}}>{'\u590f\u666e\u6bd4\u7387'}</th><th style={{textAlign:'right'}}>{'\u603b\u6536\u76ca'}</th><th style={{textAlign:'right'}}>{'\u5e74\u5316\u6536\u76ca%'}</th><th style={{textAlign:'right'}}>{'\u6700\u5927\u56de\u64a4'}</th></tr></thead><tbody>{optimizeResults.map((r, i) => (<tr key={i}><td>{i + 1}</td><td style={{fontFamily:'monospace',fontSize:12}}>{JSON.stringify(r.params)}</td><td style={{textAlign:'right'}} className={r.sharpe_ratio >= 1 ? 'text-profit' : 'text-loss'}>{r.sharpe_ratio}</td><td style={{textAlign:'right'}} className={r.total_return >= 0 ? 'text-profit' : 'text-loss'}>{r.total_return}</td><td style={{textAlign:'right'}} className={r.annual_return >= 0 ? 'text-profit' : 'text-loss'}>{r.annual_return}</td><td style={{textAlign:'right'}} className="text-loss">{r.max_drawdown}</td></tr>))}</tbody></table></div>)}
-                        {wfResult && wfResult.summary && (<div><div style={{fontSize:13,fontWeight:600,color:'var(--text-100)',marginBottom:8}}>{'Walk-Forward \u9a8c\u8bc1\u7ed3\u679c'}</div><div className="grid-4" style={{gap:8,marginBottom:10}}><div className="metric-card"><div className="metric-label">{'\u7a97\u53e3\u6570'}</div><div className="metric-value">{wfResult.summary.total_windows}</div></div><div className="metric-card"><div className="metric-label">{'\u8bad\u7ec3\u671f\u590f\u666e'}</div><div className="metric-value">{wfResult.summary.avg_train_sharpe}</div></div><div className="metric-card"><div className="metric-label">{'\u6837\u672c\u5916\u590f\u666e'}</div><div className="metric-value" style={{color: wfResult.summary.avg_oos_sharpe >= 0 ? 'var(--profit)' : 'var(--loss)'}}>{wfResult.summary.avg_oos_sharpe}</div></div><div className="metric-card"><div className="metric-label">{'\u8fc7\u62df\u5408\u6bd4\u7387'}</div><div className="metric-value" style={{color: wfResult.summary.overfit_ratio >= 0.5 ? 'var(--loss)' : 'var(--profit)'}}>{wfResult.summary.overfit_ratio}</div></div></div><div className="table-wrap"><table><thead><tr><th>{'\u7a97\u53e3'}</th><th>{'\u8bad\u7ec3\u671f'}</th><th>{'\u6d4b\u8bd5\u671f'}</th><th>{'\u6700\u4f18\u53c2\u6570'}</th><th style={{textAlign:'right'}}>{'\u8bad\u7ec3\u590f\u666e'}</th><th style={{textAlign:'right'}}>{'\u6d4b\u8bd5\u590f\u666e'}</th><th style={{textAlign:'right'}}>{'\u6d4b\u8bd5\u6536\u76ca%'}</th></tr></thead><tbody>{wfResult.windows.map((w,i) => (<tr key={i}><td>{w.window}</td><td className="text-xs">{w.train_period}</td><td className="text-xs">{w.test_period}</td><td style={{fontFamily:'monospace',fontSize:11}}>{JSON.stringify(w.best_params)}</td><td style={{textAlign:'right'}}>{w.train_sharpe}</td><td style={{textAlign:'right'}} className={w.test_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{w.test_sharpe}</td><td style={{textAlign:'right'}} className={w.test_return >= 0 ? 'text-profit' : 'text-loss'}>{w.test_return}</td></tr>))}</tbody></table></div></div>)}
+                        <div className="field">
+                            <label className="label">参数网格（JSON 格式）</label>
+                            <textarea className="input" rows={3} value={paramGrid} onChange={e => setParamGrid(e.target.value)} style={{fontFamily:'monospace',fontSize:13}} />
+                        </div>
+                        <div className="flex gap-sm">
+                            <button type="button" className="btn btn-primary" onClick={(e) => { e.preventDefault(); runOptimize(); }} disabled={optimizing}>{optimizing ? <><span className="spinner"/> {'优化中...'}</> : '开始网格搜索'}</button>
+                            <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); runWalkForward(); }} disabled={wfRunning}>{wfRunning ? <><span className="spinner"/> {'验证中...'}</> : 'Walk-Forward 验证'}</button>
+                        </div>
+                        {optimizeResults && optimizeResults.length > 0 && (
+                            <div className="table-wrap">
+                                <table>
+                                    <thead><tr><th>排名</th><th>参数</th><th style={{textAlign:'right'}}>夏普比率</th><th style={{textAlign:'right'}}>总收益</th><th style={{textAlign:'right'}}>年化收益%</th><th style={{textAlign:'right'}}>最大回撤</th></tr></thead>
+                                    <tbody>
+                                        {optimizeResults.map((r, i) => (
+                                            <tr key={i}>
+                                                <td>{i + 1}</td>
+                                                <td style={{fontFamily:'monospace',fontSize:12}}>{JSON.stringify(r.params)}</td>
+                                                <td style={{textAlign:'right'}} className={r.sharpe_ratio >= 1 ? 'text-profit' : 'text-loss'}>{r.sharpe_ratio}</td>
+                                                <td style={{textAlign:'right'}} className={r.total_return >= 0 ? 'text-profit' : 'text-loss'}>{r.total_return}</td>
+                                                <td style={{textAlign:'right'}} className={r.annual_return >= 0 ? 'text-profit' : 'text-loss'}>{r.annual_return}</td>
+                                                <td style={{textAlign:'right'}} className="text-loss">{r.max_drawdown}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        {wfResult && wfResult.summary && (
+                            <div>
+                                <div style={{fontSize:13,fontWeight:600,color:'var(--text-100)',marginBottom:8}}>Walk-Forward 验证结果</div>
+                                <div className="grid-4" style={{gap:8,marginBottom:10}}>
+                                    <div className="metric-card"><div className="metric-label">窗口数</div><div className="metric-value">{wfResult.summary.total_windows}</div></div>
+                                    <div className="metric-card"><div className="metric-label">训练期夏普</div><div className="metric-value">{wfResult.summary.avg_train_sharpe}</div></div>
+                                    <div className="metric-card"><div className="metric-label">样本外夏普</div><div className="metric-value" style={{color: wfResult.summary.avg_oos_sharpe >= 0 ? 'var(--profit)' : 'var(--loss)'}}>{wfResult.summary.avg_oos_sharpe}</div></div>
+                                    <div className="metric-card"><div className="metric-label">过拟合比率</div><div className="metric-value" style={{color: wfResult.summary.overfit_ratio >= 0.5 ? 'var(--loss)' : 'var(--profit)'}}>{wfResult.summary.overfit_ratio}</div></div>
+                                </div>
+                                <div className="table-wrap">
+                                    <table>
+                                        <thead><tr><th>窗口</th><th>训练期</th><th>测试期</th><th>最优参数</th><th style={{textAlign:'right'}}>训练夏普</th><th style={{textAlign:'right'}}>测试夏普</th><th style={{textAlign:'right'}}>测试收益%</th></tr></thead>
+                                        <tbody>
+                                            {wfResult.windows.map((w, i) => (
+                                                <tr key={i}>
+                                                    <td>{w.window}</td>
+                                                    <td className="text-xs">{w.train_period}</td>
+                                                    <td className="text-xs">{w.test_period}</td>
+                                                    <td style={{fontFamily:'monospace',fontSize:11}}>{JSON.stringify(w.best_params)}</td>
+                                                    <td style={{textAlign:'right'}}>{w.train_sharpe}</td>
+                                                    <td style={{textAlign:'right'}} className={w.test_sharpe >= 0 ? 'text-profit' : 'text-loss'}>{w.test_sharpe}</td>
+                                                    <td style={{textAlign:'right'}} className={w.test_return >= 0 ? 'text-profit' : 'text-loss'}>{w.test_return}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
-            {result && <div ref={resultRef}><BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} onOpenHistory={openResultInHistory} /></div>}
+
+            {showPoolManager ? (
+                <div className="factor-board-modal" onClick={() => setShowPoolManager(false)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()}>
+                        <div className="factor-board-modal-head">
+                            <div>
+                                <div className="factor-board-modal-title">回测股票池管理</div>
+                                <div className="factor-board-modal-copy">在回测页直接搜索股票、保存自定义股票池，并立即用于当前回测。</div>
+                            </div>
+                            <button className="btn btn-secondary" type="button" onClick={() => setShowPoolManager(false)}>关闭</button>
+                        </div>
+                        <div className="factor-board-modal-grid">
+                            <div className="factor-board-modal-stack">
+                                <div className="card" style={{padding:'18px'}}>
+                                    <div className="flex items-center justify-between" style={{marginBottom:12}}>
+                                        <div>
+                                            <div className="card-title" style={{marginBottom:4}}>编辑股票池</div>
+                                            <div className="factor-board-subtle">新建、修改、删除自定义股票池；保存后会同步到回测股票池列表。</div>
+                                        </div>
+                                        <div className="backtest-mode-row">
+                                            <button className="btn btn-secondary" type="button" onClick={resetPoolForm}>新建</button>
+                                            <button className="btn btn-primary" type="button" onClick={savePool} disabled={poolSaving}>{poolSaving ? '保存中...' : (poolForm.id ? '更新股票池' : '保存股票池')}</button>
+                                            {poolForm.id ? <button className="btn btn-secondary" type="button" onClick={deletePool} disabled={poolDeleting}>{poolDeleting ? '删除中...' : '删除'}</button> : null}
+                                        </div>
+                                    </div>
+                                    <div className="grid-2" style={{gap:12}}>
+                                        <div className="field"><label className="label">股票池名称</label><input className="input" value={poolForm.name} placeholder="例如：消费龙头池" onChange={e => setPoolForm({ ...poolForm, name: e.target.value })} /></div>
+                                        <div className="field"><label className="label">成分数量</label><div className="backtest-pool-panel" style={{padding:'10px 12px'}}><div className="backtest-side-value" style={{marginTop:0}}>{(poolForm.stock_items || []).length} 只股票</div></div></div>
+                                    </div>
+                                    <div className="field" style={{marginTop:12}}><label className="label">说明</label><textarea className="input" rows="2" value={poolForm.description} placeholder="记录该股票池的行业主题、因子偏好或选股逻辑" onChange={e => setPoolForm({ ...poolForm, description: e.target.value })}></textarea></div>
+                                    <div className="field stock-search-wrap" style={{marginTop:12}}>
+                                        <label className="label">搜索并添加股票</label>
+                                        <input className="input" value={stockKeyword} placeholder="输入股票代码或名称，例如：600519 / 贵州茅台" onChange={e => setStockKeyword(e.target.value)} />
+                                        {showStockResults ? (
+                                            <div className="stock-search-dropdown">
+                                                {stockResults.length === 0 ? <div className="stock-search-item" style={{justifyContent:'center',color:'var(--text-500)'}}>未找到匹配股票</div> : stockResults.map(item => (
+                                                    <div key={item.ts_code} className="stock-search-item" onClick={() => addStockToPool(item)}>
+                                                        <span>{item.name || item.ts_code}</span>
+                                                        <span style={{color:'var(--text-500)'}}>{item.ts_code}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <div className="factor-board-list" style={{maxHeight:260, overflowY:'auto', marginTop:12}}>
+                                        {(poolForm.stock_items || []).length === 0 ? <div className="factor-board-empty">当前股票池还没有股票，请先搜索并添加。</div> : (poolForm.stock_items || []).map((item, idx) => (
+                                            <div key={item.ts_code + '-' + idx} className="factor-board-list-item">
+                                                <div>
+                                                    <div style={{fontWeight:600, color:'#f8fafc'}}>{item.name || item.ts_code}</div>
+                                                    <div className="factor-board-subtle">{item.ts_code}</div>
+                                                </div>
+                                                <button className="btn-link" type="button" onClick={() => removeStockFromPool(item.ts_code)}>移除</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="factor-board-modal-stack">
+                                <div className="card" style={{padding:'18px'}}>
+                                    <div className="card-title" style={{marginBottom:4}}>已保存股票池</div>
+                                    <div className="factor-board-subtle">点击“用于回测”可直接切换当前回测股票池。</div>
+                                    <div className="factor-board-list" style={{maxHeight:420, overflowY:'auto', marginTop:14}}>
+                                        {(universeOptions.custom_pools || []).length === 0 ? <div className="factor-board-empty">暂无已保存的自定义股票池。</div> : (universeOptions.custom_pools || []).map(pool => (
+                                            <div key={pool.id} className="factor-board-list-item">
+                                                <div>
+                                                    <div style={{fontWeight:600, color:'#f8fafc'}}>{pool.name}</div>
+                                                    <div className="factor-board-subtle">{pool.stock_count} 只股票 · {pool.description || '未填写说明'}</div>
+                                                </div>
+                                                <div className="factor-board-toolbar-right">
+                                                    <button className="btn-link" type="button" onClick={() => { setCustomPoolId(String(pool.id)); setUniverseInputMode('custom'); setShowPoolManager(false); }}>用于回测</button>
+                                                    <button className="btn-link" type="button" onClick={() => editPool(pool)}>编辑</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {result ? <div ref={resultRef}><BacktestResultView result={result} tab={resultTab} setTab={setResultTab} logs={logs} onOpenHistory={openResultInHistory} /></div> : null}
             <QualityPanel universe={universe} startDate={startDate} endDate={endDate} showToast={showToast} />
         </div>
     );
 }
 
-function BacktestForm({ strategies, strategyId, setStrategyId, universe, setUniverse, startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark, running, onRun, maxPosPct, setMaxPosPct, maxDdLimit, setMaxDdLimit, prefillInfo, universeInputMode, setUniverseInputMode, dateInputMode, setDateInputMode, benchmarkInputMode, setBenchmarkInputMode, restoreSourceDateRange, restoreSourceBenchmark }) {
-    const hasPoolDescriptor = !!(prefillInfo && prefillInfo.universe_type);
+function BacktestForm({
+    strategies, strategyId, setStrategyId, running, onRun,
+    startDate, setStartDate, endDate, setEndDate, cash, setCash, benchmark, setBenchmark,
+    maxPosPct, setMaxPosPct, maxDdLimit, setMaxDdLimit,
+    prefillInfo, linkedPoolAvailable, universeInputMode, setUniverseInputMode,
+    dateInputMode, setDateInputMode, benchmarkInputMode, setBenchmarkInputMode,
+    restoreSourceDateRange, restoreSourceBenchmark,
+    universeOptions, systemUniverseCode, setSystemUniverseCode, customPoolId, setCustomPoolId,
+    selectedSystemUniverse, selectedCustomPool,
+    codeList, codeDraft, setCodeDraft, addCodeDraft, removeCodeFromList, unsupportedLabels,
+    openPoolManager, resetPoolForm, editPool
+}) {
     const hasSourceDate = !!(prefillInfo && (prefillInfo.start_date || prefillInfo.end_date));
     const hasSourceBenchmark = !!(prefillInfo && prefillInfo.benchmark);
-    const poolSummary = hasPoolDescriptor ? [prefillInfo.universe_name || '', prefillInfo.universe_code || '', prefillInfo.stock_count ? `${prefillInfo.stock_count}\u53ea\u80a1\u7968` : '', prefillInfo.start_date && prefillInfo.end_date ? `${prefillInfo.start_date} ~ ${prefillInfo.end_date}` : ''].filter(Boolean).join(' \u00b7 ') : '';
-    const stateSummary = [universeInputMode === 'pool' && hasPoolDescriptor ? '\u80a1\u7968\u6c60\u76f4\u8fde\u540e\u7aef' : '\u4ee3\u7801\u5217\u8868\u624b\u52a8\u8f93\u5165', dateInputMode === 'source' && hasSourceDate ? '\u533a\u95f4\u8ddf\u968f\u6765\u6e90' : '\u533a\u95f4\u624b\u52a8\u8986\u76d6', benchmarkInputMode === 'source' && hasSourceBenchmark ? '\u57fa\u51c6\u8ddf\u968f\u6765\u6e90' : '\u57fa\u51c6\u624b\u52a8\u8986\u76d6'].join(' \u00b7 ');
-    return (<div className="card backtest-card space-y"><div className="backtest-hero"><div><div className="card-title" style={{marginBottom: 8}}>{'\u56de\u6d4b\u914d\u7f6e'}</div><div className="backtest-hero-copy">{'\u5c06\u7b56\u7565\u3001\u80a1\u7968\u6c60\u3001\u56de\u6d4b\u533a\u95f4\u548c\u98ce\u63a7\u53c2\u6570\u7edf\u4e00\u653e\u5728\u540c\u4e00\u5de5\u4f5c\u533a\u4e2d\u7ba1\u7406\u3002\u5982\u679c\u7b56\u7565\u6765\u81ea\u56e0\u5b50\u770b\u677f\uff0c\u53ef\u4ee5\u76f4\u63a5\u9501\u5b9a\u6765\u6e90\u80a1\u7968\u6c60\u3001\u533a\u95f4\u548c\u57fa\u51c6\uff1b\u82e5\u9700\u8981\u505a\u5b9e\u9a8c\u6027\u8c03\u6574\uff0c\u53ef\u4ee5\u968f\u65f6\u5207\u6362\u5230\u624b\u52a8\u8986\u76d6\u3002'}</div></div><div className="backtest-mode-row"><button className={'backtest-mode-chip' + (universeInputMode === 'pool' ? ' active' : '')} disabled={!hasPoolDescriptor} onClick={() => hasPoolDescriptor && setUniverseInputMode('pool')}>{'\u80a1\u7968\u6c60\u6a21\u5f0f'}</button><button className={'backtest-mode-chip' + (universeInputMode === 'codes' ? ' active' : '')} onClick={() => setUniverseInputMode('codes')}>{'\u4ee3\u7801\u5217\u8868\u6a21\u5f0f'}</button></div></div>{universeInputMode === 'pool' && hasPoolDescriptor ? (<div className="backtest-pool-panel"><div><div className="backtest-pool-title">{'\u5f53\u524d\u56de\u6d4b\u5c06\u76f4\u63a5\u4f7f\u7528\u6765\u6e90\u80a1\u7968\u6c60'}</div><div className="backtest-pool-copy">{'\u540e\u7aef\u4f1a\u6309\u80a1\u7968\u6c60\u63cf\u8ff0\u5b9e\u65f6\u89e3\u6790\u7cfb\u7edf\u6307\u6570\u6210\u5206\u80a1\u6216\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u4e0d\u518d\u4f9d\u8d56\u524d\u7aef\u62fc\u63a5\u957f\u4ee3\u7801\u5b57\u7b26\u4e32\u3002'}</div><div className="backtest-pool-meta"><span className="backtest-badge">{prefillInfo.source_label || '\u7b56\u7565\u8054\u52a8'}</span><span className="backtest-badge">{prefillInfo.universe_type === 'system' ? '\u7cfb\u7edf\u80a1\u7968\u6c60' : '\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</span>{prefillInfo.stock_count ? <span className="backtest-badge">{prefillInfo.stock_count}{'\u53ea\u80a1\u7968'}</span> : null}</div></div><div className="backtest-pool-side"><div className="backtest-side-label">{'\u5f53\u524d\u80a1\u7968\u6c60'}</div><div className="backtest-side-value">{prefillInfo.universe_name || '-'}</div><div className="backtest-side-value" style={{marginTop: 10, color: 'var(--text-400)'}}>{poolSummary || '\u672a\u63d0\u4f9b\u80a1\u7968\u6c60\u6458\u8981'}</div></div></div>) : (<div className="field"><label className="label">{'\u80a1\u7968\u4ee3\u7801\u5217\u8868\uff08\u9017\u53f7\u5206\u9694\uff09'}</label><input className="input" value={universe} onChange={e => setUniverse(e.target.value)} placeholder="600519.SH,000858.SZ,601318.SH" /><div className="backtest-runhint" style={{marginTop: 6}}>{'\u9002\u5408\u4e34\u65f6\u6d4b\u8bd5\u5c0f\u6837\u672c\u80a1\u7968\u6c60\uff1b\u5982\u9700\u590d\u7528\u56e0\u5b50\u770b\u677f\u6216\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60\uff0c\u8bf7\u5207\u56de\u80a1\u7968\u6c60\u6a21\u5f0f\u3002'}</div></div>)}<div className="backtest-grid"><div className="field"><label className="label">{'\u7b56\u7565'}</label><select className="input" value={strategyId} onChange={e => setStrategyId(e.target.value)}>{strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div><div className="field"><label className="label">{'\u8d77\u59cb\u65e5\u671f'}</label><div className="backtest-mode-row" style={{marginBottom: 8}}><button className={'backtest-mode-chip' + (dateInputMode === 'source' ? ' active' : '')} disabled={!hasSourceDate} onClick={() => hasSourceDate && restoreSourceDateRange()}>{'\u6765\u6e90\u9501\u5b9a'}</button><button className={'backtest-mode-chip' + (dateInputMode === 'manual' ? ' active' : '')} onClick={() => setDateInputMode('manual')}>{'\u624b\u52a8\u8986\u76d6'}</button></div><input className="input" value={startDate} onChange={e => { setDateInputMode('manual'); setStartDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} /><div className="backtest-runhint" style={{marginTop: 6}}>{dateInputMode === 'source' && hasSourceDate ? `${prefillInfo.start_date || '-'} ~ ${prefillInfo.end_date || '-'}` : '\u624b\u52a8\u8f93\u5165\u56de\u6d4b\u533a\u95f4'}</div></div><div className="field"><label className="label">{'\u7ed3\u675f\u65e5\u671f'}</label><input className="input" value={endDate} onChange={e => { setDateInputMode('manual'); setEndDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} /></div><div className="field"><label className="label">{'\u57fa\u51c6\u6307\u6570'}</label><div className="backtest-mode-row" style={{marginBottom: 8}}><button className={'backtest-mode-chip' + (benchmarkInputMode === 'source' ? ' active' : '')} disabled={!hasSourceBenchmark} onClick={() => hasSourceBenchmark && restoreSourceBenchmark()}>{'\u6765\u6e90\u9501\u5b9a'}</button><button className={'backtest-mode-chip' + (benchmarkInputMode === 'manual' ? ' active' : '')} onClick={() => setBenchmarkInputMode('manual')}>{'\u624b\u52a8\u8986\u76d6'}</button></div><input className="input" value={benchmark} onChange={e => { setBenchmarkInputMode('manual'); setBenchmark(e.target.value); }} disabled={benchmarkInputMode === 'source' && hasSourceBenchmark} /><div className="backtest-runhint" style={{marginTop: 6}}>{benchmarkInputMode === 'source' && hasSourceBenchmark ? prefillInfo.benchmark : '\u53ef\u8f93\u5165 000300.SH\u3001000905.SH \u7b49\u57fa\u51c6\u4ee3\u7801'}</div></div><div className="field"><label className="label">{'\u521d\u59cb\u8d44\u91d1'}</label><input className="input" type="number" value={cash} onChange={e => setCash(parseFloat(e.target.value)||0)} /></div><div className="field"><label className="label">{'\u5f53\u524d\u72b6\u6001'}</label><div className="backtest-side-value" style={{marginTop: 0}}>{stateSummary}</div></div></div><div style={{fontSize:13,fontWeight:600,color:'var(--text-300)',marginTop:8}}>{'\u98ce\u63a7\u53c2\u6570'}</div><div className="backtest-risk-grid"><div className="field"><label className="label">{'\u5355\u80a1\u6700\u5927\u4ed3\u4f4d'}</label><input className="input" type="number" step="0.05" min="0" max="1" value={maxPosPct} onChange={e => setMaxPosPct(parseFloat(e.target.value)||0)} /></div><div className="field"><label className="label">{'\u56de\u64a4\u7194\u65ad %\uff080 = \u5173\u95ed\uff09'}</label><input className="input" type="number" step="0.05" min="0" max="1" value={maxDdLimit} onChange={e => setMaxDdLimit(parseFloat(e.target.value)||0)} /></div></div><div className="backtest-runbar"><div className="backtest-runhint">{universeInputMode === 'pool' && hasPoolDescriptor ? '\u5c06\u6309\u80a1\u7968\u6c60\u63cf\u8ff0\u5728\u540e\u7aef\u89e3\u6790\u771f\u5b9e\u6210\u5206\u80a1\u540e\u518d\u8fd0\u884c\u3002' : '\u5c06\u76f4\u63a5\u6309\u8f93\u5165\u7684\u80a1\u7968\u4ee3\u7801\u5217\u8868\u8fd0\u884c\u56de\u6d4b\u3002'}</div><button className="btn btn-primary" onClick={onRun} disabled={running}>{running ? <><span className="spinner"/> {'\u56de\u6d4b\u8fd0\u884c\u4e2d...'}</> : '\u8fd0\u884c\u56de\u6d4b'}</button></div></div>);
+    const linkedSummary = linkedPoolAvailable
+        ? [prefillInfo.universe_name || '', prefillInfo.universe_code || '', prefillInfo.stock_count ? `${prefillInfo.stock_count}只股票` : '', prefillInfo.start_date && prefillInfo.end_date ? `${prefillInfo.start_date} ~ ${prefillInfo.end_date}` : ''].filter(Boolean).join(' · ')
+        : '';
+    const currentPoolLabel = universeInputMode === 'linked'
+        ? (prefillInfo && prefillInfo.universe_name) || '联动股票池'
+        : universeInputMode === 'system'
+            ? ((selectedSystemUniverse && selectedSystemUniverse.name) || '系统股票池')
+            : universeInputMode === 'custom'
+                ? ((selectedCustomPool && selectedCustomPool.name) || '未选择自定义股票池')
+                : '代码列表';
+    const poolHint = universeInputMode === 'linked'
+        ? '将直接复用联动来源中的股票池描述'
+        : universeInputMode === 'system'
+            ? '将使用真实指数成分股作为股票池，后端按最新成分解析'
+            : universeInputMode === 'custom'
+                ? '将使用你保存的自定义股票池'
+                : '将使用下方代码列表中的股票直接回测';
+    const stateSummary = [
+        universeInputMode === 'linked' ? '联动股票池' : universeInputMode === 'system' ? '系统股票池' : universeInputMode === 'custom' ? '自定义股票池' : '代码列表',
+        dateInputMode === 'source' && hasSourceDate ? '区间跟随来源' : '区间手动覆盖',
+        benchmarkInputMode === 'source' && hasSourceBenchmark ? '基准跟随来源' : '基准手动覆盖',
+    ].join(' · ');
+
+    return (
+        <div className="card backtest-card space-y">
+            <div className="backtest-hero">
+                <div>
+                    <div className="card-title" style={{marginBottom: 8}}>回测配置</div>
+                    <div className="backtest-hero-copy">回测页现在支持独立选择系统股票池、自定义股票池和代码列表；点击运行前会先保存当前配置，避免页面异常刷新时丢失输入。</div>
+                </div>
+                <div className="backtest-mode-row">
+                    {linkedPoolAvailable ? <button type="button" className={'backtest-mode-chip' + (universeInputMode === 'linked' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setUniverseInputMode('linked'); }}>联动股票池</button> : null}
+                    <button type="button" className={'backtest-mode-chip' + (universeInputMode === 'system' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setUniverseInputMode('system'); }}>系统股票池</button>
+                    <button type="button" className={'backtest-mode-chip' + (universeInputMode === 'custom' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setUniverseInputMode('custom'); }}>自定义股票池</button>
+                    <button type="button" className={'backtest-mode-chip' + (universeInputMode === 'codes' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setUniverseInputMode('codes'); }}>代码列表</button>
+                </div>
+            </div>
+
+            {universeInputMode === 'linked' && linkedPoolAvailable ? (
+                <div className="backtest-pool-panel">
+                    <div>
+                        <div className="backtest-pool-title">当前将使用联动股票池</div>
+                        <div className="backtest-pool-copy">适合直接承接因子看板或策略页面推送过来的股票池、日期区间和基准设置。</div>
+                        <div className="backtest-pool-meta">
+                            <span className="backtest-badge">{prefillInfo.source_label || '外部联动'}</span>
+                            <span className="backtest-badge">{prefillInfo.universe_type === 'system' ? '系统股票池' : '自定义股票池'}</span>
+                            {prefillInfo.stock_count ? <span className="backtest-badge">{prefillInfo.stock_count}只股票</span> : null}
+                        </div>
+                    </div>
+                    <div className="backtest-pool-side">
+                        <div className="backtest-side-label">当前股票池</div>
+                        <div className="backtest-side-value">{prefillInfo.universe_name || '-'}</div>
+                        <div className="backtest-side-value" style={{marginTop: 10, color: 'var(--text-400)'}}>{linkedSummary || '未提供联动摘要'}</div>
+                    </div>
+                </div>
+            ) : null}
+
+            {universeInputMode === 'system' ? (
+                <div className="backtest-pool-panel">
+                    <div className="field">
+                        <label className="label">系统股票池</label>
+                        <select className="input" value={systemUniverseCode} onChange={e => setSystemUniverseCode(e.target.value)}>
+                            {(universeOptions.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name}（{item.code}）</option>)}
+                        </select>
+                        <div className="backtest-runhint" style={{marginTop: 6}}>{selectedSystemUniverse ? `将按 ${selectedSystemUniverse.name} 最新真实成分股进行回测` : '请选择系统股票池'}</div>
+                    </div>
+                    <div className="backtest-pool-side">
+                        <div className="backtest-side-label">默认基准</div>
+                        <div className="backtest-side-value">{(selectedSystemUniverse && selectedSystemUniverse.benchmark_code) || benchmark || '-'}</div>
+                        <div className="backtest-side-value" style={{marginTop: 10, color: 'var(--text-400)'}}>当前真实数据源已接入：沪深300、上证50、中证500、中证1000。</div>
+                    </div>
+                </div>
+            ) : null}
+
+            {universeInputMode === 'custom' ? (
+                <div className="backtest-pool-panel">
+                    <div className="field">
+                        <label className="label">自定义股票池</label>
+                        <select className="input" value={customPoolId} onChange={e => setCustomPoolId(e.target.value)}>
+                            <option value="">请选择已保存的股票池</option>
+                            {(universeOptions.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name}（{item.stock_count}只）</option>)}
+                        </select>
+                        <div className="backtest-runhint" style={{marginTop: 6}}>{selectedCustomPool ? `${selectedCustomPool.description || '未填写说明'} · ${selectedCustomPool.stock_count}只股票` : '可在因子看板页维护自定义股票池'}</div>
+                        <div className="backtest-mode-row" style={{marginTop: 10}}>
+                            <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); resetPoolForm(); openPoolManager(); }}>新建股票池</button>
+                            <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); openPoolManager(); }}>管理股票池</button>
+                            {selectedCustomPool ? <button type="button" className="btn btn-secondary" onClick={(e) => { e.preventDefault(); editPool(selectedCustomPool); }}>编辑当前股票池</button> : null}
+                        </div>
+                    </div>
+                    <div className="backtest-pool-side">
+                        <div className="backtest-side-label">当前股票池</div>
+                        <div className="backtest-side-value">{(selectedCustomPool && selectedCustomPool.name) || '-'}</div>
+                        <div className="backtest-side-value" style={{marginTop: 10, color: 'var(--text-400)'}}>{selectedCustomPool ? `将复用已保存的 ${selectedCustomPool.stock_count} 只股票` : '请选择自定义股票池'}</div>
+                    </div>
+                </div>
+            ) : null}
+
+            {universeInputMode === 'codes' ? (
+                <div className="space-y-sm">
+                    <div className="field">
+                        <label className="label">添加股票代码</label>
+                        <div className="backtest-mode-row">
+                            <input
+                                className="input"
+                                value={codeDraft}
+                                onChange={e => setCodeDraft(e.target.value)}
+                                placeholder="支持逗号或空格分隔，例如：600519.SH,000858.SZ"
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') addCodeDraft(e);
+                                }}
+                            />
+                            <button type="button" className="btn btn-secondary" onClick={addCodeDraft}>添加到列表</button>
+                        </div>
+                        <div className="backtest-runhint" style={{marginTop: 6}}>代码会保存为可移除的列表项，避免运行回测时丢失。</div>
+                    </div>
+                    <div className="backtest-pool-panel">
+                        <div>
+                            <div className="backtest-pool-title">当前代码列表</div>
+                            <div className="backtest-pool-copy">已添加 {codeList.length} 只股票。运行回测时将按该列表直接取真实行情。</div>
+                            <div className="backtest-pool-meta">
+                                {codeList.length === 0 ? <span className="backtest-badge">尚未添加股票</span> : codeList.map(code => (
+                                    <span key={code} className="backtest-badge" style={{gap: 8}}>
+                                        {code}
+                                        <button type="button" className="btn-link" style={{fontSize: 11}} onClick={(e) => { e.preventDefault(); removeCodeFromList(code); }}>移除</button>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="backtest-pool-side">
+                            <div className="backtest-side-label">快速提示</div>
+                            <div className="backtest-side-value">代码列表模式更适合小样本调试、择时策略验证、单标的策略验证。</div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="backtest-grid">
+                <div className="field">
+                    <label className="label">策略</label>
+                    <select className="input" value={strategyId} onChange={e => setStrategyId(e.target.value)}>
+                        {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </div>
+                <div className="field">
+                    <label className="label">起始日期</label>
+                    <div className="backtest-mode-row" style={{marginBottom: 8}}>
+                        <button type="button" className={'backtest-mode-chip' + (dateInputMode === 'source' ? ' active' : '')} disabled={!hasSourceDate} onClick={(e) => { e.preventDefault(); hasSourceDate && restoreSourceDateRange(); }}>来源锁定</button>
+                        <button type="button" className={'backtest-mode-chip' + (dateInputMode === 'manual' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setDateInputMode('manual'); }}>手动覆盖</button>
+                    </div>
+                    <input className="input" value={startDate} onChange={e => { setDateInputMode('manual'); setStartDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} />
+                    <div className="backtest-runhint" style={{marginTop: 6}}>{dateInputMode === 'source' && hasSourceDate ? `${prefillInfo.start_date || '-'} ~ ${prefillInfo.end_date || '-'}` : '手动输入回测区间'}</div>
+                </div>
+                <div className="field">
+                    <label className="label">结束日期</label>
+                    <input className="input" value={endDate} onChange={e => { setDateInputMode('manual'); setEndDate(e.target.value); }} placeholder="YYYYMMDD" disabled={dateInputMode === 'source' && hasSourceDate} />
+                </div>
+                <div className="field">
+                    <label className="label">基准指数</label>
+                    <div className="backtest-mode-row" style={{marginBottom: 8}}>
+                        <button type="button" className={'backtest-mode-chip' + (benchmarkInputMode === 'source' ? ' active' : '')} disabled={!hasSourceBenchmark} onClick={(e) => { e.preventDefault(); hasSourceBenchmark && restoreSourceBenchmark(); }}>来源锁定</button>
+                        <button type="button" className={'backtest-mode-chip' + (benchmarkInputMode === 'manual' ? ' active' : '')} onClick={(e) => { e.preventDefault(); setBenchmarkInputMode('manual'); }}>手动覆盖</button>
+                    </div>
+                    <input className="input" value={benchmark} onChange={e => { setBenchmarkInputMode('manual'); setBenchmark(e.target.value); }} disabled={benchmarkInputMode === 'source' && hasSourceBenchmark} />
+                    <div className="backtest-runhint" style={{marginTop: 6}}>{benchmarkInputMode === 'source' && hasSourceBenchmark ? prefillInfo.benchmark : '可输入 000300.SH、000905.SH、000016.SH 等真实基准代码'}</div>
+                </div>
+                <div className="field">
+                    <label className="label">初始资金</label>
+                    <input className="input" type="number" value={cash} onChange={e => setCash(parseFloat(e.target.value)||0)} />
+                </div>
+                <div className="field">
+                    <label className="label">当前状态</label>
+                    <div className="backtest-side-value" style={{marginTop: 0}}>{stateSummary}</div>
+                    <div className="backtest-runhint" style={{marginTop: 6}}>{currentPoolLabel} · {poolHint}</div>
+                </div>
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,color:'var(--text-300)',marginTop:8}}>风控参数</div>
+            <div className="backtest-risk-grid">
+                <div className="field">
+                    <label className="label">单股最大仓位</label>
+                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxPosPct} onChange={e => setMaxPosPct(parseFloat(e.target.value)||0)} />
+                </div>
+                <div className="field">
+                    <label className="label">回撤熔断 %（0 = 关闭）</label>
+                    <input className="input" type="number" step="0.05" min="0" max="1" value={maxDdLimit} onChange={e => setMaxDdLimit(parseFloat(e.target.value)||0)} />
+                </div>
+            </div>
+
+            {unsupportedLabels && unsupportedLabels.length > 0 ? (
+                <div className="backtest-runhint">{unsupportedLabels.join('；')}</div>
+            ) : null}
+
+            <div className="backtest-runbar">
+                <div className="backtest-runhint">回测使用真实 Tushare 行情、真实指数成分股；当前模式：{currentPoolLabel}。</div>
+                <button type="button" className="btn btn-primary" onClick={(e) => { e.preventDefault(); onRun(); }} disabled={running}>
+                    {running ? <><span className="spinner"/> {'回测运行中...'}</> : '运行回测'}
+                </button>
+            </div>
+        </div>
+    );
 }
+
 /* ===== Backtest Result View ===== */
+function buildBacktestInsightModel(result) {
+    const metrics = result && result.metrics ? result.metrics : {};
+    const trades = Array.isArray(result && result.trades) ? result.trades : [];
+    const equityCurve = Array.isArray(result && result.equity_curve) ? result.equity_curve : [];
+    const benchmarkCurve = Array.isArray(result && result.benchmark_curve) ? result.benchmark_curve : [];
+    const strategyProfile = result && result.strategy_profile ? result.strategy_profile : {};
+
+    const toNum = (value, fallback = 0) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    };
+    const toDate = (value) => {
+        const text = String(value || '').replace(/-/g, '');
+        if (!/^\d{8}$/.test(text)) return null;
+        return new Date(Number(text.slice(0, 4)), Number(text.slice(4, 6)) - 1, Number(text.slice(6, 8)));
+    };
+    const diffDays = (startValue, endValue) => {
+        const startDate = toDate(startValue);
+        const endDate = toDate(endValue);
+        if (!startDate || !endDate) return 0;
+        return Math.max(Math.round((endDate - startDate) / 86400000), 0);
+    };
+    const formatPct = (value) => {
+        if (value == null || !Number.isFinite(Number(value))) return '-';
+        const num = Number(value);
+        return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+    };
+    const formatSigned = (value, digits = 2) => {
+        if (value == null || !Number.isFinite(Number(value))) return '-';
+        const num = Number(value);
+        return `${num >= 0 ? '+' : ''}${num.toFixed(digits)}`;
+    };
+    const formatDays = (value) => {
+        if (!Number.isFinite(Number(value))) return '-';
+        return `${Number(value).toFixed(1)}天`;
+    };
+
+    const startDate = result && result.start_date ? result.start_date : (equityCurve[0] && equityCurve[0].date) || '';
+    const endDate = result && result.end_date ? result.end_date : (equityCurve[equityCurve.length - 1] && equityCurve[equityCurve.length - 1].date) || '';
+    const totalDays = diffDays(startDate, endDate) + 1;
+    const totalMonths = Math.max(totalDays / 30, 1);
+    const uniqueSymbols = Array.from(new Set(trades.map(item => item.ts_code).filter(Boolean)));
+    const tradeDates = Array.from(new Set(trades.map(item => item.date).filter(Boolean))).sort();
+
+    let avgTradeGap = null;
+    if (tradeDates.length > 1) {
+        let totalGap = 0;
+        for (let idx = 1; idx < tradeDates.length; idx += 1) totalGap += diffDays(tradeDates[idx - 1], tradeDates[idx]);
+        avgTradeGap = totalGap / (tradeDates.length - 1);
+    }
+
+    const buyCount = trades.filter(item => item.side === 'buy').length;
+    const sellCount = trades.filter(item => item.side === 'sell').length;
+    const monthlyTradeCount = trades.length / totalMonths;
+    const benchmarkReturn = benchmarkCurve.length >= 2 ? (toNum(benchmarkCurve[benchmarkCurve.length - 1].value, 1) - 1) * 100 : null;
+    const excessReturn = benchmarkReturn == null ? null : toNum(metrics.total_return) - benchmarkReturn;
+    const returnDrawdownRatio = toNum(metrics.max_drawdown) < 0 ? toNum(metrics.total_return) / Math.abs(toNum(metrics.max_drawdown)) : null;
+
+    const openLots = {};
+    let closedTradeCount = 0;
+    let winTrades = 0;
+    let positivePnl = 0;
+    let negativePnl = 0;
+    let holdingDaysWeighted = 0;
+    let holdingAmountWeighted = 0;
+    const symbolClosedPnl = {};
+
+    [...trades].sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).forEach((trade) => {
+        const code = String(trade.ts_code || '').trim();
+        if (!code) return;
+        openLots[code] = openLots[code] || [];
+        const amount = Math.max(toNum(trade.amount), 0);
+        const price = toNum(trade.price);
+        if (trade.side === 'buy') {
+            openLots[code].push({ amount, price, date: trade.date });
+            return;
+        }
+        let remaining = amount;
+        while (remaining > 0 && openLots[code].length > 0) {
+            const lot = openLots[code][0];
+            const matchedAmount = Math.min(remaining, lot.amount);
+            const pnl = (price - toNum(lot.price)) * matchedAmount;
+            const holdDays = diffDays(lot.date, trade.date);
+            closedTradeCount += 1;
+            if (pnl >= 0) {
+                winTrades += 1;
+                positivePnl += pnl;
+            } else {
+                negativePnl += pnl;
+            }
+            symbolClosedPnl[code] = (symbolClosedPnl[code] || 0) + pnl;
+            holdingDaysWeighted += holdDays * matchedAmount;
+            holdingAmountWeighted += matchedAmount;
+            lot.amount -= matchedAmount;
+            remaining -= matchedAmount;
+            if (lot.amount <= 0) openLots[code].shift();
+        }
+    });
+
+    const winRateClosed = closedTradeCount > 0 ? (winTrades / closedTradeCount) * 100 : null;
+    const profitFactor = negativePnl < 0 ? positivePnl / Math.abs(negativePnl) : null;
+    const avgHoldingDays = holdingAmountWeighted > 0 ? holdingDaysWeighted / holdingAmountWeighted : null;
+    const symbolContribution = Object.entries(symbolClosedPnl).sort((a, b) => b[1] - a[1]);
+    const bestSymbol = symbolContribution[0] || null;
+    const worstSymbol = symbolContribution.length ? symbolContribution[symbolContribution.length - 1] : null;
+
+    const diagnosticTags = [];
+    if (excessReturn != null) diagnosticTags.push(excessReturn >= 0 ? `跑赢基准 ${formatPct(excessReturn)}` : `落后基准 ${formatPct(excessReturn)}`);
+    if (toNum(metrics.sharpe_ratio) >= 1) diagnosticTags.push(`风险调整后表现较好（Sharpe ${formatSigned(metrics.sharpe_ratio)})`);
+    else diagnosticTags.push(`风险收益效率一般（Sharpe ${formatSigned(metrics.sharpe_ratio)})`);
+    if (avgHoldingDays != null) diagnosticTags.push(avgHoldingDays <= 5 ? '更接近短周期择时/轮动执行' : avgHoldingDays >= 20 ? '更接近中周期持有策略' : '持有周期位于中短周期区间');
+    if (monthlyTradeCount >= 25) diagnosticTags.push('交易频率偏高，需重点关注冲击成本与滑点');
+    else if (monthlyTradeCount <= 8) diagnosticTags.push('交易频率较低，执行压力相对较小');
+
+    return {
+        periodText: startDate && endDate ? `${startDate} ~ ${endDate}` : '-',
+        totalDays,
+        buyCount,
+        sellCount,
+        uniqueSymbolCount: uniqueSymbols.length,
+        universeSize: strategyProfile.universe_size ?? result.resolved_universe_count ?? null,
+        monthlyTradeCount,
+        avgTradeGap,
+        avgHoldingDays,
+        closedTradeCount,
+        winRateClosed,
+        profitFactor,
+        benchmarkReturn,
+        excessReturn,
+        returnDrawdownRatio,
+        bestSymbol,
+        worstSymbol,
+        diagnosticTags,
+        formatPct,
+        formatSigned,
+        formatDays,
+    };
+}
+
+function BacktestInsightPanel({ result }) {
+    const insight = buildBacktestInsightModel(result);
+    const signedClass = (value) => Number(value) >= 0 ? 'text-profit' : 'text-loss';
+
+    return (
+        <div className="insight-grid">
+            <div className="insight-card">
+                <div className="insight-title">回测洞察</div>
+                <div className="insight-metrics">
+                    <div>
+                        <div className="insight-metric-label">超额收益</div>
+                        <div className={'insight-metric-value ' + signedClass(insight.excessReturn || 0)}>{insight.formatPct(insight.excessReturn)}</div>
+                    </div>
+                    <div>
+                        <div className="insight-metric-label">收益回撤比</div>
+                        <div className={'insight-metric-value ' + (Number(insight.returnDrawdownRatio) >= 1 ? 'text-profit' : '')}>{insight.formatSigned(insight.returnDrawdownRatio)}</div>
+                    </div>
+                    <div>
+                        <div className="insight-metric-label">闭合胜率</div>
+                        <div className={'insight-metric-value ' + (Number(insight.winRateClosed) >= 50 ? 'text-profit' : '')}>{insight.formatPct(insight.winRateClosed)}</div>
+                    </div>
+                    <div>
+                        <div className="insight-metric-label">平均持有期</div>
+                        <div className="insight-metric-value">{insight.formatDays(insight.avgHoldingDays)}</div>
+                    </div>
+                    <div>
+                        <div className="insight-metric-label">月均交易次数</div>
+                        <div className="insight-metric-value">{Number.isFinite(insight.monthlyTradeCount) ? insight.monthlyTradeCount.toFixed(1) : '-'}</div>
+                    </div>
+                    <div>
+                        <div className="insight-metric-label">平均调仓间隔</div>
+                        <div className="insight-metric-value">{insight.formatDays(insight.avgTradeGap)}</div>
+                    </div>
+                </div>
+                <div className="insight-chip-row" style={{marginTop: 14}}>
+                    {(insight.diagnosticTags || []).map((tag, idx) => <span key={idx} className="insight-chip">{tag}</span>)}
+                </div>
+            </div>
+            <div className="insight-card">
+                <div className="insight-title">执行摘要</div>
+                <div className="insight-list">
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">回测区间</div>
+                        <div className="insight-list-value">{insight.periodText}</div>
+                    </div>
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">交易覆盖 / 股票池规模</div>
+                        <div className="insight-list-value">{insight.uniqueSymbolCount} / {insight.universeSize ?? '-'}</div>
+                    </div>
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">买卖笔数</div>
+                        <div className="insight-list-value">{insight.buyCount} 买 / {insight.sellCount} 卖</div>
+                    </div>
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">基准区间收益</div>
+                        <div className={'insight-list-value ' + signedClass(insight.benchmarkReturn || 0)}>{insight.formatPct(insight.benchmarkReturn)}</div>
+                    </div>
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">盈利贡献最大</div>
+                        <div className={'insight-list-value ' + (insight.bestSymbol && insight.bestSymbol[1] >= 0 ? 'text-profit' : '')}>{insight.bestSymbol ? `${insight.bestSymbol[0]} (${insight.bestSymbol[1].toFixed(0)})` : '-'}</div>
+                    </div>
+                    <div className="insight-list-item">
+                        <div className="insight-list-label">拖累最大</div>
+                        <div className={'insight-list-value ' + (insight.worstSymbol && insight.worstSymbol[1] < 0 ? 'text-loss' : '')}>{insight.worstSymbol ? `${insight.worstSymbol[0]} (${insight.worstSymbol[1].toFixed(0)})` : '-'}</div>
+                    </div>
+                    <div className="insight-copy" style={{paddingTop: 4}}>
+                        闭合胜率、持有期和盈亏贡献基于已成交买卖记录按 FIFO 粗略配对计算，用于快速诊断策略执行风格与交易质量。
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function BacktestResultView({ result, tab, setTab, logs, onOpenHistory }) {
     const metrics = result.metrics || {};
+    const strategyProfile = result.strategy_profile || null;
     const tabs = [{ key: 'chart', label: '\u6536\u76ca\u66f2\u7ebf' }, { key: 'metrics', label: '\u7ee9\u6548\u6307\u6807' }, { key: 'trades', label: '\u4ea4\u6613\u8bb0\u5f55' }, { key: 'risk', label: '\u98ce\u9669\u5206\u6790' }, { key: 'attribution', label: '\u5f52\u56e0\u5206\u6790' }, { key: 'logs', label: '\u8fd0\u884c\u65e5\u5fd7' }];
     const exportCSV = () => { if (result.id) window.open('/api/backtest/export/' + result.id, '_blank'); };
-    return (<div className="fade-in space-y"><div className="flex items-center justify-between"><MetricCards metrics={metrics} /></div><div className="card" style={{padding:0}}><div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}><div style={{display:'flex',flexWrap:'wrap'}}>{tabs.map(t => <button key={t.key} onClick={() => setTab(t.key)} className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>)}</div><div style={{display:'flex',gap:8,alignItems:'center'}}>{result.id && onOpenHistory ? <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={onOpenHistory}>{'\u67e5\u770b\u5386\u53f2'}</button> : null}{result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={exportCSV}>{'\u5bfc\u51fa CSV'}</button>}</div></div><div className="tab-content">{tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}{tab === 'metrics' && <MetricsTable metrics={metrics} />}{tab === 'trades' && <TradesTable trades={result.trades} />}{tab === 'risk' && <RiskAnalysisTab resultId={result.id} />}{tab === 'attribution' && <AttributionTab resultId={result.id} />}{tab === 'logs' && <LogsPanel logs={logs} />}</div></div></div>);
+    return (
+        <div className="fade-in space-y">
+            <div className="flex items-center justify-between"><MetricCards metrics={metrics} /></div>
+            {strategyProfile ? (
+                <div className="card" style={{padding:'14px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+                        <div>
+                            <div style={{fontSize:12,color:'var(--text-500)',textTransform:'uppercase',letterSpacing:'0.06em'}}>策略识别</div>
+                            <div style={{fontSize:16,fontWeight:700,color:'var(--text-100)',marginTop:4}}>
+                                {strategyProfile.strategy_type || '未识别'} · {strategyProfile.execution_scope || '未知范围'}
+                            </div>
+                            <div style={{fontSize:12,color:'var(--text-400)',marginTop:4}}>
+                                解析股票池规模：{strategyProfile.universe_size ?? result.resolved_universe_count ?? '-'} 只
+                            </div>
+                        </div>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                            {(strategyProfile.notes || []).map((note, idx) => (
+                                <span key={idx} className="backtest-badge">{note}</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            <BacktestInsightPanel result={result} />
+            <div className="card" style={{padding:0}}>
+                <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
+                    <div style={{display:'flex',flexWrap:'wrap'}}>{tabs.map(t => <button key={t.key} onClick={() => setTab(t.key)} className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>)}</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>{result.id && onOpenHistory ? <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={onOpenHistory}>{'\u67e5\u770b\u5386\u53f2'}</button> : null}{result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={exportCSV}>{'\u5bfc\u51fa CSV'}</button>}</div>
+                </div>
+                <div className="tab-content">{tab === 'chart' && <EquityChart data={result.equity_curve} benchmarkData={result.benchmark_curve} trades={result.trades} />}{tab === 'metrics' && <MetricsTable metrics={metrics} />}{tab === 'trades' && <TradesTable trades={result.trades} />}{tab === 'risk' && <RiskAnalysisTab resultId={result.id} />}{tab === 'attribution' && <AttributionTab resultId={result.id} />}{tab === 'logs' && <LogsPanel logs={logs} />}</div>
+            </div>
+        </div>
+    );
 }
 
 /* ===== Risk Analysis Tab ===== */
@@ -2798,7 +3998,7 @@ function LogsPanel({ logs }) {
     );
 }
 /* ===== History Page ===== */
-function HistoryPage({ showToast }) {
+function HistoryPage({ showToast, openPortfolioWorkspace }) {
     const [results, setResults] = useState([]);
     const [detail, setDetail] = useState(null);
     const [detailTab, setDetailTab] = useState('risk');
@@ -2806,31 +4006,42 @@ function HistoryPage({ showToast }) {
     const [comparing, setComparing] = useState(false);
     const [compareData, setCompareData] = useState(null);
     const [historyFocusId, setHistoryFocusId] = useState(null);
+    const [searchText, setSearchText] = useState('');
+    const [resultFilter, setResultFilter] = useState('all');
+    const [sortKey, setSortKey] = useState('created_at');
+    const [sortDir, setSortDir] = useState('desc');
+    const [resultMetaMap, setResultMetaMap] = useState({});
+    const [prefillBanner, setPrefillBanner] = useState(null);
 
     const loadResults = useCallback(() => {
         api.get('/api/backtest/history').then(setResults).catch(() => {});
     }, []);
 
-    const viewDetail = async (id, preferredTab) => {
+    const viewDetail = useCallback(async (id, preferredTab) => {
         try {
             const res = await api.get('/api/backtest/history/' + id);
             setDetail(res);
             setDetailTab(preferredTab || 'risk');
             setHistoryFocusId(id);
-        } catch (e) {
-            showToast('加载失败', 'error');
+        } catch (_) {
+            showToast('加载详情失败', 'error');
         }
-    };
+    }, [showToast]);
 
     const applyHistoryFocus = useCallback(() => {
         const focus = readHistoryFocus();
         if (!focus || !focus.result_id) return;
         setHistoryFocusId(focus.result_id);
         viewDetail(focus.result_id, focus.tab || 'risk');
+    }, [viewDetail]);
+
+    const refreshMeta = useCallback(() => {
+        setResultMetaMap(readResultMetaMap());
     }, []);
 
     useEffect(() => { loadResults(); }, [loadResults]);
     useEffect(() => { applyHistoryFocus(); }, [applyHistoryFocus]);
+    useEffect(() => { refreshMeta(); }, [refreshMeta]);
     useEffect(() => {
         const handler = () => applyHistoryFocus();
         window.addEventListener('qtsys:history-focus', handler);
@@ -2840,22 +4051,88 @@ function HistoryPage({ showToast }) {
     const toggleSelect = (id) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
+    const toggleFavorite = (id) => {
+        const current = getResultMeta(id);
+        saveResultMeta(id, { favorite: !current.favorite });
+        refreshMeta();
+    };
+    const editNote = (id) => {
+        const current = getResultMeta(id);
+        const nextNote = window.prompt('请输入这次回测的备注，便于后续筛选和复盘', current.note || '');
+        if (nextNote === null) return;
+        saveResultMeta(id, { note: String(nextNote || '').trim() });
+        refreshMeta();
+    };
+
+    const filteredResults = useMemo(() => {
+        const keyword = String(searchText || '').trim().toLowerCase();
+        const filtered = (results || []).filter(item => {
+            const totalReturn = Number(item.metrics?.total_return || 0);
+            const sharpe = Number(item.metrics?.sharpe_ratio || 0);
+            const meta = resultMetaMap[String(item.id)] || {};
+            if (resultFilter === 'positive' && totalReturn < 0) return false;
+            if (resultFilter === 'negative' && totalReturn >= 0) return false;
+            if (resultFilter === 'high_sharpe' && sharpe < 1) return false;
+            if (resultFilter === 'favorites' && !meta.favorite) return false;
+            if (!keyword) return true;
+            const haystack = [item.strategy_name, item.universe, item.start_date, item.end_date, item.id, meta.note || ''].join(' ').toLowerCase();
+            return haystack.includes(keyword);
+        });
+        return [...filtered].sort((a, b) => {
+            let left;
+            let right;
+            if (sortKey === 'created_at') {
+                left = String(a.created_at || '');
+                right = String(b.created_at || '');
+            } else if (sortKey === 'strategy_name') {
+                left = String(a.strategy_name || '');
+                right = String(b.strategy_name || '');
+            } else if (sortKey === 'final_value') {
+                left = Number(a.final_value || 0);
+                right = Number(b.final_value || 0);
+            } else {
+                left = Number(a.metrics?.[sortKey] || 0);
+                right = Number(b.metrics?.[sortKey] || 0);
+            }
+            const cmp = typeof left === 'string' ? left.localeCompare(right) : left - right;
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+    }, [results, resultMetaMap, searchText, resultFilter, sortKey, sortDir]);
+
+    const summary = useMemo(() => {
+        const total = filteredResults.length;
+        const positive = filteredResults.filter(item => Number(item.metrics?.total_return || 0) >= 0).length;
+        const avgReturn = total ? filteredResults.reduce((sum, item) => sum + Number(item.metrics?.total_return || 0), 0) / total : 0;
+        const avgSharpe = total ? filteredResults.reduce((sum, item) => sum + Number(item.metrics?.sharpe_ratio || 0), 0) / total : 0;
+        const best = total ? [...filteredResults].sort((a, b) => Number(b.metrics?.total_return || 0) - Number(a.metrics?.total_return || 0))[0] : null;
+        return { total, positive, avgReturn, avgSharpe, best };
+    }, [filteredResults]);
 
     const runCompare = async () => {
-        if (selectedIds.length < 2) { showToast('请至少选择 2 个结果', 'error'); return; }
-        setComparing(true); setCompareData(null);
+        if (selectedIds.length < 2) { showToast('至少选择 2 个结果才能对比', 'error'); return; }
+        setComparing(true);
+        setCompareData(null);
         try {
             const res = await api.post('/api/backtest/compare', { result_ids: selectedIds });
             setCompareData(res);
-        } catch (e) { showToast(e.detail || '对比失败', 'error'); }
+        } catch (e) {
+            showToast((e && e.detail) || '对比分析失败', 'error');
+        }
         setComparing(false);
+    };
+
+    const sendToPortfolio = () => {
+        if (selectedIds.length < 2) { showToast('至少选择 2 个结果才能做组合分析', 'error'); return; }
+        pushPortfolioPrefill({ result_ids: selectedIds, method: 'max_sharpe' });
+        setPrefillBanner(`已将 ${selectedIds.length} 个回测结果带入组合分析`);
+        if (openPortfolioWorkspace) openPortfolioWorkspace();
     };
 
     if (detail) {
         return (
             <div className="fade-in space-y">
                 <div className="flex items-center justify-between">
-                    <button className="btn-link" onClick={() => { setDetail(null); setDetailTab('risk'); clearHistoryFocus(); }}>&larr; 返回列表</button>
+                    <button className="btn-link" onClick={() => { setDetail(null); setDetailTab('risk'); clearHistoryFocus(); }}>&larr; 返回历史</button>
                     <div className="text-xs text-muted">结果 #{detail.id}</div>
                 </div>
                 <BacktestResultView result={detail} tab={detailTab} setTab={setDetailTab} logs={detail.logs || []} />
@@ -2866,8 +4143,8 @@ function HistoryPage({ showToast }) {
     if (compareData) {
         return (
             <div className="fade-in space-y">
-                <button className="btn-link" onClick={() => setCompareData(null)}>&larr; 返回列表</button>
-                <h2 style={{fontSize:20,fontWeight:600}}>回测对比</h2>
+                <button className="btn-link" onClick={() => setCompareData(null)}>&larr; 返回历史</button>
+                <h2 style={{fontSize:20,fontWeight:600}}>策略对比分析</h2>
                 <CompareView data={compareData} />
             </div>
         );
@@ -2875,60 +4152,162 @@ function HistoryPage({ showToast }) {
 
     return (
         <div className="fade-in space-y">
-            <div className="flex items-center justify-between">
-                <h2 style={{fontSize:20,fontWeight:600}}>回测历史</h2>
+            <div className="history-toolbar">
+                <div>
+                    <h2 style={{fontSize:20,fontWeight:600}}>回测历史</h2>
+                    <div className="text-xs text-muted" style={{marginTop:6}}>集中查看历史结果、做横向对比，并把多个策略一键送入组合分析。</div>
+                </div>
                 <div className="flex gap-sm items-center" style={{gap:8}}>
                     {selectedIds.length >= 2 && (
                         <button className="btn btn-primary" style={{fontSize:13,padding:'6px 14px'}} onClick={runCompare} disabled={comparing}>
-                            {comparing ? '对比中...' : `对比 (${selectedIds.length})`}
+                            {comparing ? '对比中...' : `对比结果 (${selectedIds.length})`}
                         </button>
                     )}
+                    {selectedIds.length >= 2 && (
+                        <button className="btn btn-secondary" style={{fontSize:13,padding:'6px 14px'}} onClick={sendToPortfolio}>送入组合分析</button>
+                    )}
                     {selectedIds.length > 0 && (
-                        <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => setSelectedIds([])}>清除选择</button>
+                        <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => setSelectedIds([])}>清空选择</button>
                     )}
                 </div>
             </div>
-            {results.length === 0 ? (
-                <div className="text-muted text-center py-10">暂无回测记录</div>
+            {prefillBanner ? (
+                <div className="card" style={{padding:'12px 14px', background:'rgba(59,130,246,0.10)', border:'1px solid rgba(96,165,250,0.18)'}}>
+                    <div className="text-sm" style={{color:'#dbeafe'}}>{prefillBanner}</div>
+                </div>
+            ) : null}
+
+            <div className="history-summary-grid">
+                <div className="history-mini-card">
+                    <div className="history-mini-label">结果数量</div>
+                    <div className="history-mini-value">{summary.total}</div>
+                    <div className="history-mini-meta">当前筛选条件下的回测记录</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className={'history-mini-value ' + (summary.positive === summary.total && summary.total ? 'text-profit' : '')}>{summary.total ? ((summary.positive / summary.total) * 100).toFixed(1) : '0.0'}%</div>
+                    <div className="history-mini-label">正收益占比</div>
+                    <div className="history-mini-meta">{summary.positive} / {summary.total} 条为正收益</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className={'history-mini-value ' + (summary.avgReturn >= 0 ? 'text-profit' : 'text-loss')}>{summary.avgReturn.toFixed(2)}%</div>
+                    <div className="history-mini-label">平均总收益</div>
+                    <div className="history-mini-meta">平均 Sharpe {summary.avgSharpe.toFixed(2)}</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-value">{summary.best ? `${Number(summary.best.metrics?.total_return || 0).toFixed(2)}%` : '-'}</div>
+                    <div className="history-mini-label">最佳策略</div>
+                    <div className="history-mini-meta">{summary.best ? repairMojibakeText(summary.best.strategy_name) : '暂无数据'}</div>
+                </div>
+            </div>
+
+            <div className="card space-y" style={{padding:'16px'}}>
+                <div className="history-filter-grid">
+                    <div className="field">
+                        <label className="label">搜索</label>
+                        <input className="input" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="按策略名、股票池、日期、结果 ID 或备注搜索" />
+                    </div>
+                    <div className="field">
+                        <label className="label">结果筛选</label>
+                        <select className="input" value={resultFilter} onChange={e => setResultFilter(e.target.value)}>
+                            <option value="all">全部结果</option>
+                            <option value="positive">仅正收益</option>
+                            <option value="negative">仅负收益</option>
+                            <option value="high_sharpe">Sharpe ≥ 1</option>
+                            <option value="favorites">仅收藏</option>
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label className="label">排序字段</label>
+                        <select className="input" value={sortKey} onChange={e => setSortKey(e.target.value)}>
+                            <option value="created_at">创建时间</option>
+                            <option value="total_return">总收益率</option>
+                            <option value="annual_return">年化收益率</option>
+                            <option value="sharpe_ratio">Sharpe</option>
+                            <option value="max_drawdown">最大回撤</option>
+                            <option value="final_value">期末净值</option>
+                            <option value="strategy_name">策略名称</option>
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label className="label">排序方向</label>
+                        <select className="input" value={sortDir} onChange={e => setSortDir(e.target.value)}>
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="text-xs text-muted">已选 {selectedIds.length} 条结果，可直接对比或发送到组合分析。</div>
+            </div>
+
+            {filteredResults.length === 0 ? (
+                <div className="text-muted text-center py-10">当前筛选条件下没有匹配结果</div>
             ) : (
                 <div className="space-y-sm">
-                    {results.map(r => (
-                        <div key={r.id} className="history-item" style={{position:'relative', border: historyFocusId === r.id ? '1px solid var(--accent)' : '1px solid transparent', boxShadow: historyFocusId === r.id ? '0 0 0 1px rgba(99,102,241,0.18)' : 'none'}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,flex:1,cursor:'pointer'}} onClick={() => viewDetail(r.id, 'risk')}>
-                                <div>
-                                    <div style={{fontWeight:500}}>{r.strategy_name}</div>
-                                    <div className="text-xs text-muted" style={{marginTop:4}}>
-                                        {r.start_date} ~ {r.end_date} | {r.universe}
+                    {filteredResults.map(r => {
+                        const totalReturn = Number(r.metrics?.total_return || 0);
+                        const sharpe = Number(r.metrics?.sharpe_ratio || 0);
+                        const maxDrawdown = Number(r.metrics?.max_drawdown || 0);
+                        const meta = resultMetaMap[String(r.id)] || {};
+                        return (
+                            <div key={r.id} className="history-item" style={{position:'relative', border: historyFocusId === r.id ? '1px solid var(--accent)' : '1px solid transparent', boxShadow: historyFocusId === r.id ? '0 0 0 1px rgba(99,102,241,0.18)' : 'none'}}>
+                                <div className="history-item-main" onClick={() => viewDetail(r.id, 'risk')} style={{cursor:'pointer'}}>
+                                    <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={(e) => { e.stopPropagation(); toggleSelect(r.id); }} style={{width:16,height:16,cursor:'pointer',accentColor:'var(--accent)'}} />
+                                    <div style={{minWidth:0, flex:1}}>
+                                        <div style={{fontWeight:600, color:'var(--text-100)'}}>{repairMojibakeText(r.strategy_name)}</div>
+                                        <div className="text-xs text-muted" style={{marginTop:4}}>{r.start_date} ~ {r.end_date} · {repairMojibakeText(r.universe)}</div>
+                                        <div className="history-item-meta">
+                                            <span className="history-chip">Sharpe {sharpe.toFixed(2)}</span>
+                                            <span className="history-chip">最大回撤 {maxDrawdown.toFixed(2)}%</span>
+                                            <span className="history-chip">期末净值 {Number(r.final_value || 0).toLocaleString()}</span>
+                                            <span className="history-chip">创建于 {(r.created_at || '').slice(0, 10)}</span>
+                                            {meta.favorite ? <span className="history-chip">已收藏</span> : null}
+                                            {meta.note ? <span className="history-chip">{meta.note}</span> : null}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:12,marginLeft:12}}>
+                                    <button className="btn-link" onClick={() => toggleFavorite(r.id)}>{meta.favorite ? '取消收藏' : '收藏'}</button>
+                                    <button className="btn-link" onClick={() => editNote(r.id)}>{meta.note ? '编辑备注' : '添加备注'}</button>
+                                    <button className="btn-link" onClick={() => viewDetail(r.id, 'attribution')}>详情</button>
+                                    <div style={{textAlign:'right', minWidth:96}}>
+                                        <div className={'history-return ' + (totalReturn >= 0 ? 'text-profit' : 'text-loss')}>
+                                            {totalReturn.toFixed(2)}%
+                                        </div>
+                                        <div className="text-xs text-muted">ID #{r.id}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div style={{display:'flex',alignItems:'center',gap:12}}>
-                                <button className="btn-link" onClick={() => viewDetail(r.id, 'attribution')}>归因</button>
-                                <div style={{textAlign:'right'}}>
-                                    <div className={'history-return ' + ((r.metrics?.total_return ?? 0) >= 0 ? 'text-profit' : 'text-loss')}>
-                                        {r.metrics?.total_return ?? 0}%
-                                    </div>
-                                    <div className="text-xs text-muted">{(r.created_at || '').slice(0, 10)}</div>
-                                </div>
-                                <input type="checkbox" checked={selectedIds.includes(r.id)}
-                                    onChange={() => toggleSelect(r.id)}
-                                    style={{width:16,height:16,cursor:'pointer',accentColor:'var(--accent)'}} />
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
     );
 }
 
-/* ===== Compare View ===== */
+function buildCompareSummary(data) {
+    const metricsList = Array.isArray(data && data.metrics) ? data.metrics : [];
+    const metricValue = (item, key) => Number((item && item.metrics && item.metrics[key]) || 0);
+    const bestBy = (key, mode = 'max') => {
+        if (!metricsList.length) return null;
+        const sorted = [...metricsList].sort((a, b) => mode === 'max' ? metricValue(b, key) - metricValue(a, key) : metricValue(a, key) - metricValue(b, key));
+        return sorted[0] || null;
+    };
+    return {
+        bestReturn: bestBy('total_return', 'max'),
+        bestSharpe: bestBy('sharpe_ratio', 'max'),
+        lowestDrawdown: bestBy('max_drawdown', 'max'),
+        bestAnnual: bestBy('annual_return', 'max'),
+    };
+}
+
 function CompareView({ data }) {
     const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
     const curves = data.curves || [];
     const metrics = data.metrics || [];
+    const summary = buildCompareSummary(data);
+    const metricValue = (item, key) => Number((item && item.metrics && item.metrics[key]) || 0);
 
-    // Build chart data: merge all curves by date
     const dateMap = {};
     curves.forEach((c, idx) => {
         (c.equity_curve || []).forEach(p => {
@@ -2938,44 +4317,94 @@ function CompareView({ data }) {
     });
     const chartData = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
 
+    const ranked = [...metrics].sort((a, b) => metricValue(b, 'total_return') - metricValue(a, 'total_return'));
+
     return (
         <div className="space-y">
-            <div className="card">
-                <div className="card-title">净值对比曲线</div>
-                <ResponsiveContainer width="100%" height={350}>
-                    <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
-                        <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
-                            interval={Math.floor(chartData.length / 6)} />
-                        <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
-                            tickFormatter={v => v.toFixed(1) + '%'} />
-                        <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }} />
-                        <Legend />
-                        {curves.map((c, idx) => (
-                            <Line key={idx} type="monotone" dataKey={'s' + idx} name={c.strategy_name}
-                                stroke={COLORS[idx % COLORS.length]} strokeWidth={2} dot={false} />
-                        ))}
-                    </ComposedChart>
-                </ResponsiveContainer>
+            <div className="flex items-center justify-between" style={{gap:12, flexWrap:'wrap'}}>
+                <div className="text-xs text-muted">已对齐所选策略的收益曲线、收益指标与回撤表现。</div>
+                <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => exportCompareCSV(data)}>导出对比 CSV</button>
             </div>
+            <div className="history-compare-summary">
+                <div className="history-mini-card">
+                    <div className="history-mini-label">总收益领先</div>
+                    <div className={'history-mini-value ' + (summary.bestReturn && metricValue(summary.bestReturn, 'total_return') >= 0 ? 'text-profit' : 'text-loss')}>{summary.bestReturn ? `${metricValue(summary.bestReturn, 'total_return').toFixed(2)}%` : '-'}</div>
+                    <div className="history-mini-meta">{summary.bestReturn ? repairMojibakeText(summary.bestReturn.strategy_name) : '暂无数据'}</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">最佳 Sharpe</div>
+                    <div className={'history-mini-value ' + (summary.bestSharpe && metricValue(summary.bestSharpe, 'sharpe_ratio') >= 1 ? 'text-profit' : '')}>{summary.bestSharpe ? metricValue(summary.bestSharpe, 'sharpe_ratio').toFixed(2) : '-'}</div>
+                    <div className="history-mini-meta">{summary.bestSharpe ? repairMojibakeText(summary.bestSharpe.strategy_name) : '暂无数据'}</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">回撤控制最佳</div>
+                    <div className="history-mini-value">{summary.lowestDrawdown ? `${metricValue(summary.lowestDrawdown, 'max_drawdown').toFixed(2)}%` : '-'}</div>
+                    <div className="history-mini-meta">{summary.lowestDrawdown ? repairMojibakeText(summary.lowestDrawdown.strategy_name) : '暂无数据'}</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">年化收益领先</div>
+                    <div className={'history-mini-value ' + (summary.bestAnnual && metricValue(summary.bestAnnual, 'annual_return') >= 0 ? 'text-profit' : 'text-loss')}>{summary.bestAnnual ? `${metricValue(summary.bestAnnual, 'annual_return').toFixed(2)}%` : '-'}</div>
+                    <div className="history-mini-meta">{summary.bestAnnual ? repairMojibakeText(summary.bestAnnual.strategy_name) : '暂无数据'}</div>
+                </div>
+            </div>
+
+            <div className="history-compare-grid">
+                <div className="card">
+                    <div className="card-title">收益曲线对比</div>
+                    <ResponsiveContainer width="100%" height={360}>
+                        <ComposedChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                            <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                                interval={Math.max(0, Math.floor(chartData.length / 6))} />
+                            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false}
+                                tickFormatter={v => v.toFixed(1) + '%'} />
+                            <Tooltip contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8, color: '#e2e8f0' }} />
+                            <Legend />
+                            {curves.map((c, idx) => (
+                                <Line key={idx} type="monotone" dataKey={'s' + idx} name={repairMojibakeText(c.strategy_name)}
+                                    stroke={COLORS[idx % COLORS.length]} strokeWidth={2} dot={false} />
+                            ))}
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="card">
+                    <div className="card-title">比较结论</div>
+                    <div className="history-leader-list">
+                        {[
+                            { label: '收益率最高', item: summary.bestReturn, value: summary.bestReturn ? `${metricValue(summary.bestReturn, 'total_return').toFixed(2)}%` : '-' },
+                            { label: '风险调整收益最强', item: summary.bestSharpe, value: summary.bestSharpe ? `Sharpe ${metricValue(summary.bestSharpe, 'sharpe_ratio').toFixed(2)}` : '-' },
+                            { label: '最大回撤最小', item: summary.lowestDrawdown, value: summary.lowestDrawdown ? `回撤 ${metricValue(summary.lowestDrawdown, 'max_drawdown').toFixed(2)}%` : '-' },
+                            { label: '年化收益最高', item: summary.bestAnnual, value: summary.bestAnnual ? `${metricValue(summary.bestAnnual, 'annual_return').toFixed(2)}%` : '-' },
+                        ].map((entry, idx) => (
+                            <div key={idx} className="history-leader-item">
+                                <div className="history-leader-label">{entry.label}</div>
+                                <div className="history-leader-value">{entry.item ? repairMojibakeText(entry.item.strategy_name) : '-'}</div>
+                                <div className="history-leader-meta">{entry.value}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             <div className="card">
-                <div className="card-title">指标对比</div>
+                <div className="card-title">指标总表</div>
                 <div className="table-wrap">
                     <table>
                         <thead><tr>
-                            <th>策略</th><th style={{textAlign:'right'}}>总收益%</th>
-                            <th style={{textAlign:'right'}}>年化收益%</th><th style={{textAlign:'right'}}>夏普</th>
-                            <th style={{textAlign:'right'}}>最大回撤%</th><th style={{textAlign:'right'}}>最终资产</th>
+                            <th>排名</th><th>策略</th><th style={{textAlign:'right'}}>总收益%</th>
+                            <th style={{textAlign:'right'}}>年化收益%</th><th style={{textAlign:'right'}}>Sharpe</th>
+                            <th style={{textAlign:'right'}}>最大回撤%</th><th style={{textAlign:'right'}}>期末净值</th>
                         </tr></thead>
                         <tbody>
-                            {metrics.map((m, i) => {
+                            {ranked.map((m, i) => {
                                 const mt = m.metrics || {};
                                 return (
                                     <tr key={i}>
-                                        <td>{m.strategy_name}</td>
+                                        <td>{i + 1}</td>
+                                        <td>{repairMojibakeText(m.strategy_name)}</td>
                                         <td style={{textAlign:'right'}} className={(mt.total_return||0) >= 0 ? 'text-profit' : 'text-loss'}>{mt.total_return ?? '-'}</td>
                                         <td style={{textAlign:'right'}} className={(mt.annual_return||0) >= 0 ? 'text-profit' : 'text-loss'}>{mt.annual_return ?? '-'}</td>
-                                        <td style={{textAlign:'right'}}>{mt.sharpe_ratio ?? '-'}</td>
+                                        <td style={{textAlign:'right'}} className={(mt.sharpe_ratio||0) >= 1 ? 'text-profit' : ''}>{mt.sharpe_ratio ?? '-'}</td>
                                         <td style={{textAlign:'right'}} className="text-loss">{mt.max_drawdown ?? '-'}</td>
                                         <td style={{textAlign:'right'}}>{m.final_value?.toLocaleString() ?? '-'}</td>
                                     </tr>
@@ -2988,6 +4417,101 @@ function CompareView({ data }) {
         </div>
     );
 }
+
+function buildPortfolioDiagnosticModel(data) {
+    const corrMatrix = data?.correlations?.correlation_matrix || [];
+    const names = data?.correlations?.names || [];
+    const weights = data?.weights?.weights || [];
+    const portfolioMetrics = data?.portfolio?.metrics || {};
+    const weightValues = weights.map(item => Math.max(Number(item.weight || 0), 0));
+    const nonZeroWeights = weightValues.filter(v => v > 0);
+    const hhi = nonZeroWeights.reduce((sum, value) => sum + value * value, 0);
+    const effectiveCount = hhi > 0 ? 1 / hhi : 0;
+    const maxWeight = weightValues.length ? Math.max(...weightValues) : 0;
+    let avgCorr = 0;
+    let highestPair = null;
+    let pairCount = 0;
+    for (let i = 0; i < corrMatrix.length; i += 1) {
+        for (let j = i + 1; j < corrMatrix[i].length; j += 1) {
+            const current = Number(corrMatrix[i][j] || 0);
+            avgCorr += current;
+            pairCount += 1;
+            if (!highestPair || current > highestPair.value) {
+                highestPair = { left: names[i], right: names[j], value: current };
+            }
+        }
+    }
+    avgCorr = pairCount ? avgCorr / pairCount : 0;
+    return {
+        method: data?.weights?.method || '-',
+        avgCorr,
+        effectiveCount,
+        maxWeight,
+        sharpe: Number(portfolioMetrics.sharpe_ratio || 0),
+        totalReturn: Number(portfolioMetrics.total_return || 0),
+        annualReturn: Number(portfolioMetrics.annual_return || 0),
+        maxDrawdown: Number(portfolioMetrics.max_drawdown || 0),
+        highestPair,
+    };
+}
+
+function PortfolioDiagnosticPanel({ data }) {
+    const diagnostic = buildPortfolioDiagnosticModel(data);
+    const methodLabelMap = {
+        equal: '等权',
+        inverse_variance: '逆方差',
+        max_sharpe: '最大 Sharpe',
+        risk_parity: '风险平价',
+    };
+    const methodDescMap = {
+        equal: '每个策略分配相同权重，适合做基线组合。',
+        inverse_variance: '波动越小权重越高，偏向抑制组合总波动。',
+        max_sharpe: '基于历史收益与协方差求取最高风险调整收益组合。',
+        risk_parity: '让各策略风险贡献尽量均衡，减少单一来源主导。',
+    };
+    return (
+        <div className="card">
+            <div className="card-title">组合诊断</div>
+            <div className="history-summary-grid">
+                <div className="history-mini-card">
+                    <div className="history-mini-label">权重方法</div>
+                    <div className="history-mini-value">{methodLabelMap[diagnostic.method] || diagnostic.method}</div>
+                    <div className="history-mini-meta">{methodDescMap[diagnostic.method] || '当前组合权重生成逻辑'}</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">平均相关性</div>
+                    <div className="history-mini-value">{diagnostic.avgCorr.toFixed(2)}</div>
+                    <div className="history-mini-meta">越低通常越利于分散风险</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">有效策略数</div>
+                    <div className="history-mini-value">{diagnostic.effectiveCount ? diagnostic.effectiveCount.toFixed(2) : '-'}</div>
+                    <div className="history-mini-meta">按 HHI 估算的分散度</div>
+                </div>
+                <div className="history-mini-card">
+                    <div className="history-mini-label">最大单策略权重</div>
+                    <div className="history-mini-value">{(diagnostic.maxWeight * 100).toFixed(1)}%</div>
+                    <div className="history-mini-meta">检查组合是否过度集中</div>
+                </div>
+            </div>
+            <div className="insight-list" style={{marginTop:12}}>
+                <div className="insight-list-item">
+                    <div className="insight-list-label">组合收益 / 风险</div>
+                    <div className="insight-list-value">
+                        总收益 {diagnostic.totalReturn.toFixed(2)}% · 年化 {diagnostic.annualReturn.toFixed(2)}% · Sharpe {diagnostic.sharpe.toFixed(2)} · 回撤 {diagnostic.maxDrawdown.toFixed(2)}%
+                    </div>
+                </div>
+                <div className="insight-list-item">
+                    <div className="insight-list-label">最高相关策略对</div>
+                    <div className="insight-list-value">
+                        {diagnostic.highestPair ? `${repairMojibakeText(diagnostic.highestPair.left)} / ${repairMojibakeText(diagnostic.highestPair.right)} · ${diagnostic.highestPair.value.toFixed(2)}` : '暂无'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ===== Portfolio Page ===== */
 function PortfolioPage({ showToast }) {
     const [results, setResults] = useState([]);
@@ -2995,25 +4519,45 @@ function PortfolioPage({ showToast }) {
     const [method, setMethod] = useState('max_sharpe');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState(null);
+    const [prefillInfo, setPrefillInfo] = useState('');
 
-    useEffect(() => {
+    const loadResults = useCallback(() => {
         api.get('/api/backtest/history').then(setResults).catch(() => {});
     }, []);
+
+    const applyPortfolioPrefill = useCallback(() => {
+        const prefill = readPortfolioPrefill();
+        if (!prefill || !Array.isArray(prefill.result_ids) || prefill.result_ids.length < 2) return;
+        const ids = prefill.result_ids.map(id => Number(id)).filter(Boolean);
+        setSelectedIds(ids);
+        if (prefill.method) setMethod(prefill.method);
+        setPrefillInfo(`已从回测历史带入 ${ids.length} 个结果，可直接执行组合分析`);
+    }, []);
+
+    useEffect(() => { loadResults(); }, [loadResults]);
+    useEffect(() => { applyPortfolioPrefill(); }, [applyPortfolioPrefill]);
+    useEffect(() => {
+        const handler = () => applyPortfolioPrefill();
+        window.addEventListener('qtsys:portfolio-prefill', handler);
+        return () => window.removeEventListener('qtsys:portfolio-prefill', handler);
+    }, [applyPortfolioPrefill]);
 
     const toggleId = (id) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
     };
 
     const runAnalysis = async () => {
-        if (selectedIds.length < 2) { showToast('至少选择2个回测结果', 'error'); return; }
+        if (selectedIds.length < 2) { showToast('至少选择 2 个结果后再做组合分析', 'error'); return; }
         setLoading(true); setData(null);
         try {
             const res = await api.post('/api/backtest/portfolio_analysis', {
                 result_ids: selectedIds, method
             });
             setData(res);
-            showToast('组合分析完成', 'success');
-        } catch (e) { showToast(e.detail || '分析失败', 'error'); }
+            clearPortfolioPrefill();
+            setPrefillInfo('');
+            showToast('组合分析已完成', 'success');
+        } catch (e) { showToast((e && e.detail) || '组合分析失败', 'error'); }
         setLoading(false);
     };
 
@@ -3021,28 +4565,39 @@ function PortfolioPage({ showToast }) {
         <div className="fade-in portfolio-page">
             <div className="card space-y">
                 <div className="card-title">策略组合分析</div>
-                <div style={{fontSize:13,color:'var(--text-300)',marginBottom:8}}>选择回测结果 (2-10个)</div>
+                <div style={{fontSize:13,color:'var(--text-300)',marginBottom:8}}>从回测历史中选择 2-10 个策略，评估相关性、权重分配和组合净值表现。</div>
+                {prefillInfo ? (
+                    <div className="text-sm" style={{padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.10)', border:'1px solid rgba(96,165,250,0.18)', color:'#dbeafe'}}>
+                        {prefillInfo}
+                    </div>
+                ) : null}
                 <div className="portfolio-selector">
                     {results.map(r => (
                         <div key={r.id} className={'portfolio-check' + (selectedIds.includes(r.id)?' selected':'')}
                             onClick={() => toggleId(r.id)}>
-                            {r.strategy_name} #{r.id}
+                            {repairMojibakeText(r.strategy_name)} #{r.id}
                         </div>
                     ))}
                 </div>
-                <div className="flex items-center gap-sm">
-                    <div className="field" style={{width:180}}>
-                        <label className="label">权重方法</label>
-                        <select className="input" value={method} onChange={e=>setMethod(e.target.value)}>
-                            <option value="equal">等权 (1/N)</option>
-                            <option value="inverse_variance">反方差加权</option>
-                            <option value="max_sharpe">最大夏普</option>
-                            <option value="risk_parity">风险平价</option>
-                        </select>
+                <div className="flex items-center gap-sm" style={{justifyContent:'space-between',flexWrap:'wrap'}}>
+                    <div className="flex items-center gap-sm" style={{gap:12,flexWrap:'wrap'}}>
+                        <div className="field" style={{width:180}}>
+                            <label className="label">权重方法</label>
+                            <select className="input" value={method} onChange={e=>setMethod(e.target.value)}>
+                                <option value="equal">等权 (1/N)</option>
+                                <option value="inverse_variance">逆方差</option>
+                                <option value="max_sharpe">最大 Sharpe</option>
+                                <option value="risk_parity">风险平价</option>
+                            </select>
+                        </div>
+                        <div className="text-xs text-muted" style={{marginTop:18}}>已选 {selectedIds.length} 个策略</div>
                     </div>
-                    <button className="btn btn-primary" onClick={runAnalysis} disabled={loading} style={{marginTop:16}}>
-                        {loading ? <><span className="spinner"/> 分析中...</> : '开始分析'}
-                    </button>
+                    <div className="flex items-center gap-sm" style={{gap:8,marginTop:16}}>
+                        {selectedIds.length > 0 ? <button className="btn btn-secondary" onClick={() => setSelectedIds([])}>清空选择</button> : null}
+                        <button className="btn btn-primary" onClick={runAnalysis} disabled={loading}>
+                            {loading ? <><span className="spinner"/> 分析中...</> : '开始分析'}
+                        </button>
+                    </div>
                 </div>
             </div>
             {data && <PortfolioResults data={data} />}
@@ -3057,6 +4612,14 @@ function PortfolioResults({ data }) {
     const portfolio = data.portfolio || {};
     return (
         <div className="space-y">
+            <div className="flex items-center justify-between" style={{gap:12, flexWrap:'wrap'}}>
+                <div className="text-xs text-muted">可导出组合结果用于研究复盘、外部归档或继续建模。</div>
+                <div className="flex items-center" style={{gap:8, flexWrap:'wrap'}}>
+                    <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => exportPortfolioCSV(data)}>导出 CSV</button>
+                    <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => exportPortfolioJSON(data)}>导出 JSON</button>
+                </div>
+            </div>
+            <PortfolioDiagnosticPanel data={data} />
             <div className="card">
                 <div className="card-title">相关性矩阵</div>
                 <CorrelationHeatmap names={corr.names||[]} matrix={corr.correlation_matrix||[]} />
@@ -3085,7 +4648,8 @@ function CorrelationHeatmap({ names, matrix }) {
         ctx.fillStyle = '#252a3a'; ctx.fillRect(0, 0, W, H);
         // headers
         ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif';
-        names.forEach((nm, i) => {
+        names.forEach((rawName, i) => {
+            const nm = repairMojibakeText(rawName);
             ctx.save(); ctx.translate(padL + i * cellS + cellS/2, padT - 6);
             ctx.rotate(-0.5); ctx.textAlign = 'left';
             ctx.fillText(nm.slice(0,8), 0, 0); ctx.restore();
@@ -3113,12 +4677,13 @@ function CorrelationHeatmap({ names, matrix }) {
 /* ===== Weights Display ===== */
 function WeightsDisplay({ weights }) {
     if (!weights || weights.length === 0) return null;
-    const maxW = Math.max(...weights.map(w => w.weight), 0.01);
+    const sortedWeights = [...weights].sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0));
+    const maxW = Math.max(...sortedWeights.map(w => w.weight), 0.01);
     return (
         <div>
-            {weights.map((w, i) => (
+            {sortedWeights.map((w, i) => (
                 <div key={i} className="weight-bar">
-                    <span className="weight-bar-label">{w.name}</span>
+                    <span className="weight-bar-label">{repairMojibakeText(w.name)}</span>
                     <div style={{flex:1,background:'var(--bg-900)',borderRadius:4,height:20}}>
                         <div className="weight-bar-fill" style={{width:(w.weight/maxW*100)+'%'}}/>
                     </div>
@@ -3190,7 +4755,7 @@ function RollingCorrelationSection({ corr }) {
                     <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
                     <Legend/>
                     {corr.rolling_correlations.map((rc,i) => (
-                        <Line key={i} type="monotone" dataKey={'p'+i} name={rc.pair}
+                        <Line key={i} type="monotone" dataKey={'p'+i} name={repairMojibakeText(rc.pair)}
                             stroke={COLORS[i%COLORS.length]} strokeWidth={1.5} dot={false}/>
                     ))}
                 </ComposedChart>
@@ -3267,16 +4832,27 @@ function QualityReport({ data }) {
 /* ===== Help Page ===== */
 function HelpPage({ showToast }) {
     const [verInfo, setVerInfo] = useState(null);
+    const [updateInfo, setUpdateInfo] = useState(null);
     const [updating, setUpdating] = useState(false);
-    useEffect(() => {
-        api.get('/api/system/version').then(setVerInfo).catch(() => {});
+    const loadVersionInfo = useCallback(async () => {
+        try {
+            const [versionRes, updateRes] = await Promise.all([
+                api.get('/api/system/version'),
+                api.post('/api/system/check_update', {}).catch(() => null),
+            ]);
+            setVerInfo(versionRes || null);
+            setUpdateInfo(updateRes || null);
+        } catch (_) {}
     }, []);
+    useEffect(() => {
+        loadVersionInfo();
+    }, [loadVersionInfo]);
     const doUpdate = async () => {
         setUpdating(true);
         try {
             const r = await api.post('/api/system/update', {});
             showToast(r.message || (r.success ? '更新成功，请重启系统' : '更新失败'), r.success ? 'success' : 'error');
-            if (r.success) api.get('/api/system/version').then(setVerInfo).catch(() => {});
+            if (r.success) loadVersionInfo();
         } catch { showToast('更新请求失败', 'error'); }
         setUpdating(false);
     };
@@ -3290,17 +4866,18 @@ function HelpPage({ showToast }) {
                 {verInfo ? (
                     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
                         <span style={{fontSize:13,color:'var(--text-300)'}}>当前版本: <b style={{color:'var(--text-100)'}}>v{verInfo.version}</b></span>
-                        <span style={{fontSize:13,color:'var(--text-300)'}}>本地: <code>{verInfo.local_commit}</code></span>
-                        <span style={{fontSize:13,color:'var(--text-300)'}}>远程: <code>{verInfo.remote_commit || '—'}</code></span>
-                        {verInfo.has_update ? (
+                        <span style={{fontSize:13,color:'var(--text-300)'}}>本地提交: <code>{verInfo.commit || 'unknown'}</code></span>
+                        {verInfo.last_message ? <span style={{fontSize:13,color:'var(--text-300)'}}>最近提交: <code>{verInfo.last_message}</code></span> : null}
+                        {updateInfo && !updateInfo.error ? <span style={{fontSize:13,color:'var(--text-300)'}}>远程提交: <code>{updateInfo.remote || '—'}</code></span> : null}
+                        {updateInfo && updateInfo.has_update ? (
                             <span style={{display:'flex',alignItems:'center',gap:8}}>
-                                <span style={{color:'#f59e0b',fontSize:13}}>有 {verInfo.behind_count} 个新提交</span>
+                                <span style={{color:'#f59e0b',fontSize:13}}>有 {updateInfo.behind || 0} 个新提交</span>
                                 <button className="btn btn-sm" onClick={doUpdate} disabled={updating}>{updating ? '更新中...' : '立即更新'}</button>
                             </span>
                         ) : (
                             <span style={{color:'#34d399',fontSize:13}}>已是最新版本</span>
                         )}
-                        {verInfo.error && <span style={{color:'#f87171',fontSize:12}}>{verInfo.error}</span>}
+                        {updateInfo && updateInfo.error ? <span style={{color:'#f87171',fontSize:12}}>{updateInfo.error}</span> : null}
                     </div>
                 ) : <span style={{color:'var(--text-400)',fontSize:13}}>加载中...</span>}
             </div>
@@ -3641,7 +5218,7 @@ function FactorCreatePanel({ newName, setNewName, newExpr, setNewExpr, newDesc, 
     );
 }
 
-function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor }) {
+function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor, openStrategyFromFactor }) {
     const POOL_PRESETS = {
         '': '',
         '沪深300': '000001.SZ,000002.SZ,600036.SH,601318.SH,600519.SH,000858.SZ,601166.SH,600276.SH,000333.SZ,002415.SZ',
@@ -3688,14 +5265,19 @@ function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, s
                     </select>
                 </div>
             </div>
-            <button className="btn btn-primary mt-2" style={{marginTop:10}} onClick={evaluateFactor} disabled={loading}>
-                {loading ? <><span className="spinner"/> 评价中...</> : '运行因子评价'}
-            </button>
+            <div className="flex gap-sm" style={{marginTop:10}}>
+                <button className="btn btn-primary mt-2" style={{marginTop:0}} onClick={evaluateFactor} disabled={loading}>
+                    {loading ? <><span className="spinner"/> 评价中...</> : '运行因子评价'}
+                </button>
+                <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => openStrategyFromFactor && openStrategyFromFactor(selected, null)}>
+                    发送到 AI 策略助手
+                </button>
+            </div>
         </div>
     );
 }
 
-function FactorResultView({ result, tab, setTab }) {
+function FactorResultView({ result, tab, setTab, onGenerateStrategy }) {
     const m = result.metrics || {};
     const tabs = [
         { key: 'ic', label: 'IC序列' },
@@ -3714,8 +5296,13 @@ function FactorResultView({ result, tab, setTab }) {
                                 className={'tab-btn' + (tab === t.key ? ' active' : '')}>{t.label}</button>
                         ))}
                     </div>
-                    {result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}}
-                        onClick={() => window.open('/api/factors/export/' + result.id, '_blank')}>导出 CSV</button>}
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <button className="btn btn-primary" style={{fontSize:12,padding:'4px 12px'}} onClick={() => onGenerateStrategy && onGenerateStrategy()}>
+                            生成策略草稿
+                        </button>
+                        {result.id && <button className="btn btn-secondary" style={{fontSize:12,padding:'4px 12px'}}
+                            onClick={() => window.open('/api/factors/export/' + result.id, '_blank')}>导出 CSV</button>}
+                    </div>
                 </div>
                 <div className="tab-content">
                     {tab === 'ic' && <ICChart data={result.ic_series} />}
@@ -4614,7 +6201,7 @@ function MarketPage({ showToast }) {
 }
 
 /* ===== Factor Page ===== */
-function FactorPage({ showToast }) {
+function FactorPage({ showToast, openStrategyWorkspace }) {
     const [factors, setFactors] = useState([]);
     const [selected, setSelected] = useState(null);
     const [evalResult, setEvalResult] = useState(null);
@@ -4715,6 +6302,67 @@ function FactorPage({ showToast }) {
         setLlmRunning(false);
     };
 
+    const buildFactorResearchBacktestContext = () => {
+        const stockItems = normalizeStockItems(
+            evalUniverse.split(',').map(code => ({ ts_code: code }))
+        );
+        return normalizeBacktestContext({
+            source: 'factor_research',
+            source_label: '因子研究',
+            universe_type: 'custom',
+            universe_code: 'factor_research_custom',
+            universe_name: selected && selected.name ? `${selected.name} 研究股票池` : '因子研究股票池',
+            benchmark: '000300.SH',
+            backtest_days: Math.max(parseInt(forwardDays, 10) || 5, 20),
+            start_date: evalStart,
+            end_date: evalEnd,
+            stock_items: stockItems,
+        });
+    };
+
+    const buildFactorResearchPrompt = (factor, resultItem) => {
+        if (!factor) return '';
+        const metrics = resultItem && resultItem.metrics ? resultItem.metrics : {};
+        const parts = [
+            `请基于 QTsys 因子库中的因子“${factor.name}”生成一个可直接保存并回测的股票量化策略。`,
+            `因子分类：${factor.category || '未分类'}；来源：${factor.source || 'user'}。`,
+            `因子表达式：${factor.expression || '-'}`,
+        ];
+        if (factor.description) {
+            parts.push(`因子说明：${factor.description}`);
+        }
+        if (resultItem) {
+            parts.push(
+                `该因子最近研究结果：IC均值 ${formatNum(metrics.ic_mean, 4)}，IC_IR ${formatNum(metrics.ic_ir, 4)}，多头收益 ${formatPct(metrics.top_group_return)}，空头收益 ${formatPct(metrics.bottom_group_return)}，多空收益 ${formatPct(metrics.long_short_return)}，平均换手 ${formatPct(metrics.avg_turnover)}。`
+            );
+        }
+        parts.push(`研究股票池：${evalUniverse || '-'}`);
+        parts.push(`研究区间：${evalStart || '-'} 至 ${evalEnd || '-'}`);
+        parts.push(`预测周期：${forwardDays || '-'} 日，分组数：${evalGroups || '-'}`);
+        parts.push('请优先直接复用系统因子接口 context.get_factor(...) 或 context.get_factor_history(...)，不要手工重写该因子公式。');
+        parts.push('请给出清晰的开仓、平仓、仓位控制与风险控制逻辑，并确保代码严格符合 QTsys 的 initialize(context) / handle_data(context) 模板。');
+        parts.push('如果该因子更适合作为反向信号，请明确使用反向逻辑。');
+        return parts.join('\n');
+    };
+
+    const openStrategyFromFactor = (factor, resultItem) => {
+        if (!factor) {
+            showToast('请先选择因子', 'error');
+            return;
+        }
+        const prompt = buildFactorResearchPrompt(factor, resultItem);
+        const backtestContext = buildFactorResearchBacktestContext();
+        pushStrategyAIPrefill({
+            source: 'factor_research',
+            factor_name: factor.name,
+            prompt,
+            auto_generate: true,
+            backtest_context: backtestContext,
+        });
+        if (openStrategyWorkspace) openStrategyWorkspace();
+        showToast('已将因子研究上下文发送到 AI 策略助手', 'success');
+    };
+
     return (
         <div className="fade-in factor-layout">
             <FactorSidebar factors={factors} selected={selected} setSelected={(f) => { setSelected(f); setEvalResult(null); }}
@@ -4725,8 +6373,9 @@ function FactorPage({ showToast }) {
                 {selected && <FactorEvalPanel selected={selected} evalUniverse={evalUniverse} setEvalUniverse={setEvalUniverse}
                     evalStart={evalStart} setEvalStart={setEvalStart} evalEnd={evalEnd} setEvalEnd={setEvalEnd}
                     evalGroups={evalGroups} setEvalGroups={setEvalGroups} forwardDays={forwardDays} setForwardDays={setForwardDays}
-                    loading={loading} evaluateFactor={evaluateFactor} />}
-                {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab} />}
+                    loading={loading} evaluateFactor={evaluateFactor} openStrategyFromFactor={openStrategyFromFactor} />}
+                {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab}
+                    onGenerateStrategy={() => openStrategyFromFactor(selected, evalResult)} />}
                 <FactorMinePanel mineTab={mineTab} setMineTab={setMineTab}
                     gpPopSize={gpPopSize} setGpPopSize={setGpPopSize} gpGenerations={gpGenerations} setGpGenerations={setGpGenerations}
                     gpRunning={gpRunning} runGP={runGP}
@@ -6835,7 +8484,7 @@ function App() {
             <header className="header">
                 <div className="header-brand">
                     <h1>QTsys</h1>
-                    <span>量化交易回测系统</span>
+                    <span>量化交易分析回测系统</span>
                     {sysVersion && <span style={{fontSize:10,color:'var(--text-500)',marginLeft:4}}>v{sysVersion}</span>}
                 </div>
                 <nav className="nav">
@@ -6853,11 +8502,11 @@ function App() {
                 {page === 'backtest' && <BacktestPage showToast={showToast} openHistoryWithResult={() => setPage('history')} />}
                 {page === 'portfolio' && <PortfolioPage showToast={showToast} />}
                 {page === 'market' && <MarketPage showToast={showToast} />}
-                {page === 'factor' && <FactorPage showToast={showToast} />}
+                {page === 'factor' && <FactorPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
                 {page === 'factorboard' && <FactorBoardPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}
-                {page === 'history' && <HistoryPage showToast={showToast} />}
+                {page === 'history' && <HistoryPage showToast={showToast} openPortfolioWorkspace={() => setPage('portfolio')} />}
                 {page === 'help' && <HelpPage showToast={showToast} />}
             </main>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

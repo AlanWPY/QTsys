@@ -63,7 +63,9 @@ python -m venv .venv
 
 - 策略管理：创建、编辑、保存与回测交易策略
 - AI 策略助手：对话式生成量化策略，并直接保存到策略库
+- 因子策略联动：策略代码与 AI 都可直接调用因子库，构建多因子策略
 - 回测分析：收益、回撤、风险指标、归因与组合分析
+- 回测工作台：历史筛选、横向对比、组合分析与结果导出
 - 因子研究：因子表达式、工作流、Alpha191 模板加载
 - 因子看板：Alpha191 批量回测、收益总览、分位收益曲线、因子详情
 - 股票池管理：系统股票池 + 自定义股票池
@@ -84,6 +86,87 @@ python -m venv .venv
 - 支持查看因子详情、公式、经济含义、持仓与多分位曲线
 
 详细流程见 `docs/factor_board_guide.md`
+
+## 回测与组合分析工作流
+
+推荐使用顺序：
+
+1. 在“策略”页创建或让 AI 生成策略草稿
+2. 在“回测”页选择：
+   - 策略
+   - 回测区间
+   - 股票池模式（系统股票池 / 自定义股票池 / 代码列表）
+3. 运行回测后，在结果页查看：
+   - 收益曲线与基准对比
+   - 风险指标
+   - 交易记录
+   - 归因分析
+   - 回测洞察
+4. 点击进入“历史”页，执行：
+   - 搜索、筛选、排序历史结果
+   - 收藏重点结果
+   - 为结果添加复盘备注
+   - 选择多个结果进行横向对比
+   - 导出对比 CSV
+5. 在“历史”页选择 2 个及以上结果，点击“送入组合分析”
+6. 在“组合分析”页查看：
+   - 策略相关性矩阵
+   - 权重分配结果
+   - 组合净值曲线
+   - 组合诊断（平均相关性、有效策略数、最大单策略权重等）
+   - 导出组合 CSV / JSON
+
+## AI 策略助手工作流
+
+1. 在“策略”页输入自然语言需求
+2. AI 会结合系统模板、风控约束和可选市场新闻生成策略
+3. 若选择直接保存，策略会自动落库并联动到回测页
+4. 回测页会继承策略、股票池上下文与相关配置
+5. 可继续进入“历史”页和“组合分析”页完成研究闭环
+
+## 因子与策略联动
+
+系统已支持在策略中直接调用因子库：
+
+- `context.get_factor('因子名', ts_code)`：获取当前交易日该股票的因子值
+- `context.get_factor_history('因子名', ts_code, count)`：获取因子历史序列
+- `context.list_factors(keyword='')`：查看当前可用因子目录
+
+典型用法：
+
+```python
+def initialize(context):
+    context.target_pct = 0.2
+
+def handle_data(context):
+    for ts_code in context.universe:
+        momentum = context.get_factor('momentum_20', ts_code)
+        ma_hist = context.get_factor_history('ma_position', ts_code, 5)
+        if len(ma_hist) < 3:
+            continue
+        pos = context.positions.get(ts_code)
+        has_position = pos is not None and pos.amount > 0
+        if momentum > 0.02 and ma_hist[-1] >= 0.5 and not has_position:
+            context.order_target_percent(ts_code, context.target_pct)
+        elif has_position and (momentum < -0.02 or ma_hist[-1] < 0.25):
+            context.order(ts_code, -pos.amount)
+```
+
+AI 策略助手也会读取当前因子目录，并优先生成可调用 `context.get_factor(...)` / `context.get_factor_history(...)` 的多因子策略。
+
+现在有两条联动入口：
+
+- 在“因子研究”页选择单个因子后，可直接点击“发送到 AI 策略助手”或在评价结果里点击“生成策略草稿”
+- 在“因子看板”页查看 Alpha191 研究结果后，也可把当前因子、研究区间、股票池和评价摘要直接发送给 AI
+
+这两个入口都会把当前因子表达式、说明、研究区间、股票池和可用回测上下文一并带到“策略”页，并自动触发一次策略草稿生成。
+
+组合分析当前支持的权重方法：
+
+- `等权 (1/N)`
+- `逆方差`
+- `最大 Sharpe`
+- `风险平价`
 
 ## 配置说明
 

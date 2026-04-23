@@ -9,15 +9,54 @@ from sqlalchemy import select
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 from database.connection import get_db
-from database.models import Settings, Strategy, BacktestResult
+from database.models import Settings, Strategy, BacktestResult, StockPool
 from data.tushare_client import TushareClient
 from data.data_cache import DataCache
 from engine.backtest_engine import BacktestEngine
 from strategy.strategy_loader import load_strategy
 from services.backtest_service import resolve_backtest_universe, run_backtest_workflow
+from services.factor_catalog_service import load_factor_catalog
 from services.settings_service import get_or_create_settings
+from services.factor_board_service import get_system_universes
+from services.text_normalizer import normalize_text_payload, normalize_universe_label, repair_text
 
 router = APIRouter(prefix="/api/backtest", tags=["backtest"])
+
+
+@router.get("/universe_options")
+async def get_backtest_universe_options(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(StockPool).order_by(StockPool.updated_at.desc(), StockPool.id.desc()))
+    custom_pools = []
+    for pool in result.scalars().all():
+        items = pool.stock_items or []
+        custom_pools.append({
+            "id": pool.id,
+            "name": pool.name,
+            "description": pool.description or "",
+            "pool_type": pool.pool_type or "custom",
+            "index_code": pool.index_code or "",
+            "stock_items": items,
+            "stock_count": len(items),
+        })
+    unsupported_universes = [
+        {
+            "code": "NDX.US",
+            "name": "纳斯达克100",
+            "supported": False,
+            "reason": "当前真实数据源尚未接入美股成分股与日线，暂不能用于真实股票池回测",
+        },
+        {
+            "code": "SPX.US",
+            "name": "标普500",
+            "supported": False,
+            "reason": "当前真实数据源尚未接入美股成分股与日线，暂不能用于真实股票池回测",
+        },
+    ]
+    return {
+        "system_universes": get_system_universes(),
+        "custom_pools": custom_pools,
+        "unsupported_universes": unsupported_universes,
+    }
 
 
 class BacktestRequest(BaseModel):
@@ -68,17 +107,17 @@ async def list_results(db: AsyncSession = Depends(get_db)):
     )
     results = result.scalars().all()
     return [
-        {
+        normalize_text_payload({
             "id": r.id,
-            "strategy_name": r.strategy_name,
+            "strategy_name": repair_text(r.strategy_name),
             "start_date": r.start_date,
             "end_date": r.end_date,
-            "universe": r.universe,
+            "universe": normalize_universe_label(r.universe),
             "initial_cash": r.initial_cash,
             "final_value": r.final_value,
             "metrics": r.metrics,
             "created_at": r.created_at.isoformat() if r.created_at else "",
-        }
+        })
         for r in results
     ]
 
@@ -91,12 +130,12 @@ async def get_result(result_id: int, db: AsyncSession = Depends(get_db)):
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="结果不存在")
-    return {
+    return normalize_text_payload({
         "id": r.id,
         "strategy_name": r.strategy_name,
         "start_date": r.start_date,
         "end_date": r.end_date,
-        "universe": r.universe,
+        "universe": normalize_universe_label(r.universe),
         "initial_cash": r.initial_cash,
         "final_value": r.final_value,
         "metrics": r.metrics,
@@ -104,7 +143,7 @@ async def get_result(result_id: int, db: AsyncSession = Depends(get_db)):
         "trades": r.trades,
         "daily_returns": r.daily_returns,
         "benchmark_curve": r.benchmark_curve or [],
-    }
+    })
 
 
 # ===== 参数优化 =====
@@ -141,6 +180,7 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
     client = TushareClient(settings.tushare_token)
     from data.data_cache import make_mysql_conn
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
+    factor_catalog = await load_factor_catalog(db)
     resolved_universe = await resolve_backtest_universe(
         db,
         settings,
@@ -165,6 +205,7 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
         stamp_tax_rate=settings.stamp_tax_rate,
         slippage=settings.slippage,
         benchmark=req.benchmark,
+        factor_catalog=factor_catalog,
     )
 
     return {"results": results}
@@ -206,6 +247,7 @@ async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depe
     client = TushareClient(settings.tushare_token)
     from data.data_cache import make_mysql_conn
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
+    factor_catalog = await load_factor_catalog(db)
     resolved_universe = await resolve_backtest_universe(
         db,
         settings,
@@ -232,6 +274,7 @@ async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depe
         stamp_tax_rate=settings.stamp_tax_rate,
         slippage=settings.slippage,
         benchmark=req.benchmark,
+        factor_catalog=factor_catalog,
     )
 
     if "error" in wf_result:
@@ -276,19 +319,19 @@ async def compare_results(req: CompareRequest, db: AsyncSession = Depends(get_db
             normalized = eq
         curves.append({
             "id": r.id,
-            "strategy_name": r.strategy_name,
+            "strategy_name": repair_text(r.strategy_name),
             "equity_curve": normalized,
         })
         metrics_list.append({
             "id": r.id,
-            "strategy_name": r.strategy_name,
+            "strategy_name": repair_text(r.strategy_name),
             "metrics": r.metrics,
             "final_value": r.final_value,
             "start_date": r.start_date,
             "end_date": r.end_date,
         })
 
-    return {"curves": curves, "metrics": metrics_list}
+    return normalize_text_payload({"curves": curves, "metrics": metrics_list})
 
 
 # ===== CSV导出 =====
@@ -445,7 +488,7 @@ async def portfolio_analysis(req: PortfolioAnalysisRequest, db: AsyncSession = D
             raise HTTPException(status_code=404, detail=f"结果 {rid} 不存在")
         items.append({
             "id": r.id,
-            "strategy_name": r.strategy_name,
+            "strategy_name": repair_text(r.strategy_name),
             "daily_returns": r.daily_returns or [],
             "equity_curve": r.equity_curve or [],
             "initial_cash": r.initial_cash,
@@ -464,7 +507,7 @@ async def portfolio_analysis(req: PortfolioAnalysisRequest, db: AsyncSession = D
     )
 
     return {
-        "correlations": corr,
-        "weights": weights_result,
-        "portfolio": portfolio,
+        "correlations": normalize_text_payload(corr),
+        "weights": normalize_text_payload(weights_result),
+        "portfolio": normalize_text_payload(portfolio),
     }

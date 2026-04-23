@@ -3,7 +3,7 @@ import os
 import shutil
 import sqlite3
 
-VERSION = "2.0.0"
+VERSION = "26.4.22"
 REPO_URL = "https://github.com/AlanWPY/QTsys.git"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,8 +55,19 @@ else:
 DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 DATABASE_URL_SYNC = f"sqlite:///{DB_PATH}"
 
-CACHE_DIR = os.path.join(BASE_DIR, "data", "cache")
+LEGACY_CACHE_DIR = os.path.join(BASE_DIR, "data", "cache")
+CACHE_DIR = os.path.join(RUNTIME_DATA_DIR, "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+if os.path.isdir(LEGACY_CACHE_DIR) and not os.listdir(CACHE_DIR):
+    try:
+        for file_name in os.listdir(LEGACY_CACHE_DIR):
+            src_path = os.path.join(LEGACY_CACHE_DIR, file_name)
+            dst_path = os.path.join(CACHE_DIR, file_name)
+            if os.path.isfile(src_path) and not os.path.exists(dst_path):
+                shutil.copy2(src_path, dst_path)
+    except OSError:
+        pass
 
 DEFAULT_CASH = 1_000_000.0
 DEFAULT_COMMISSION = 0.0003

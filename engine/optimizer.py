@@ -10,6 +10,15 @@ from logging_config import get_logger
 logger = get_logger("qtsys.engine.optimizer")
 
 
+def _detect_required_history_fields(strategy_code: str) -> set[str]:
+    required = set()
+    code = strategy_code or ""
+    for field in ("turnover_rate", "volume", "vol", "open", "high", "low", "close", "amount"):
+        if f"'{field}'" in code or f'"{field}"' in code:
+            required.add(field)
+    return required
+
+
 def grid_search(
     strategy_code: str,
     param_grid: dict[str, list[Any]],
@@ -22,6 +31,7 @@ def grid_search(
     stamp_tax_rate: float = 0.001,
     slippage: float = 0.002,
     benchmark: str = "000300.SH",
+    factor_catalog: list[dict] | None = None,
 ) -> list[dict]:
     """网格搜索策略参数组合,返回按夏普比率排序的结果"""
     param_names = list(param_grid.keys())
@@ -53,6 +63,8 @@ def grid_search(
             initialize_func=init_func,
             handle_data_func=handle_func,
             benchmark=benchmark,
+            required_fields=_detect_required_history_fields(code),
+            factor_catalog=factor_catalog,
         )
 
         if "error" in result:
@@ -95,6 +107,7 @@ def walk_forward(
     stamp_tax_rate: float = 0.001,
     slippage: float = 0.002,
     benchmark: str = "000300.SH",
+    factor_catalog: list[dict] | None = None,
 ) -> dict:
     """Walk-Forward滚动验证 - 训练期优化参数 → 测试期验证"""
     # 获取完整交易日历
@@ -124,7 +137,7 @@ def walk_forward(
         train_results = grid_search(
             strategy_code, param_grid, universe,
             tr_s, tr_e, cache,
-            initial_cash, commission_rate, stamp_tax_rate, slippage, benchmark,
+            initial_cash, commission_rate, stamp_tax_rate, slippage, benchmark, factor_catalog,
         )
 
         if not train_results:
@@ -150,6 +163,8 @@ def walk_forward(
             universe=universe, start_date=te_s, end_date=te_e,
             initialize_func=init_func, handle_data_func=handle_func,
             benchmark=benchmark,
+            required_fields=_detect_required_history_fields(code),
+            factor_catalog=factor_catalog,
         )
 
         if "error" in test_result:

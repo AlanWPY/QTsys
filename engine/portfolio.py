@@ -1,7 +1,21 @@
 """策略组合分析模块 - 相关性分析、最优权重、组合回测"""
 import numpy as np
-from typing import Optional
 from engine.metrics import calc_metrics
+
+EPSILON = 1e-12
+
+
+def _safe_corr(left: np.ndarray, right: np.ndarray) -> float:
+    if left.size < 2 or right.size < 2:
+        return 0.0
+    left_std = float(np.std(left))
+    right_std = float(np.std(right))
+    if left_std < EPSILON or right_std < EPSILON:
+        return 0.0
+    value = float(np.corrcoef(left, right)[0, 1])
+    if not np.isfinite(value):
+        return 0.0
+    return value
 
 
 def analyze_correlations(results: list[dict]) -> dict:
@@ -27,8 +41,12 @@ def analyze_correlations(results: list[dict]) -> dict:
     n = len(results)
 
     # Pearson 相关系数矩阵
-    corr = np.corrcoef(returns_matrix)
-    corr_matrix = [[round(float(corr[i][j]), 4) for j in range(n)] for i in range(n)]
+    corr_matrix = []
+    for i in range(n):
+        row = []
+        for j in range(n):
+            row.append(round(1.0 if i == j else _safe_corr(returns_matrix[i], returns_matrix[j]), 4))
+        corr_matrix.append(row)
 
     # 60日滚动相关性（仅计算相邻策略对）
     window = 60
@@ -41,12 +59,7 @@ def analyze_correlations(results: list[dict]) -> dict:
                 for k in range(window - 1, min_len):
                     chunk_i = returns_matrix[i, k - window + 1: k + 1]
                     chunk_j = returns_matrix[j, k - window + 1: k + 1]
-                    std_i = np.std(chunk_i)
-                    std_j = np.std(chunk_j)
-                    if std_i > 0 and std_j > 0:
-                        c = float(np.corrcoef(chunk_i, chunk_j)[0, 1])
-                    else:
-                        c = 0.0
+                    c = _safe_corr(chunk_i, chunk_j)
                     series.append({"idx": k, "value": round(c, 4)})
                 rolling_corrs.append({"pair": pair_name, "series": series})
 

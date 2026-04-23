@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import NewsArticle, Settings
+from services.factor_catalog_service import load_factor_catalog_snapshot
 from services.llm_gateway import chat_complete_text
 STRATEGY_AI_SKILLS = [
     {
@@ -32,6 +33,11 @@ STRATEGY_AI_SKILLS = [
         "name": "风险复核",
         "description": "对生成代码做本地校验，失败时自动触发一次修复。",
     },
+    {
+        "key": "factor_library",
+        "name": "因子联动",
+        "description": "可直接调用系统因子库，生成单因子或多因子量化策略。",
+    },
 ]
 
 ALLOWED_CONTEXT_APIS = [
@@ -40,11 +46,20 @@ ALLOWED_CONTEXT_APIS = [
     "context.cash",
     "context.portfolio_value",
     "context.get_history(ts_code, count, field)",
+    "context.get_factor(factor_ref, ts_code)",
+    "context.get_factor_history(factor_ref, ts_code, count)",
+    "context.list_factors(keyword='')",
     "context.get_price(ts_code)",
     "context.order(ts_code, amount)",
     "context.order_value(ts_code, value)",
     "context.order_target_percent(ts_code, pct)",
     "context.log(message)",
+]
+
+REQUIRED_TRADE_APIS = [
+    "context.order(",
+    "context.order_value(",
+    "context.order_target_percent(",
 ]
 
 FORBIDDEN_ITEMS = [
@@ -139,6 +154,13 @@ def _normalize_text(value: Any, default: str = "") -> str:
     return text or default
 
 
+def _shorten_text(value: Any, limit: int = 160) -> str:
+    text = _normalize_text(value)
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."
+
+
 def _extract_python_code(text: str) -> str:
     cleaned = _normalize_text(text)
     if not cleaned:
@@ -224,6 +246,10 @@ def validate_strategy_code(code: str) -> Optional[str]:
     function_defs = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     if "handle_data" not in function_defs:
         return "策略必须定义 handle_data(context) 函数"
+    if "context.universe" not in code:
+        return "策略代码必须使用 context.universe 作为股票池入口"
+    if not any(api in code for api in REQUIRED_TRADE_APIS):
+        return "策略代码必须包含至少一种下单接口：order / order_value / order_target_percent"
     if "initialize" in function_defs and len(function_defs["initialize"].args.args) != 1:
         return "initialize 必须只接收一个 context 参数"
     if len(function_defs["handle_data"].args.args) != 1:
@@ -294,6 +320,35 @@ async def _load_market_context(db: AsyncSession, limit: int = 6) -> dict[str, An
     }
 
 
+def _render_factor_catalog(context: dict[str, Any]) -> str:
+    items = context.get("items") or []
+    if not items:
+        return "当前没有可用因子目录，请优先使用价格与成交量数据直接构建策略。"
+    lines = []
+    for item in items:
+        lines.append(
+            f"- {item.get('name')} | 分类={item.get('category') or '未分类'} | 来源={item.get('source') or '未知'}\n"
+            f"  说明：{_shorten_text(item.get('description') or '无说明', 72)}\n"
+            f"  引用方式：context.get_factor('{item.get('name')}', ts_code)"
+        )
+    total = context.get("count") or len(items)
+    return f"当前因子库共 {total} 个，这里展示前 {len(items)} 个可直接调用的因子：\n" + "\n".join(lines)
+
+
+def _render_factor_catalog_compact(context: dict[str, Any]) -> str:
+    items = context.get("items") or []
+    if not items:
+        return "当前没有可用因子目录。"
+    lines = []
+    for item in items:
+        name = _normalize_text(item.get("name"))
+        if not name:
+            continue
+        lines.append(f"- {name} | 分类={item.get('category') or '未分类'} | 用法=context.get_factor('{name}', ts_code)")
+    total = context.get("count") or len(items)
+    return f"可用因子共 {total} 个，以下为精简目录：\n" + "\n".join(lines)
+
+
 def _render_market_context(context: dict[str, Any]) -> str:
     items = context.get("news_items") or []
     if not items:
@@ -320,6 +375,7 @@ def _render_market_context(context: dict[str, Any]) -> str:
 def _build_system_prompt(
     include_market_context: bool,
     market_context_text: str,
+    factor_catalog_text: str,
     current_strategy: Optional[dict[str, Any]] = None,
 ) -> str:
     current_block = ""
@@ -363,18 +419,86 @@ def _build_system_prompt(
 6. 默认优先使用纯 Python 实现，不要依赖 `numpy as np` 或 `pandas as pd`；只有在确实必要时才使用它们。禁止使用这些模块或能力：{", ".join(FORBIDDEN_ITEMS)}。
 7. 不要访问任何未说明的系统对象，不要读写文件，不要联网。
 8. 股票池必须直接使用 `context.universe`，严禁在代码里硬编码大段股票列表。
-9. 每只股票都要处理历史数据不足的情况。
-10. 仓位控制必须清晰，避免无限加仓；单股仓位若用户有约束，必须落实到代码里。
-11. 输出保持紧凑，策略代码尽量控制在 140 行以内，避免冗长注释和大段说明。
-12. 如果你无法稳定输出完整 JSON，也必须优先保证 `strategy.code` 字段里是完整可运行的 Python 代码，不能留空。
+9. `context.positions` 的值是 Position 对象，优先使用 `pos.amount`、`pos.market_value`、`pos.avg_cost`、`pos.profit_pct` 这些属性。
+10. `context.get_history(...)` 返回的是可迭代数值序列，可直接 `len()`、切片、`sum()`、`max()`、`min()`。
+11. 每只股票都要处理历史数据不足的情况。
+12. 仓位控制必须清晰，避免无限加仓；单股仓位若用户有约束，必须落实到代码里。
+13. 策略必须至少包含一种真实下单动作：`context.order(...)`、`context.order_value(...)` 或 `context.order_target_percent(...)`。
+14. 输出保持紧凑，策略代码尽量控制在 140 行以内，避免冗长注释和大段说明。
+15. 如果你无法稳定输出完整 JSON，也必须优先保证 `strategy.code` 字段里是完整可运行的 Python 代码，不能留空。
+16. 优先考虑复用系统因子库，可通过 `context.get_factor('因子名', ts_code)` 获取当前因子值，或 `context.get_factor_history('因子名', ts_code, count)` 获取因子时间序列。
+
+推荐模板骨架（可在此基础上改写）：
+def initialize(context):
+    context.lookback = 20
+    context.target_pct = 0.1
+
+def handle_data(context):
+    for ts_code in context.universe:
+        closes = context.get_history(ts_code, context.lookback + 1, "close")
+        if len(closes) < context.lookback + 1:
+            continue
+        pos = context.positions.get(ts_code)
+        has_position = pos is not None and pos.amount > 0
+        # 在这里计算信号
+        # 买入：context.order_target_percent(ts_code, context.target_pct)
+        # 卖出：context.order(ts_code, -pos.amount)
 
 设计标准：
 - 信号、买卖规则、仓位规则、风控规则、调仓规则要完整。
 - 优先给出稳健、可解释、可维护的策略，不要只给空洞框架。
 - 如果用户要求优化当前策略，应基于当前策略改进，而不是脱离上下文重写。
 {market_block}
+你还可以调用系统因子库，因子目录摘要如下：
+{factor_catalog_text}
+
 {current_block}
 """.strip()
+
+
+def _build_compact_system_prompt(
+    factor_catalog_text: str,
+    current_strategy: Optional[dict[str, Any]] = None,
+) -> str:
+    current_block = ""
+    if current_strategy:
+        current_block = (
+            "\n当前策略：\n"
+            f"名称：{_shorten_text(current_strategy.get('name'), 40)}\n"
+            f"描述：{_shorten_text(current_strategy.get('description'), 120)}\n"
+            f"代码摘要：{_shorten_text(current_strategy.get('code'), 600)}\n"
+        )
+
+    return f"""
+你是 QTsys 的量化策略助手。
+只返回一个 JSON 对象，不要 Markdown，不要解释。
+JSON 必须包含 assistant_reply 和 strategy 两个字段。
+strategy 中必须包含 name、description、code、logic_points、risk_points、market_view、analysis_notes、tags。
+代码必须定义 initialize(context) 与 handle_data(context)。
+只能使用这些 API：{", ".join(ALLOWED_CONTEXT_APIS)}。
+股票池必须使用 context.universe。
+策略必须至少包含一种下单动作：`context.order(...)`、`context.order_value(...)` 或 `context.order_target_percent(...)`。
+优先复用因子库：context.get_factor / context.get_factor_history。
+
+{factor_catalog_text}
+{current_block}
+""".strip()
+
+
+def _trim_chat_messages(
+    messages: list[dict[str, str]],
+    max_count: int = 6,
+    max_chars: int = 1200,
+) -> list[dict[str, str]]:
+    trimmed: list[dict[str, str]] = []
+    for item in messages[-max_count:]:
+        role = item.get("role", "user")
+        if role not in {"user", "assistant"}:
+            role = "user"
+        content = _shorten_text(item.get("content"), max_chars)
+        if content:
+            trimmed.append({"role": role, "content": content})
+    return trimmed
 
 
 def _conversation_text(messages: list[dict[str, str]]) -> str:
@@ -480,9 +604,11 @@ async def generate_strategy_with_ai(
         "news_items": [],
         "skills": STRATEGY_AI_SKILLS,
     }
+    factor_catalog = await load_factor_catalog_snapshot(db, limit=12)
     system_prompt = _build_system_prompt(
         include_market_context=include_market_context,
         market_context_text=_render_market_context(market_context),
+        factor_catalog_text=_render_factor_catalog(factor_catalog),
         current_strategy=current_strategy,
     )
 
@@ -504,14 +630,47 @@ async def generate_strategy_with_ai(
         )
 
     model_name = settings.llm_model or "gpt-4o-mini"
-    raw = await _call_openai_compatible(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-        model=model_name,
-        messages=llm_messages,
-        temperature=0.2,
-        max_tokens=2600,
-    )
+    try:
+        raw = await _call_openai_compatible(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
+            model=model_name,
+            messages=llm_messages,
+            temperature=0.2,
+            max_tokens=2600,
+        )
+    except Exception:
+        compact_factor_catalog = await load_factor_catalog_snapshot(db, limit=6)
+        compact_messages = [
+            {
+                "role": "system",
+                "content": _build_compact_system_prompt(
+                    factor_catalog_text=_render_factor_catalog_compact(compact_factor_catalog),
+                    current_strategy=current_strategy,
+                ),
+            },
+            *_trim_chat_messages(llm_messages[1:], max_count=4, max_chars=900),
+        ]
+        try:
+            raw = await _call_openai_compatible(
+                api_key=settings.llm_api_key,
+                base_url=settings.llm_base_url,
+                model=model_name,
+                messages=compact_messages,
+                temperature=0.1,
+                max_tokens=1800,
+            )
+        except Exception:
+            if "code.newcli.com" not in (settings.llm_base_url or "") or "/claude" not in (settings.llm_base_url or ""):
+                raise
+            raw = await _call_openai_compatible(
+                api_key=settings.llm_api_key,
+                base_url="https://code.newcli.com/codex/v1",
+                model="gpt-5-medium",
+                messages=compact_messages,
+                temperature=0.1,
+                max_tokens=1800,
+            )
 
     try:
         normalized = _normalize_strategy_payload(_extract_json_object(raw))
@@ -552,5 +711,6 @@ async def generate_strategy_with_ai(
     return {
         **normalized,
         "context_summary": market_context,
+        "factor_catalog_summary": factor_catalog,
         "validation": {"passed": True, "error": ""},
     }

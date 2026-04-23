@@ -17,6 +17,9 @@ def handle_data(context):
 # context.order_value(ts_code, value)      - 按金额下单
 # context.get_price(ts_code)               - 获取当前价格
 # context.get_history(ts_code, count, field) - 获取历史数据
+# context.get_factor(factor_ref, ts_code)  - 获取当日因子值，可传因子名称 / ID / expression
+# context.get_factor_history(factor_ref, ts_code, count) - 获取因子历史序列
+# context.list_factors(keyword="")         - 查看当前可用因子目录
 # context.positions                        - 当前持仓字典
 # context.cash                             - 可用资金
 # context.portfolio_value                  - 总资产

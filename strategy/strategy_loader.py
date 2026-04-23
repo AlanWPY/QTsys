@@ -14,6 +14,20 @@ FORBIDDEN_IMPORTS = [
 FORBIDDEN_DUNDER = re.compile(r'__\w+__')
 
 
+SAFE_IMPORTS = {
+    "numpy",
+    "pandas",
+    "math",
+}
+
+
+def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+    root_name = str(name or "").split(".")[0]
+    if root_name not in SAFE_IMPORTS:
+        raise ValueError(f"禁止导入模块: {root_name}")
+    return __import__(name, globals, locals, fromlist, level)
+
+
 def load_strategy(code: str) -> Tuple[Callable, Callable]:
     """加载用户策略代码,返回 (initialize, handle_data) 函数"""
     # 基本安全检查
@@ -45,6 +59,7 @@ def load_strategy(code: str) -> Tuple[Callable, Callable]:
             "TypeError": TypeError, "KeyError": KeyError,
             "IndexError": IndexError, "RuntimeError": RuntimeError,
             "True": True, "False": False, "None": None,
+            "__import__": _safe_import,
         }
     }
 

@@ -2,24 +2,25 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON, UniqueConstraint
 from database.connection import Base
+from database.encrypted_types import EncryptedString
 
 
 class Settings(Base):
     __tablename__ = "settings"
 
     id = Column(Integer, primary_key=True, default=1)
-    tushare_token = Column(String(200), default="")
+    tushare_token = Column(EncryptedString(), default="")
     default_cash = Column(Float, default=1_000_000.0)
     commission_rate = Column(Float, default=0.0003)
     stamp_tax_rate = Column(Float, default=0.001)
     slippage = Column(Float, default=0.002)
-    llm_api_key = Column(String(200), default="")
+    llm_api_key = Column(EncryptedString(), default="")
     llm_base_url = Column(String(500), default="")
     llm_model = Column(String(100), default="")
     mysql_host = Column(String(200), default="")
     mysql_port = Column(Integer, default=3306)
     mysql_user = Column(String(100), default="")
-    mysql_password = Column(String(200), default="")
+    mysql_password = Column(EncryptedString(), default="")
     mysql_database = Column(String(100), default="qtsys")
     use_mysql = Column(Integer, default=0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

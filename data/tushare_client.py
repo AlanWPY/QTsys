@@ -24,8 +24,38 @@ class TushareClient:
     _global_call_times: dict[str, list[float]] = {}
 
     def __init__(self, token: str):
-        self.token = token
-        self.pro = ts.pro_api(token)
+        self.token = str(token or "").strip()
+        if self.token:
+            ts.set_token(self.token)
+        self.pro = ts.pro_api(self.token)
+
+    def _ensure_token(self):
+        if self.token:
+            ts.set_token(self.token)
+
+    def _call_pro_bar(self, **kwargs):
+        self._ensure_token()
+        last_error = None
+        for payload in ({**kwargs, "api": self.pro}, kwargs):
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message="Series.fillna with 'method' is deprecated.*",
+                        category=FutureWarning,
+                    )
+                    return ts.pro_bar(**payload)
+            except Exception as exc:
+                last_error = exc
+                message = str(exc)
+                if isinstance(exc, OSError) and "token" in message.lower():
+                    self._ensure_token()
+                if isinstance(exc, TypeError):
+                    continue
+                continue
+        if last_error:
+            raise last_error
+        return pd.DataFrame()
 
     def _rate_limit(self):
         """速率限制保护 - 滑动窗口"""
@@ -51,32 +81,19 @@ class TushareClient:
     def get_daily(self, ts_code: str, start_date: str, end_date: str, adj: Optional[str] = None) -> pd.DataFrame:
         """获取日线行情数据，`adj` 可选 `qfq` 或 `hfq`。"""
         self._rate_limit()
+        self._ensure_token()
         try:
             if adj:
-                try:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
-                        df = ts.pro_bar(
-                            api=self.pro,
-                            ts_code=ts_code,
-                            adj=adj,
-                            start_date=start_date,
-                            end_date=end_date,
-                            asset="E",
-                            freq="D",
-                        )
-                except TypeError:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
-                        df = ts.pro_bar(
-                            ts_code=ts_code,
-                            adj=adj,
-                            start_date=start_date,
-                            end_date=end_date,
-                            asset="E",
-                            freq="D",
-                        )
+                df = self._call_pro_bar(
+                    ts_code=ts_code,
+                    adj=adj,
+                    start_date=start_date,
+                    end_date=end_date,
+                    asset="E",
+                    freq="D",
+                )
             else:
+                self._ensure_token()
                 df = self.pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
             if df is None or df.empty:
                 return pd.DataFrame()
@@ -90,6 +107,7 @@ class TushareClient:
     def get_daily_basic(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """获取每日指标(市值、换手率等)"""
         self._rate_limit()
+        self._ensure_token()
         try:
             df = self.pro.daily_basic(ts_code=ts_code, start_date=start_date, end_date=end_date)
             if df is None or df.empty:
@@ -103,6 +121,7 @@ class TushareClient:
     def get_trade_cal(self, start_date: str, end_date: str) -> list[str]:
         """获取交易日历"""
         self._rate_limit()
+        self._ensure_token()
         try:
             df = self.pro.trade_cal(
                 exchange="SSE", start_date=start_date, end_date=end_date, is_open="1"
@@ -117,6 +136,7 @@ class TushareClient:
     def get_stock_basic(self, ts_code: Optional[str] = None) -> pd.DataFrame:
         """获取股票基本信息"""
         self._rate_limit()
+        self._ensure_token()
         try:
             kwargs = {"exchange": "", "list_status": "L"}
             if ts_code:
@@ -130,6 +150,7 @@ class TushareClient:
     def get_index_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """获取指数日线(用于基准)"""
         self._rate_limit()
+        self._ensure_token()
         try:
             df = self.pro.index_daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
             if df is None or df.empty:
@@ -144,6 +165,7 @@ class TushareClient:
     def get_adj_factor(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """获取复权因子"""
         self._rate_limit()
+        self._ensure_token()
         try:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message="Series.fillna with 'method' is deprecated.*", category=FutureWarning)
@@ -159,6 +181,7 @@ class TushareClient:
     def get_index_weight(self, index_code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """获取指数成分股权重"""
         self._rate_limit()
+        self._ensure_token()
         try:
             kwargs = {"index_code": index_code}
             if start_date:
@@ -176,6 +199,7 @@ class TushareClient:
     def validate_token(self) -> bool:
         """验证token是否有效"""
         try:
+            self._ensure_token()
             df = self.pro.trade_cal(exchange="SSE", start_date="20240101", end_date="20240102")
             return df is not None and not df.empty
         except Exception:

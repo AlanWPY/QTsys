@@ -126,22 +126,25 @@ class BacktestEngine:
         pos = self.positions.get(ts_code)
         current_value = pos.market_value if pos and pos.amount > 0 else 0.0
         diff = target_value - current_value
-        price = self._get_prev_close(ts_code)
+        price = self._get_reference_price(ts_code)
         if price and price > 0:
             amount = int(diff / price)
             if amount != 0:
                 self.order(ts_code, amount)
 
     def order_value(self, ts_code: str, value: float):
-        price = self._get_prev_close(ts_code)
+        price = self._get_reference_price(ts_code)
         if price and price > 0:
             amount = int(float(value) / price)
             if amount != 0:
                 self.order(ts_code, amount)
 
-    def _get_prev_close(self, ts_code: str) -> Optional[float]:
+    def _get_reference_price(self, ts_code: str) -> Optional[float]:
         if ts_code not in self.date_index:
             return None
+        current_row = self.date_index[ts_code].get(self.current_date)
+        if current_row and current_row.get("close") is not None:
+            return float(current_row["close"])
         current_pos = self._date_to_idx.get(self.current_date)
         if current_pos is None:
             return None
@@ -165,10 +168,12 @@ class BacktestEngine:
         current_pos = self._date_to_idx.get(self.current_date)
         if current_pos is None:
             return HistoryWindow(name=field)
+        idx = self.date_index.get(ts_code, {})
+        if self.current_date not in idx:
+            return HistoryWindow(name=field)
 
         normalized_field = HISTORY_FIELD_ALIASES.get(field, field)
         relevant_dates = self.trade_dates[max(0, current_pos - count + 1): current_pos + 1]
-        idx = self.date_index.get(ts_code, {})
         values = []
         for date_value in relevant_dates:
             row = idx.get(date_value)
@@ -521,14 +526,14 @@ class BacktestEngine:
             self._settle_t1()
             self._check_stop_loss_take_profit()
             self._check_portfolio_risk()
+            self._execute_orders()
+            self._update_prices()
 
             try:
                 handle_data_func(self)
             except Exception as exc:
                 self.log(f"策略异常: {exc}")
 
-            self._execute_orders()
-            self._update_prices()
 
             portfolio_value = self.portfolio_value
             daily_return = (portfolio_value - prev_value) / prev_value if prev_value > 0 else 0.0

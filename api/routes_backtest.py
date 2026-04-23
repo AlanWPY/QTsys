@@ -11,7 +11,7 @@ from typing import Any, Optional
 from database.connection import get_db
 from database.models import Settings, Strategy, BacktestResult, StockPool
 from data.tushare_client import TushareClient
-from data.data_cache import DataCache
+from data.data_cache import DataCache, make_mysql_conn
 from engine.backtest_engine import BacktestEngine
 from strategy.strategy_loader import load_strategy
 from services.backtest_service import resolve_backtest_universe, run_backtest_workflow
@@ -421,36 +421,57 @@ class AttributionRequest(BaseModel):
 
 @router.post("/attribution")
 async def compute_attribution(req: AttributionRequest, db: AsyncSession = Depends(get_db)):
-    """归因分析 - 个股盈亏、行业归因、月度归因"""
+    """Attribution analysis - stock pnl, sector attribution, monthly attribution"""
     result = await db.execute(
         select(BacktestResult).where(BacktestResult.id == req.result_id)
     )
     r = result.scalar_one_or_none()
     if not r:
-        raise HTTPException(status_code=404, detail="结果不存在")
+        raise HTTPException(status_code=404, detail="Result not found")
 
-    # 获取行业映射
     settings_result = await db.execute(select(Settings).where(Settings.id == 1))
     settings = settings_result.scalar_one_or_none()
     industry_map = {}
+    end_prices = {}
     if settings and settings.tushare_token:
         try:
             client = TushareClient(settings.tushare_token)
+            cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
             df = await asyncio.to_thread(client.get_stock_basic)
             if df is not None and not df.empty:
                 for _, row in df.iterrows():
-                    industry_map[row.get("ts_code", "")] = row.get("industry", "未知")
+                    industry_map[row.get("ts_code", "")] = row.get("industry", "Unknown")
+
+            traded_codes = sorted({
+                str(item.get("ts_code") or "").strip()
+                for item in (r.trades or [])
+                if item.get("ts_code")
+            })
+            for code in traded_codes:
+                try:
+                    daily = await asyncio.to_thread(cache.get_daily, code, r.start_date, r.end_date, "qfq")
+                    if daily is not None and not daily.empty and "close" in daily.columns:
+                        last_close = daily.sort_values("trade_date").iloc[-1]["close"]
+                        if last_close is not None:
+                            end_prices[code] = float(last_close)
+                except Exception:
+                    continue
         except Exception:
             pass
 
     from engine.attribution import compute_stock_pnl, compute_sector_attribution, compute_monthly_attribution
 
     stock_pnl = await asyncio.to_thread(
-        compute_stock_pnl, r.trades or [], r.initial_cash
+        compute_stock_pnl, r.trades or [], r.initial_cash, end_prices
     )
     sector_attr = await asyncio.to_thread(
-        compute_sector_attribution, r.trades or [], industry_map,
-        None, (r.metrics or {}).get("total_return", 0), r.initial_cash
+        compute_sector_attribution,
+        r.trades or [],
+        industry_map,
+        None,
+        (r.metrics or {}).get("total_return", 0),
+        r.initial_cash,
+        stock_pnl,
     )
     monthly_attr = await asyncio.to_thread(
         compute_monthly_attribution, r.equity_curve or [], r.benchmark_curve or []

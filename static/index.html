@@ -769,6 +769,14 @@ body::after {
     border: 1px solid rgba(148, 163, 184, 0.12);
     background: rgba(15, 23, 42, 0.72);
 }
+.trades-table-wrap {
+    max-height: min(62vh, 720px);
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+.trades-table-wrap table {
+    min-width: 760px;
+}
 .toast {
     backdrop-filter: blur(14px);
     box-shadow: 0 18px 44px rgba(2, 6, 23, 0.35);
@@ -3540,7 +3548,7 @@ function RiskAnalysisTab({ resultId }) {
             .then(setData).catch(() => {}).finally(() => setLoading(false));
     }, [resultId]);
     if (loading) return <div className="text-center py-10"><span className="spinner"/></div>;
-    if (!data) return <div className="text-muted text-center py-10">无数据</div>;
+    if (!data) return <div className="text-muted text-center py-10">{'\u6682\u65e0\u5f52\u56e0\u6570\u636e'}</div>;
     const rm = data.risk_metrics || {};
     return (
         <div className="space-y">
@@ -3769,21 +3777,30 @@ function StockPnLTable({ stocks }) {
     if (!stocks || stocks.length === 0) return null;
     return (
         <div>
-            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>个股盈亏分解</div>
-            <div className="table-wrap" style={{maxHeight:300}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{'\u4e2a\u80a1\u76c8\u4e8f\u5206\u89e3'}</div>
+            <div className="table-wrap" style={{maxHeight:'min(62vh, 720px)', overflowY:'auto', overflowX:'auto'}}>
                 <table>
                     <thead><tr>
-                        <th>代码</th><th style={{textAlign:'right'}}>买入成本</th>
-                        <th style={{textAlign:'right'}}>卖出收入</th><th style={{textAlign:'right'}}>已实现盈亏</th>
-                        <th style={{textAlign:'right'}}>贡献率%</th><th style={{textAlign:'right'}}>交易次数</th>
+                        <th>{'\u4ee3\u7801'}</th>
+                        <th style={{textAlign:'right'}}>{'\u4e70\u5165\u6210\u672c'}</th>
+                        <th style={{textAlign:'right'}}>{'\u5356\u51fa\u6536\u5165'}</th>
+                        <th style={{textAlign:'right'}}>{'\u5df2\u5b9e\u73b0\u76c8\u4e8f'}</th>
+                        <th style={{textAlign:'right'}}>{'\u672a\u5b9e\u73b0\u76c8\u4e8f'}</th>
+                        <th style={{textAlign:'right'}}>{'\u603b\u76c8\u4e8f'}</th>
+                        <th style={{textAlign:'right'}}>{'\u8d21\u732e\u7387(%)'}</th>
+                        <th style={{textAlign:'right'}}>{'\u671f\u672b\u6301\u4ed3'}</th>
+                        <th style={{textAlign:'right'}}>{'\u4ea4\u6613\u6b21\u6570'}</th>
                     </tr></thead>
-                    <tbody>{stocks.map((s,i) => (
+                    <tbody>{stocks.map((s, i) => (
                         <tr key={i}>
                             <td>{s.ts_code}</td>
                             <td style={{textAlign:'right'}}>{s.buy_cost?.toLocaleString()}</td>
                             <td style={{textAlign:'right'}}>{s.sell_income?.toLocaleString()}</td>
-                            <td style={{textAlign:'right'}} className={s.realized_pnl>=0?'text-profit':'text-loss'}>{s.realized_pnl?.toLocaleString()}</td>
-                            <td style={{textAlign:'right'}} className={s.contribution_pct>=0?'text-profit':'text-loss'}>{s.contribution_pct}</td>
+                            <td style={{textAlign:'right'}} className={s.realized_pnl >= 0 ? 'text-profit' : 'text-loss'}>{s.realized_pnl?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}} className={s.unrealized_pnl >= 0 ? 'text-profit' : 'text-loss'}>{s.unrealized_pnl?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}} className={(s.total_pnl ?? s.realized_pnl) >= 0 ? 'text-profit' : 'text-loss'}>{(s.total_pnl ?? s.realized_pnl)?.toLocaleString()}</td>
+                            <td style={{textAlign:'right'}} className={s.contribution_pct >= 0 ? 'text-profit' : 'text-loss'}>{s.contribution_pct}</td>
+                            <td style={{textAlign:'right'}}>{s.ending_position ?? 0}</td>
                             <td style={{textAlign:'right'}}>{s.trade_count}</td>
                         </tr>
                     ))}</tbody>
@@ -3796,23 +3813,24 @@ function StockPnLTable({ stocks }) {
 /* ===== Top Contributors Chart ===== */
 function TopContributorsChart({ stocks }) {
     if (!stocks || stocks.length === 0) return null;
-    const sorted = [...stocks].sort((a,b) => b.realized_pnl - a.realized_pnl);
+    const valueOf = (item) => item.total_pnl ?? item.realized_pnl ?? 0;
+    const sorted = [...stocks].sort((a, b) => valueOf(b) - valueOf(a));
     const top5 = sorted.slice(0, 5);
     const bottom5 = sorted.slice(-5).reverse();
-    const items = [...top5, ...bottom5].filter((v,i,a) => a.findIndex(x=>x.ts_code===v.ts_code)===i);
-    const maxAbs = Math.max(...items.map(s => Math.abs(s.realized_pnl || 0)), 1);
+    const items = [...top5, ...bottom5].filter((v, i, arr) => arr.findIndex(x => x.ts_code === v.ts_code) === i);
+    const maxAbs = Math.max(...items.map(s => Math.abs(valueOf(s))), 1);
     return (
         <div>
-            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>Top 盈亏贡献</div>
-            {items.map((s,i) => (
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{'Top \u76c8\u4e8f\u8d21\u732e'}</div>
+            {items.map((s, i) => (
                 <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,fontSize:12}}>
                     <span style={{minWidth:80,color:'var(--text-300)'}}>{s.ts_code}</span>
                     <div style={{flex:1,display:'flex',alignItems:'center'}}>
-                        <span className={'pnl-bar ' + (s.realized_pnl>=0?'pnl-bar-profit':'pnl-bar-loss')}
-                            style={{width: Math.abs(s.realized_pnl)/maxAbs*100+'%'}}/>
+                        <span className={'pnl-bar ' + (valueOf(s) >= 0 ? 'pnl-bar-profit' : 'pnl-bar-loss')}
+                            style={{width: Math.abs(valueOf(s)) / maxAbs * 100 + '%'}}/>
                     </div>
-                    <span className={s.realized_pnl>=0?'text-profit':'text-loss'} style={{minWidth:80,textAlign:'right'}}>
-                        {s.realized_pnl?.toLocaleString()}
+                    <span className={valueOf(s) >= 0 ? 'text-profit' : 'text-loss'} style={{minWidth:100,textAlign:'right'}}>
+                        {valueOf(s)?.toLocaleString()}
                     </span>
                 </div>
             ))}
@@ -3826,18 +3844,17 @@ function SectorAttributionChart({ sectors }) {
     const COLORS = ['#6366f1','#22c55e','#f59e0b'];
     return (
         <div>
-            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>行业归因</div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{'\u884c\u4e1a\u5f52\u56e0'}</div>
             <ResponsiveContainer width="100%" height={Math.max(200, sectors.length * 35)}>
                 <BarChart data={sectors} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
-                    <XAxis type="number" tick={{fill:'#94a3b8',fontSize:10}} tickFormatter={v=>v.toFixed(2)+'%'}/>
-                    <YAxis type="category" dataKey="sector" tick={{fill:'#94a3b8',fontSize:11}} width={70}/>
-                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
-                        formatter={v=>[v+'%']}/>
+                    <XAxis type="number" tick={{fill:'#94a3b8',fontSize:10}} tickFormatter={v => v.toFixed(2) + '%'}/>
+                    <YAxis type="category" dataKey="sector" tick={{fill:'#94a3b8',fontSize:11}} width={90}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}} formatter={v => [v + '%']}/>
                     <Legend/>
-                    <Bar dataKey="allocation" name="配置效应" fill={COLORS[0]} stackId="a"/>
-                    <Bar dataKey="selection" name="选择效应" fill={COLORS[1]} stackId="a"/>
-                    <Bar dataKey="interaction" name="交互效应" fill={COLORS[2]} stackId="a"/>
+                    <Bar dataKey="allocation" name={'\u914d\u7f6e\u6548\u5e94'} fill={COLORS[0]} stackId="a"/>
+                    <Bar dataKey="selection" name={'\u9009\u80a1\u6548\u5e94'} fill={COLORS[1]} stackId="a"/>
+                    <Bar dataKey="interaction" name={'\u4ea4\u4e92\u6548\u5e94'} fill={COLORS[2]} stackId="a"/>
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -3849,26 +3866,23 @@ function MonthlyAttributionChart({ monthly }) {
     if (!monthly || monthly.length === 0) return null;
     return (
         <div>
-            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>月度超额收益</div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{'\u6708\u5ea6\u8d85\u989d\u6536\u76ca'}</div>
             <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={monthly}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
-                    <XAxis dataKey="month" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
-                        interval={Math.max(0,Math.floor(monthly.length/8)-1)}/>
-                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false}
-                        tickFormatter={v=>v.toFixed(1)+'%'}/>
-                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}
-                        formatter={(v,name)=>{
-                            const labels={strategy_return:'策略',benchmark_return:'基准',excess_return:'超额'};
-                            return [v+'%',labels[name]||name];
-                        }}/>
-                    <Legend formatter={v=>{
-                        const labels={strategy_return:'策略',benchmark_return:'基准',excess_return:'超额'};
-                        return labels[v]||v;
+                    <XAxis dataKey="month" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false} interval={Math.max(0, Math.floor(monthly.length / 8) - 1)}/>
+                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} tickLine={false} tickFormatter={v => v.toFixed(1) + '%'}/>
+                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}} formatter={(v, name) => {
+                        const labels = {strategy_return:'\u7b56\u7565', benchmark_return:'\u57fa\u51c6', excess_return:'\u8d85\u989d'};
+                        return [v + '%', labels[name] || name];
+                    }}/>
+                    <Legend formatter={v => {
+                        const labels = {strategy_return:'\u7b56\u7565', benchmark_return:'\u57fa\u51c6', excess_return:'\u8d85\u989d'};
+                        return labels[v] || v;
                     }}/>
                     <Bar dataKey="excess_return" name="excess_return">
-                        {monthly.map((m,i)=>(
-                            <Cell key={i} fill={m.excess_return>=0?'#22c55e':'#ef4444'}/>
+                        {monthly.map((m, i) => (
+                            <Cell key={i} fill={m.excess_return >= 0 ? '#22c55e' : '#ef4444'}/>
                         ))}
                     </Bar>
                 </BarChart>
@@ -3996,7 +4010,7 @@ function MetricsTable({ metrics }) {
 function TradesTable({ trades }) {
     if (!trades || trades.length === 0) return <div className="text-muted text-center py-10">暂无交易记录</div>;
     return (
-        <div className="table-wrap">
+        <div className="table-wrap trades-table-wrap">
             <table>
                 <thead><tr>
                     <th>日期</th><th>代码</th><th>方向</th>
@@ -7326,7 +7340,7 @@ function FactorWorkflowPage({ showToast }) {
                     {btResult.trades && btResult.trades.length > 0 && (
                         <details style={{marginTop:6,fontSize:11}}>
                             <summary style={{cursor:'pointer',color:'#888'}}>交易记录 ({btResult.trades.length}笔)</summary>
-                            <div style={{maxHeight:120,overflowY:'auto',marginTop:4}}>
+                            <div style={{maxHeight:320,overflowY:'auto',overflowX:'auto',marginTop:4}}>
                                 <table style={{width:'100%',fontSize:10,borderCollapse:'collapse'}}>
                                     <thead><tr style={{color:'#888'}}>
                                         <th style={{textAlign:'left',padding:'2px 4px'}}>日期</th>
@@ -7335,7 +7349,7 @@ function FactorWorkflowPage({ showToast }) {
                                         <th style={{textAlign:'right',padding:'2px 4px'}}>价格</th>
                                         <th style={{textAlign:'right',padding:'2px 4px'}}>数量</th>
                                     </tr></thead>
-                                    <tbody>{btResult.trades.slice(0,100).map((t,i) => (
+                                    <tbody>{btResult.trades.map((t,i) => (
                                         <tr key={i} style={{color:'#ccc',borderTop:'1px solid #222'}}>
                                             <td style={{padding:'2px 4px'}}>{t.date}</td>
                                             <td style={{padding:'2px 4px'}}>{t.code||''}</td>

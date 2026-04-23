@@ -231,6 +231,15 @@ def handle_data(context):
 | SQLite | 保存系统设置、策略、回测结果和股票池 | 是 |
 | MySQL | 因子看板行情缓存和批量分析结果存储 | 使用因子看板时建议启用 |
 
+## 敏感信息安全
+
+- `Tushare Token`、`LLM API Key`、`MySQL 密码` 会以加密形式保存到本地数据库
+- 系统使用本地主密钥对敏感配置做透明加解密，主密钥默认保存在 `runtime/secrets/master.key`
+- `runtime/` 目录已被 `.gitignore` 忽略，不会随 GitHub 一起提交
+- 如需在新机器上继续使用原有密文配置，请同时迁移主密钥，或设置环境变量 `QTSYS_MASTER_KEY`
+- 若主密钥丢失，已保存的密文配置将无法解密，需要重新在“设置”页填写
+- 发布前可执行 `.\.venv\Scripts\python.exe scripts/security_check.py` 扫描当前工作区中的疑似明文密钥
+
 ## 目录结构
 
 - `main.py`：FastAPI 入口
@@ -286,4 +295,3 @@ def handle_data(context):
 - 策略尚未保存
 - 股票池为空
 - 当前筛选条件过严
-

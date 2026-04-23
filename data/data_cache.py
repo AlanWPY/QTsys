@@ -14,6 +14,7 @@ logger = get_logger("qtsys.data.cache")
 # TTL配置(秒)
 TTL_HISTORICAL = 24 * 3600  # 历史数据: 24小时
 TTL_INTRADAY = 300           # 当日数据: 5分钟
+CACHE_SCHEMA_VERSION = "v2"
 
 
 def make_mysql_conn(settings):
@@ -207,7 +208,7 @@ class DataCache:
             logger.warning(f"MySQL 写入缓存失败 {table}: {e}")
 
     def _cache_path(self, key: str) -> str:
-        h = hashlib.md5(key.encode()).hexdigest()
+        h = hashlib.md5(f"{CACHE_SCHEMA_VERSION}:{key}".encode()).hexdigest()
         return os.path.join(CACHE_DIR, f"{h}.pkl")
 
     def _is_expired(self, path: str, is_today: bool = False) -> bool:
@@ -296,6 +297,29 @@ class DataCache:
                 segments.append((tail_start, end_date))
         return segments
 
+    def _missing_trade_segments(self, df: Optional[pd.DataFrame], start_date: str, end_date: str, date_col: str = "trade_date") -> list[tuple[str, str]]:
+        expected_dates = self.get_trade_cal(start_date, end_date)
+        if not expected_dates:
+            return self._missing_segments(df, start_date, end_date, date_col=date_col)
+        if df is None or df.empty or date_col not in df.columns:
+            return [(expected_dates[0], expected_dates[-1])]
+        prepared = self._prepare_frame(df, date_col=date_col)
+        existing_dates = set(prepared[date_col].dt.strftime("%Y%m%d").tolist())
+        missing = [date for date in expected_dates if date not in existing_dates]
+        if not missing:
+            return []
+        expected_pos = {date: idx for idx, date in enumerate(expected_dates)}
+        segments: list[tuple[str, str]] = []
+        seg_start = missing[0]
+        prev = missing[0]
+        for date in missing[1:]:
+            if expected_pos[date] != expected_pos[prev] + 1:
+                segments.append((seg_start, prev))
+                seg_start = date
+            prev = date
+        segments.append((seg_start, prev))
+        return segments
+
     def _merge_frames(self, *frames: Optional[pd.DataFrame], date_col: str = "trade_date", unique_cols: Optional[list[str]] = None) -> pd.DataFrame:
         valid = [self._prepare_frame(frame, date_col=date_col, unique_cols=unique_cols) for frame in frames if frame is not None and not frame.empty]
         if not valid:
@@ -322,7 +346,7 @@ class DataCache:
             mysql_df = self._prepare_frame(self._mysql_read(table, ts_code, start_date, end_date), unique_cols=unique_cols)
             base_df = self._prepare_frame(cached_full, unique_cols=unique_cols)
             merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
-            segments = self._missing_segments(merged, start_date, end_date)
+            segments = self._missing_trade_segments(merged, start_date, end_date)
             fetched_segments = []
             for seg_start, seg_end in segments:
                 seg_df = self.client.get_daily(ts_code, seg_start, seg_end, adj=adj)
@@ -349,7 +373,7 @@ class DataCache:
         mysql_df = self._prepare_frame(self._mysql_read(table, ts_code, start_date, end_date), unique_cols=unique_cols)
         base_df = self._prepare_frame(cached_full, unique_cols=unique_cols)
         merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
-        segments = self._missing_segments(merged, start_date, end_date)
+        segments = self._missing_trade_segments(merged, start_date, end_date)
         fetched_segments = []
         for seg_start, seg_end in segments:
             seg_df = self.client.get_daily(ts_code, seg_start, seg_end)
@@ -446,7 +470,7 @@ class DataCache:
             return cached
         base_key = f"index_weight_full_{index_code}"
         base_df = self._prepare_frame(self._load(base_key), unique_cols=["trade_date", "con_code"])
-        segments = self._missing_segments(base_df, start_date, end_date)
+        segments = self._missing_trade_segments(base_df, start_date, end_date)
         fetched = []
         for seg_start, seg_end in segments:
             seg_df = self.client.get_index_weight(index_code, seg_start, seg_end)
@@ -470,7 +494,7 @@ class DataCache:
         base_df = self._prepare_frame(self._load(base_key), unique_cols=unique_cols)
         mysql_df = self._prepare_frame(self._mysql_read("qtsys_index_daily", ts_code, start_date, end_date), unique_cols=unique_cols)
         merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
-        segments = self._missing_segments(merged, start_date, end_date)
+        segments = self._missing_trade_segments(merged, start_date, end_date)
         fetched = []
         for seg_start, seg_end in segments:
             seg_df = self.client.get_index_daily(ts_code, seg_start, seg_end)

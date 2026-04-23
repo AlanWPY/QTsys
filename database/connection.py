@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 from config import DATABASE_URL
+from database.secret_crypto import encrypt_secret, is_encrypted_secret
 from logging_config import get_logger
 
 logger = get_logger("qtsys.db")
@@ -88,6 +89,29 @@ async def _init_schema(engine):
                 )
             except Exception:
                 pass
+        try:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT id, tushare_token, llm_api_key, mysql_password "
+                        "FROM settings"
+                    )
+                )
+            ).mappings().all()
+            for row in rows:
+                updates = {}
+                for field in ("tushare_token", "llm_api_key", "mysql_password"):
+                    value = row.get(field) or ""
+                    if value and not is_encrypted_secret(value):
+                        updates[field] = encrypt_secret(value)
+                if updates:
+                    set_clause = ", ".join(f"{field} = :{field}" for field in updates)
+                    await conn.execute(
+                        text(f"UPDATE settings SET {set_clause} WHERE id = :id"),
+                        {"id": row["id"], **updates},
+                    )
+        except Exception:
+            logger.exception("敏感配置明文迁移失败")
 
 
 async def init_db():

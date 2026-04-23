@@ -15,3 +15,4 @@ aiomysql>=0.2.0
 PyMySQL>=1.1.0
 cryptography>=41.0.0
 scipy>=1.11.0
+backtrader>=1.9.78.123

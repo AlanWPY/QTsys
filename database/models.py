@@ -71,6 +71,55 @@ class Factor(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class FactorMiningSession(Base):
+    __tablename__ = "factor_mining_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(40), nullable=False, unique=True)
+    status = Column(String(20), default="pending")
+    phase = Column(String(40), default="queued")
+    message = Column(Text, default="")
+    universe_type = Column(String(20), default="system")
+    universe_code = Column(String(20), default="")
+    universe_name = Column(String(100), default="")
+    custom_pool_id = Column(Integer, default=None)
+    stock_count = Column(Integer, default=0)
+    start_date = Column(String(10), nullable=False)
+    end_date = Column(String(10), nullable=False)
+    params = Column(JSON, default=dict)
+    tested_count = Column(Integer, default=0)
+    accepted_count = Column(Integer, default=0)
+    best_score = Column(Float, default=0.0)
+    error = Column(Text, default="")
+    started_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    stopped_at = Column(DateTime, default=None)
+
+
+class FactorMiningCandidate(Base):
+    __tablename__ = "factor_mining_candidates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(40), nullable=False)
+    expression_hash = Column(String(64), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, default="")
+    expression = Column(Text, nullable=False)
+    source = Column(String(40), default="")
+    direction = Column(String(10), default="top")
+    complexity = Column(Integer, default=0)
+    score = Column(Float, default=0.0)
+    metrics = Column(JSON, default=dict)
+    train_metrics = Column(JSON, default=dict)
+    valid_metrics = Column(JSON, default=dict)
+    test_metrics = Column(JSON, default=dict)
+    backtest_metrics = Column(JSON, default=dict)
+    equity_curve = Column(JSON, default=list)
+    normalized_curve = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("session_id", "expression_hash"),)
+
+
 class FactorResult(Base):
     __tablename__ = "factor_results"
 

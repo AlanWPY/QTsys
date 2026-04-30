@@ -14,7 +14,12 @@ from factor.builtin_factors import BUILTIN_FACTORS
 from factor.alpha191_templates import get_alpha191_formula
 from factor.expression_to_graph import ExpressionToGraph
 from services.factor_catalog_service import load_factor_catalog
-from services.factor_service import evaluate_factor_workflow, mine_gp_workflow
+from services.factor_service import (
+    create_strategy_from_factor_workflow,
+    evaluate_factor_workflow,
+    mine_gp_workflow,
+    rank_factor_cross_section_workflow,
+)
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
 
@@ -49,6 +54,19 @@ class LLMMineRequest(BaseModel):
     end_date: str
     count: int = 5
     hint: str = ""
+
+
+class FactorStrategyRequest(BaseModel):
+    direction: str = "top"
+
+
+class FactorRankRequest(BaseModel):
+    factor_id: int
+    trade_date: str
+    universe_type: str = "system"
+    universe_code: str = "000300.SH"
+    custom_pool_id: Optional[int] = None
+    n: int = 10
 
 
 # ===== 因子CRUD =====
@@ -178,6 +196,36 @@ async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get
     await db.commit()
 
     return eval_result
+
+
+@router.post("/{factor_id}/create_strategy")
+async def create_strategy_from_factor(
+    factor_id: int,
+    req: FactorStrategyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await create_strategy_from_factor_workflow(db, factor_id=factor_id, direction=req.direction)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/rank")
+async def rank_factor_cross_section(req: FactorRankRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        return await rank_factor_cross_section_workflow(
+            db,
+            factor_id=req.factor_id,
+            trade_date=req.trade_date,
+            universe_type=req.universe_type,
+            universe_code=req.universe_code,
+            custom_pool_id=req.custom_pool_id,
+            n=req.n,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ===== 遗传算法挖掘 =====

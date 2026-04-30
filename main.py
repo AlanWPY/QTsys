@@ -29,6 +29,7 @@ from api.routes_ws import router as ws_router
 from api.routes_factor_backtest import router as factor_backtest_router
 from api.routes_quality import router as quality_router
 from api.routes_factor_board import router as factor_board_router
+from api.routes_factor_mining import router as factor_mining_router
 
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
@@ -114,6 +115,7 @@ app.include_router(ws_router)
 app.include_router(factor_backtest_router)
 app.include_router(quality_router)
 app.include_router(factor_board_router)
+app.include_router(factor_mining_router)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

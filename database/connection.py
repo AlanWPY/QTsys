@@ -63,6 +63,7 @@ async def _init_schema(engine):
     async with engine.begin() as conn:
         from database.models import (
             Settings, Strategy, BacktestResult, Factor, FactorResult,
+            FactorMiningSession, FactorMiningCandidate,
             FactorBacktestResult, NewsArticle, StockPool,
             DailyQuote, DailyBasic, IndexDaily, TradeCalendar,
         )

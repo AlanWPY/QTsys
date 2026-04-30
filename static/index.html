@@ -450,6 +450,13 @@ tr:hover td { background: var(--bg-600); }
 .factor-metric-label { font-size: 11px; color: var(--text-400); }
 .factor-metric-val { font-size: 18px; font-weight: 700; margin-top: 2px; }
 .mine-panel { background: var(--bg-700); border-radius: 12px; padding: 16px; margin-top: 12px; }
+.factor-rank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.factor-rank-table { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+.factor-rank-table table { min-width: 460px; }
+.factor-rank-toolbar { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.factor-rank-toolbar .field { min-width: 140px; }
+.factor-rank-toolbar .wide { min-width: 220px; }
+@media (max-width: 980px) { .factor-rank-grid { grid-template-columns: 1fr; } }
 
 /* ===== 新闻页面 ===== */
 .news-layout { display: flex; gap: 16px; }
@@ -1057,6 +1064,72 @@ body::after {
 .factor-board-legend-item.spread { cursor: default; border-style: dashed; }
 .factor-board-legend-item.spread:hover { transform: none; }
 .factor-board-legend-name.subtle { color: #cbd5e1; }
+
+/* ===== Factor Mining ===== */
+.factor-mining-shell { display: flex; flex-direction: column; gap: 18px; }
+.factor-mining-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.85fr); gap: 18px; align-items: start; }
+.factor-mining-panel { border: 1px solid rgba(148, 163, 184, 0.12); background: linear-gradient(180deg, rgba(15,23,42,0.78), rgba(2,6,23,0.62)); box-shadow: 0 18px 42px rgba(0,0,0,0.20); }
+.factor-mining-title { font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 6px; }
+.factor-mining-copy { color: var(--text-400); font-size: 13px; line-height: 1.7; max-width: 860px; }
+.factor-mining-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.factor-mining-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.factor-mining-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.factor-mining-kpi { padding: 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.68); border: 1px solid rgba(148, 163, 184, 0.1); }
+.factor-mining-kpi-label { color: var(--text-500); font-size: 11px; margin-bottom: 6px; }
+.factor-mining-kpi-value { color: #f8fafc; font-size: 18px; font-weight: 800; }
+.factor-mining-chart { height: 300px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.1); background: rgba(2, 6, 23, 0.32); padding: 12px; }
+.factor-mining-list { display: flex; flex-direction: column; gap: 10px; max-height: 860px; overflow-y: auto; padding-right: 4px; }
+.factor-mining-item { border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.12); background: rgba(30, 41, 59, 0.54); padding: 12px; }
+.factor-mining-item-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.factor-mining-name { color: #f8fafc; font-size: 14px; font-weight: 700; }
+.factor-mining-meta { color: var(--text-400); font-size: 12px; margin-top: 4px; line-height: 1.6; }
+.factor-mining-expression { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(2, 6, 23, 0.5); color: #cbd5e1; font-size: 12px; font-family: Consolas, Monaco, monospace; overflow-x: auto; white-space: nowrap; }
+.factor-mining-mini-chart { height: 120px; margin-top: 10px; }
+.factor-mining-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 8px; font-size: 11px; background: rgba(99, 102, 241, 0.14); color: #c7d2fe; }
+.factor-mining-empty { padding: 36px 16px; text-align: center; color: var(--text-500); border: 1px dashed rgba(148, 163, 184, 0.18); border-radius: 8px; background: rgba(15, 23, 42, 0.38); }
+.factor-mining-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.factor-mining-metric { padding: 8px 9px; border-radius: 8px; background: rgba(15,23,42,0.54); border: 1px solid rgba(148,163,184,0.08); }
+.factor-mining-metric span { display: block; color: var(--text-500); font-size: 10px; margin-bottom: 4px; }
+.factor-mining-metric b { color: #e2e8f0; font-size: 12px; font-weight: 800; }
+.factor-mining-metric b.text-profit { color: var(--profit); }
+.factor-mining-metric b.text-loss { color: var(--loss); }
+.factor-mining-statusbar { display: grid; grid-template-columns: 180px minmax(0, 1fr) 160px; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: rgba(15,23,42,0.62); border: 1px solid rgba(148,163,184,0.10); }
+.factor-mining-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; box-shadow: 0 0 0 4px rgba(100,116,139,0.12); }
+.factor-mining-status-dot.running { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.12); }
+.factor-mining-status-dot.failed { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.12); }
+.factor-mining-status-main { display: flex; align-items: center; gap: 10px; color: #e2e8f0; font-weight: 700; }
+.factor-mining-progress { height: 8px; border-radius: 999px; background: rgba(51,65,85,0.9); overflow: hidden; }
+.factor-mining-progress span { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.25s ease; }
+.factor-mining-log { max-height: 150px; overflow-y: auto; font-size: 12px; color: var(--text-400); line-height: 1.7; font-family: Consolas, Monaco, monospace; }
+.factor-mining-toggle { display: inline-flex; gap: 8px; align-items: center; color: var(--text-400); font-size: 12px; }
+.factor-mining-summary-table { max-height: 520px; overflow: auto; border: 1px solid rgba(148,163,184,0.10); border-radius: 10px; }
+.factor-mining-summary-table table { min-width: 980px; }
+.factor-mining-summary-table td.formula-cell { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: Consolas, Monaco, monospace; color: #cbd5e1; }
+.factor-mining-stage { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px; border-radius: 12px; background: radial-gradient(circle at 20% 15%, rgba(56,189,248,0.12), transparent 34%), rgba(15,23,42,0.52); border: 1px solid rgba(148,163,184,0.10); overflow: hidden; }
+.factor-mining-miner { position: relative; height: 96px; }
+.factor-mining-ground { position: absolute; left: 14px; right: 8px; bottom: 10px; height: 18px; border-radius: 50%; background: linear-gradient(90deg, rgba(120,53,15,0.86), rgba(180,83,9,0.68)); box-shadow: inset 0 5px 10px rgba(0,0,0,0.18); }
+.factor-mining-hole { position: absolute; left: 58px; bottom: 13px; width: 48px; height: 14px; border-radius: 50%; background: rgba(2,6,23,0.78); }
+.factor-mining-person { position: absolute; left: 46px; bottom: 27px; width: 42px; height: 52px; transform-origin: 50% 80%; }
+.factor-mining-miner.digging .factor-mining-person { animation: minerBody 1.15s ease-in-out infinite; }
+.factor-mining-head { position: absolute; left: 11px; top: 0; width: 22px; height: 22px; border-radius: 50%; background: #f8c891; border: 2px solid rgba(15,23,42,0.4); }
+.factor-mining-helmet { position: absolute; left: 8px; top: -4px; width: 28px; height: 13px; border-radius: 16px 16px 5px 5px; background: #facc15; box-shadow: inset 0 -3px rgba(202,138,4,0.5); }
+.factor-mining-body { position: absolute; left: 9px; top: 23px; width: 26px; height: 28px; border-radius: 10px 10px 6px 6px; background: linear-gradient(180deg, #38bdf8, #2563eb); }
+.factor-mining-arm { position: absolute; left: 25px; top: 24px; width: 32px; height: 5px; border-radius: 999px; background: #f8c891; transform-origin: 2px 50%; }
+.factor-mining-pickaxe { position: absolute; left: 48px; top: 8px; width: 36px; height: 5px; border-radius: 999px; background: #94a3b8; transform-origin: 4px 50%; }
+.factor-mining-pickaxe:after { content: ''; position: absolute; right: -8px; top: -9px; width: 18px; height: 22px; border-top: 4px solid #cbd5e1; border-right: 4px solid #cbd5e1; transform: rotate(30deg); border-radius: 2px; }
+.factor-mining-miner.digging .factor-mining-arm, .factor-mining-miner.digging .factor-mining-pickaxe { animation: pickaxeSwing 1.15s ease-in-out infinite; }
+.factor-mining-spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #facc15; opacity: 0; }
+.factor-mining-spark.s1 { left: 93px; bottom: 33px; }
+.factor-mining-spark.s2 { left: 105px; bottom: 25px; animation-delay: .18s; }
+.factor-mining-spark.s3 { left: 83px; bottom: 23px; animation-delay: .32s; }
+.factor-mining-miner.digging .factor-mining-spark { animation: minerSpark 1.15s ease-out infinite; }
+.factor-mining-stage-title { color: #e2e8f0; font-weight: 800; font-size: 14px; }
+.factor-mining-stage-copy { color: var(--text-400); font-size: 12px; line-height: 1.7; margin-top: 5px; }
+@keyframes pickaxeSwing { 0%,100% { transform: rotate(-38deg); } 45% { transform: rotate(34deg) translate(4px, 9px); } }
+@keyframes minerBody { 0%,100% { transform: rotate(-3deg) translateY(0); } 45% { transform: rotate(5deg) translateY(4px); } }
+@keyframes minerSpark { 0%,45% { opacity: 0; transform: translate(0,0) scale(.8); } 58% { opacity: 1; } 100% { opacity: 0; transform: translate(12px,-18px) scale(.2); } }
+@media (max-width: 1100px) { .factor-mining-grid { grid-template-columns: 1fr; } .factor-mining-kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .factor-mining-statusbar, .factor-mining-stage { grid-template-columns: 1fr; } .factor-mining-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .factor-board-legend-swatch.spread { background: linear-gradient(90deg, #f8fafc, #94a3b8); }
 .factor-board-chart-baseline { fill: #94a3b8; font-size: 11px; }
 .factor-board-code {
@@ -5269,7 +5342,7 @@ function FactorCreatePanel({ newName, setNewName, newExpr, setNewExpr, newDesc, 
     );
 }
 
-function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor, openStrategyFromFactor }) {
+function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor, openStrategyFromFactor, createBacktestFromFactor }) {
     const POOL_PRESETS = {
         '': '',
         '沪深300': '000001.SZ,000002.SZ,600036.SH,601318.SH,600519.SH,000858.SZ,601166.SH,600276.SH,000333.SZ,002415.SZ',
@@ -5322,6 +5395,9 @@ function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, s
                 </button>
                 <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => openStrategyFromFactor && openStrategyFromFactor(selected, null)}>
                     发送到 AI 策略助手
+                </button>
+                <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => createBacktestFromFactor && createBacktestFromFactor(selected)}>
+                    {'\u751f\u6210\u56e0\u5b50\u7b56\u7565\u5e76\u56de\u6d4b'}
                 </button>
             </div>
         </div>
@@ -6251,8 +6327,125 @@ function MarketPage({ showToast }) {
     );
 }
 
+function FactorCrossSectionPanel({ selected, showToast }) {
+    const [options, setOptions] = useState({ system_universes: [], custom_pools: [] });
+    const [form, setForm] = useState({
+        trade_date: todayCompactDate(),
+        universe_type: 'system',
+        universe_code: '000300.SH',
+        custom_pool_id: '',
+        n: 10,
+    });
+    const [loading, setLoading] = useState(false);
+    const [rankData, setRankData] = useState(null);
+
+    useEffect(() => {
+        api.get('/api/factor_mining/options').then(res => setOptions(res || { system_universes: [], custom_pools: [] })).catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        setRankData(null);
+    }, [selected && selected.id]);
+
+    const rowsForDownload = () => {
+        const top = ((rankData && rankData.top) || []).map(item => ({ group: '\u6700\u5927', ...item }));
+        const bottom = ((rankData && rankData.bottom) || []).map(item => ({ group: '\u6700\u5c0f', ...item }));
+        return [...top, ...bottom];
+    };
+
+    const runRank = async () => {
+        if (!selected) { showToast('\u8bf7\u5148\u9009\u62e9\u56e0\u5b50', 'error'); return; }
+        setLoading(true);
+        try {
+            const res = await api.post('/api/factors/rank', {
+                factor_id: selected.id,
+                trade_date: compactDate(form.trade_date),
+                universe_type: form.universe_type,
+                universe_code: form.universe_type === 'system' ? form.universe_code : '',
+                custom_pool_id: form.universe_type === 'custom' ? Number(form.custom_pool_id || 0) || null : null,
+                n: Number(form.n || 10),
+            });
+            setRankData(res);
+            showToast('\u56e0\u5b50\u622a\u9762\u6392\u884c\u5df2\u751f\u6210', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u56e0\u5b50\u622a\u9762\u6392\u884c\u5931\u8d25', 'error');
+        }
+        setLoading(false);
+    };
+
+    const downloadRank = () => {
+        const rows = rowsForDownload();
+        if (!rows.length) return;
+        const headers = ['分组', '股票代码', '股票名称', '因子值', '因子日期'];
+        const escapeCsv = value => `"${String(value === undefined || value === null ? '' : value).replace(/"/g, '""')}"`;
+        const csv = '\ufeff' + [headers, ...rows.map(item => [item.group, item.ts_code, item.name, item.factor_value, item.factor_date])]
+            .map(row => row.map(escapeCsv).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `factor_rank_${selected ? selected.name : 'factor'}_${compactDate(form.trade_date)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const renderTable = (title, rows) => (
+        <div>
+            <div className="card-title" style={{fontSize:15,marginBottom:8}}>{title}</div>
+            <div className="factor-rank-table">
+                <table>
+                    <thead>
+                        <tr><th>{'\u80a1\u7968\u4ee3\u7801'}</th><th>{'\u80a1\u7968\u540d\u79f0'}</th><th>{'\u56e0\u5b50\u503c'}</th><th>{'\u56e0\u5b50\u65e5\u671f'}</th></tr>
+                    </thead>
+                    <tbody>
+                        {rows && rows.length ? rows.map(item => (
+                            <tr key={title + item.ts_code}>
+                                <td>{item.ts_code}</td>
+                                <td>{item.name || '-'}</td>
+                                <td>{Number(item.factor_value).toFixed(6)}</td>
+                                <td>{item.factor_date || '-'}</td>
+                            </tr>
+                        )) : <tr><td colSpan="4" className="text-center text-muted">{'\u6682\u65e0\u6570\u636e'}</td></tr>}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="card" style={{padding:14}}>
+            <div className="factor-mining-toolbar" style={{marginBottom:12}}>
+                <div>
+                    <div className="card-title" style={{marginBottom:4}}>{'\u56e0\u5b50\u622a\u9762\u6392\u884c'}</div>
+                    <div className="text-xs text-muted">{'\u8ba1\u7b97\u6307\u5b9a\u65e5\u671f\u548c\u80a1\u7968\u6c60\u4e2d\u56e0\u5b50\u503c\u6700\u5927 / \u6700\u5c0f\u7684 N \u53ea\u80a1\u7968\u3002'}</div>
+                </div>
+                <button className="btn btn-secondary" onClick={downloadRank} disabled={!rankData}>{'\u4e0b\u8f7d CSV'}</button>
+            </div>
+            <div className="factor-rank-toolbar">
+                <div className="field"><label className="label">{'\u65e5\u671f'}</label><input className="input" value={form.trade_date} onChange={e => setForm(prev => ({...prev, trade_date: e.target.value}))} placeholder="YYYYMMDD" /></div>
+                <div className="field"><label className="label">{'\u6570\u91cf N'}</label><input className="input" type="number" min="1" max="100" value={form.n} onChange={e => setForm(prev => ({...prev, n: Number(e.target.value || 10)}))} /></div>
+                <div className="field"><label className="label">{'\u80a1\u7968\u6c60\u7c7b\u578b'}</label><select className="input" value={form.universe_type} onChange={e => setForm(prev => ({...prev, universe_type: e.target.value}))}><option value="system">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</option><option value="custom">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</option></select></div>
+                {form.universe_type === 'system' ? (
+                    <div className="field wide"><label className="label">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</label><select className="input" value={form.universe_code} onChange={e => setForm(prev => ({...prev, universe_code: e.target.value}))}>{(options.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name || item.code}</option>)}</select></div>
+                ) : (
+                    <div className="field wide"><label className="label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</label><select className="input" value={form.custom_pool_id} onChange={e => setForm(prev => ({...prev, custom_pool_id: e.target.value}))}><option value="">{'\u8bf7\u9009\u62e9'}</option>{(options.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name} ({item.stock_count})</option>)}</select></div>
+                )}
+                <button className="btn btn-primary" onClick={runRank} disabled={loading || !selected || (form.universe_type === 'custom' && !form.custom_pool_id)}>{loading ? <><span className="spinner"/> {'\u8ba1\u7b97\u4e2d...'}</> : '\u751f\u6210\u6392\u884c'}</button>
+            </div>
+            {rankData ? (
+                <div className="factor-rank-grid mt-4">
+                    {renderTable('\u56e0\u5b50\u503c\u6700\u5927', rankData.top || [])}
+                    {renderTable('\u56e0\u5b50\u503c\u6700\u5c0f', rankData.bottom || [])}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 /* ===== Factor Page ===== */
-function FactorPage({ showToast, openStrategyWorkspace }) {
+function FactorPage({ showToast, openStrategyWorkspace, openBacktestWithStrategy }) {
     const [factors, setFactors] = useState([]);
     const [selected, setSelected] = useState(null);
     const [evalResult, setEvalResult] = useState(null);
@@ -6414,6 +6607,27 @@ function FactorPage({ showToast, openStrategyWorkspace }) {
         showToast('已将因子研究上下文发送到 AI 策略助手', 'success');
     };
 
+    const createBacktestFromFactor = async (factor) => {
+        if (!factor) {
+            showToast('\u8bf7\u5148\u9009\u62e9\u56e0\u5b50', 'error');
+            return;
+        }
+        try {
+            const res = await api.post(`/api/factors/${factor.id}/create_strategy`, { direction: 'top' });
+            const backtestContext = buildFactorResearchBacktestContext();
+            saveStrategyBacktestContext(res.id, backtestContext);
+            pushBacktestPrefill({
+                strategy_id: String(res.id),
+                strategy_name: res.name || `\u56e0\u5b50\u7b56\u7565_${factor.name || factor.id}`,
+                ...backtestContext,
+            });
+            if (openBacktestWithStrategy) openBacktestWithStrategy();
+            showToast('\u5df2\u751f\u6210\u56e0\u5b50\u7b56\u7565\u5e76\u8df3\u8f6c\u56de\u6d4b\u9875', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u751f\u6210\u56e0\u5b50\u56de\u6d4b\u7b56\u7565\u5931\u8d25', 'error');
+        }
+    };
+
     return (
         <div className="fade-in factor-layout">
             <FactorSidebar factors={factors} selected={selected} setSelected={(f) => { setSelected(f); setEvalResult(null); }}
@@ -6424,9 +6638,11 @@ function FactorPage({ showToast, openStrategyWorkspace }) {
                 {selected && <FactorEvalPanel selected={selected} evalUniverse={evalUniverse} setEvalUniverse={setEvalUniverse}
                     evalStart={evalStart} setEvalStart={setEvalStart} evalEnd={evalEnd} setEvalEnd={setEvalEnd}
                     evalGroups={evalGroups} setEvalGroups={setEvalGroups} forwardDays={forwardDays} setForwardDays={setForwardDays}
-                    loading={loading} evaluateFactor={evaluateFactor} openStrategyFromFactor={openStrategyFromFactor} />}
+                    loading={loading} evaluateFactor={evaluateFactor} openStrategyFromFactor={openStrategyFromFactor}
+                    createBacktestFromFactor={createBacktestFromFactor} />}
                 {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab}
                     onGenerateStrategy={() => openStrategyFromFactor(selected, evalResult)} />}
+                {selected && <FactorCrossSectionPanel selected={selected} showToast={showToast} />}
                 <FactorMinePanel mineTab={mineTab} setMineTab={setMineTab}
                     gpPopSize={gpPopSize} setGpPopSize={setGpPopSize} gpGenerations={gpGenerations} setGpGenerations={setGpGenerations}
                     gpRunning={gpRunning} runGP={runGP}
@@ -8505,6 +8721,453 @@ function FactorBoardPage({ showToast, openStrategyWorkspace }) {
     );
 }
 
+/* ===== Factor Mining Page ===== */
+function FactorMiningPage({ showToast }) {
+    const toInputDate = (text) => {
+        const value = compactDate(text);
+        return value && value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : '';
+    };
+    const [options, setOptions] = useState({ system_universes: [], custom_pools: [] });
+    const [form, setForm] = useState({
+        universe_type: 'system',
+        universe_code: '000016.SH',
+        custom_pool_id: '',
+        start_date: toInputDate(shiftCompactDate(todayCompactDate(), -430)),
+        end_date: toInputDate(todayCompactDate()),
+        max_stocks: 50,
+        candidate_count: 12,
+        gp_generations: 2,
+        gp_population: 12,
+        select_pct: 0.1,
+        rebalance_days: 5,
+    });
+    const [starting, setStarting] = useState(false);
+    const [stopping, setStopping] = useState(false);
+    const [sessionId, setSessionId] = useState('');
+    const [status, setStatus] = useState(null);
+    const [results, setResults] = useState([]);
+    const [lastId, setLastId] = useState(0);
+    const [logs, setLogs] = useState([]);
+    const [savingExpression, setSavingExpression] = useState('');
+    const pollRef = useRef(null);
+    const lastIdRef = useRef(0);
+
+    useEffect(() => {
+        api.get('/api/factor_mining/options').then(setOptions).catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    }, []);
+
+    const best = results.length ? results[0] : null;
+    const chartResults = useMemo(() => {
+        const sorted = [...results].sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+        const top = sorted.slice(0, 5);
+        const bottom = sorted.length > 5 ? sorted.slice(-5) : [];
+        const map = new Map();
+        [...top, ...bottom].forEach(item => {
+            if (item && item.id !== undefined) map.set(item.id, item);
+        });
+        return Array.from(map.values());
+    }, [results]);
+    const chartData = useMemo(() => {
+        const map = {};
+        chartResults.forEach((item, idx) => {
+            (item.normalized_curve || []).forEach(point => {
+                const date = String(point.date || '');
+                if (!date) return;
+                if (!map[date]) map[date] = { date };
+                map[date]['f' + idx] = Number(point.value || 0);
+            });
+        });
+        return Object.values(map).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }, [chartResults]);
+    const chartYDomain = useMemo(() => {
+        const values = [];
+        chartData.forEach(row => {
+            Object.keys(row).forEach(key => {
+                if (key === 'date') return;
+                const value = Number(row[key]);
+                if (Number.isFinite(value)) values.push(value);
+            });
+        });
+        if (!values.length) return ['auto', 'auto'];
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const pad = Math.max((maxVal - minVal) * 0.18, 0.02);
+        return [Number((minVal - pad).toFixed(4)), Number((maxVal + pad).toFixed(4))];
+    }, [chartData]);
+    const palette = ['#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#22d3ee', '#fb7185', '#84cc16'];
+    const pct = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num.toFixed(2) + '%' : '-';
+    };
+    const num = (value, digits = 3) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toFixed(digits) : '-';
+    };
+    const isRunning = !!(status && status.running);
+    const tested = Number(status && status.tested_count || 0);
+    const accepted = Number(status && status.accepted_count || 0);
+    const hitRate = tested > 0 ? Math.min(100, accepted / tested * 100) : 0;
+    const statusKind = status && status.status === 'failed' ? 'failed' : isRunning ? 'running' : '';
+    const directionLabel = (value) => value === 'bottom' ? '\u4f4e\u503c\u7ec4\u5360\u4f18' : '\u9ad8\u503c\u7ec4\u5360\u4f18';
+    const metricValueClass = (value) => {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n === 0) return '';
+        return n > 0 ? 'text-profit' : 'text-loss';
+    };
+    const csvEscape = (value) => `"${String(value === undefined || value === null ? '' : value).replace(/"/g, '""')}"`;
+    const downloadSummary = () => {
+        const headers = ['因子名称', '因子公式', 'IC值', 'IR值', '最大回撤', '年化收益'];
+        const rows = results.map(item => [
+            item.name || '',
+            item.expression || '',
+            num(item.valid_metrics && item.valid_metrics.ic_mean, 6),
+            num(item.valid_metrics && item.valid_metrics.ic_ir, 6),
+            pct(item.backtest_metrics && item.backtest_metrics.max_drawdown),
+            pct(item.backtest_metrics && item.backtest_metrics.annual_return),
+        ]);
+        const csv = '\ufeff' + [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `factor_mining_${sessionId || 'results'}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const appendLog = (message) => {
+        const text = String(message || '').trim();
+        if (!text) return;
+        setLogs(prev => {
+            if (prev.length && prev[prev.length - 1].text === text) return prev;
+            return [...prev.slice(-80), { time: new Date().toLocaleTimeString(), text }];
+        });
+    };
+
+    const mergeResults = (items) => {
+        if (!Array.isArray(items) || !items.length) return;
+        setResults(prev => {
+            const map = new Map(prev.map(item => [item.id, item]));
+            items.forEach(item => map.set(item.id, item));
+            return Array.from(map.values()).sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+        });
+    };
+
+    const fetchIncrementalResults = async (sid) => {
+        const res = await api.get(`/api/factor_mining/sessions/${sid}/results?after_id=${lastIdRef.current}&limit=80`);
+        const items = Array.isArray(res && res.items) ? res.items : [];
+        if (items.length) {
+            mergeResults(items);
+            const nextId = Number(res.last_id || items[items.length - 1].id || lastIdRef.current);
+            lastIdRef.current = nextId;
+            setLastId(nextId);
+        }
+    };
+
+    const pollSession = (sid) => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        const tick = async () => {
+            try {
+                const st = await api.get(`/api/factor_mining/sessions/${sid}/status`);
+                setStatus(st);
+                appendLog(st.message);
+                await fetchIncrementalResults(sid);
+                if (!st.running && pollRef.current) {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                }
+            } catch (e) {
+                appendLog((e && e.detail) || '\u8f6e\u8be2\u6316\u6398\u72b6\u6001\u5931\u8d25');
+                if (pollRef.current) {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                }
+            }
+        };
+        tick();
+        pollRef.current = setInterval(tick, 2000);
+    };
+
+    const runMining = async () => {
+        setStarting(true);
+        try {
+            const payload = {
+                universe_type: form.universe_type,
+                universe_code: form.universe_type === 'system' ? form.universe_code : '',
+                custom_pool_id: form.universe_type === 'custom' ? Number(form.custom_pool_id || 0) || null : null,
+                start_date: compactDate(form.start_date),
+                end_date: compactDate(form.end_date),
+                max_stocks: Number(form.max_stocks || 50),
+                candidate_count: Number(form.candidate_count || 12),
+                gp_generations: Number(form.gp_generations || 0),
+                gp_population: Number(form.gp_population || 0),
+                select_pct: Number(form.select_pct || 0.1),
+                rebalance_days: Number(form.rebalance_days || 5),
+                max_depth: 4,
+                max_expression_length: 600,
+                auto_stop_candidates: 0,
+            };
+            const data = await api.post('/api/factor_mining/sessions', payload);
+            const sid = data.session_id;
+            setSessionId(sid);
+            setResults([]);
+            setStatus({ running: true, status: 'running', phase: 'queued', message: '\u6316\u6398\u4efb\u52a1\u5df2\u63d0\u4ea4', tested_count: 0, accepted_count: 0, best_score: 0 });
+            lastIdRef.current = 0;
+            setLastId(0);
+            setLogs([]);
+            appendLog(data.already_running ? '\u5df2\u6709\u6316\u6398\u4efb\u52a1\u5728\u8fd0\u884c\uff0c\u5df2\u63a5\u5165\u5f53\u524d\u4f1a\u8bdd' : '\u6301\u7eed\u6316\u6398\u5df2\u542f\u52a8');
+            pollSession(sid);
+            showToast('\u6301\u7eed\u56e0\u5b50\u6316\u6398\u5df2\u542f\u52a8', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u56e0\u5b50\u6316\u6398\u5931\u8d25', 'error');
+        }
+        setStarting(false);
+    };
+
+    const stopMining = async () => {
+        if (!sessionId) return;
+        setStopping(true);
+        try {
+            const res = await api.post(`/api/factor_mining/sessions/${sessionId}/stop`, {});
+            appendLog((res && res.message) || '\u5df2\u53d1\u9001\u505c\u6b62\u8bf7\u6c42');
+            showToast((res && res.message) || '\u5df2\u53d1\u9001\u505c\u6b62\u8bf7\u6c42', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u505c\u6b62\u6316\u6398\u5931\u8d25', 'error');
+        }
+        setStopping(false);
+    };
+
+    const saveFactor = async (item) => {
+        if (!item || !item.expression) return;
+        setSavingExpression(item.expression);
+        try {
+            const res = await api.post('/api/factor_mining/save_factor', {
+                name: item.name || '\u6316\u6398\u56e0\u5b50',
+                description: `${item.description || ''}\nIC=${num(item.metrics && item.metrics.ic_mean)}; return=${pct(item.backtest_metrics && item.backtest_metrics.total_return)}`,
+                expression: item.expression,
+                candidate_id: item.id,
+            });
+            showToast((res && res.name ? res.name : '\u56e0\u5b50') + ' \u5df2\u4fdd\u5b58', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u4fdd\u5b58\u56e0\u5b50\u5931\u8d25', 'error');
+        }
+        setSavingExpression('');
+    };
+
+    return (
+        <div className="factor-mining-shell fade-in">
+            <section className="card factor-mining-panel">
+                <div className="factor-mining-toolbar">
+                    <div>
+                        <div className="factor-mining-title">{'\u56e0\u5b50\u6316\u6398'}</div>
+                        <div className="factor-mining-copy">{'\u6301\u7eed\u641c\u7d22\u6570\u5b66\u3001\u65f6\u5e8f\u3001\u7edf\u8ba1\u56de\u5f52\u548c\u6761\u4ef6\u903b\u8f91\u7b97\u5b50\u7ec4\u5408\uff0c\u6bcf\u53d1\u73b0\u4e00\u4e2a\u901a\u8fc7\u771f\u5b9e\u6570\u636e\u9a8c\u8bc1\u7684\u56e0\u5b50\u5c31\u7acb\u5373\u5c55\u793a\u3002'}</div>
+                    </div>
+                    <div className="factor-mining-actions">
+                        <button className="btn btn-primary" onClick={runMining} disabled={starting || isRunning || (form.universe_type === 'custom' && !form.custom_pool_id)}>
+                            {starting ? <span className="spinner"/> : null}{starting ? '\u542f\u52a8\u4e2d...' : '\u5f00\u59cb\u6301\u7eed\u6316\u6398'}
+                        </button>
+                        <button className="btn btn-secondary" onClick={stopMining} disabled={!isRunning || stopping}>
+                            {stopping ? <span className="spinner"/> : null}{stopping ? '\u505c\u6b62\u4e2d...' : '\u505c\u6b62\u6316\u6398'}
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section className="card factor-mining-panel space-y">
+                <div className="grid-4">
+                    <div className="field">
+                        <label className="label">{'\u80a1\u7968\u6c60\u7c7b\u578b'}</label>
+                        <select className="input" value={form.universe_type} onChange={e => setForm(prev => ({ ...prev, universe_type: e.target.value }))}>
+                            <option value="system">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</option>
+                            <option value="custom">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</option>
+                        </select>
+                    </div>
+                    {form.universe_type === 'system' ? (
+                        <div className="field">
+                            <label className="label">{'\u7cfb\u7edf\u80a1\u7968\u6c60'}</label>
+                            <select className="input" value={form.universe_code} onChange={e => setForm(prev => ({ ...prev, universe_code: e.target.value }))}>
+                                {(options.system_universes || []).map(item => <option key={item.code} value={item.code}>{item.name || item.code}</option>)}
+                            </select>
+                        </div>
+                    ) : (
+                        <div className="field">
+                            <label className="label">{'\u81ea\u5b9a\u4e49\u80a1\u7968\u6c60'}</label>
+                            <select className="input" value={form.custom_pool_id} onChange={e => setForm(prev => ({ ...prev, custom_pool_id: e.target.value }))}>
+                                <option value="">{'\u8bf7\u9009\u62e9'}</option>
+                                {(options.custom_pools || []).map(item => <option key={item.id} value={item.id}>{item.name} ({item.stock_count})</option>)}
+                            </select>
+                        </div>
+                    )}
+                    <div className="field"><label className="label">{'\u5f00\u59cb\u65e5\u671f'}</label><input className="input" type="date" value={form.start_date} onChange={e => setForm(prev => ({ ...prev, start_date: e.target.value }))}/></div>
+                    <div className="field"><label className="label">{'\u7ed3\u675f\u65e5\u671f'}</label><input className="input" type="date" value={form.end_date} onChange={e => setForm(prev => ({ ...prev, end_date: e.target.value }))}/></div>
+                    <div className="field"><label className="label">{'\u6700\u5927\u80a1\u7968\u6570'}</label><input className="input" type="number" min="5" max="500" value={form.max_stocks} onChange={e => setForm(prev => ({ ...prev, max_stocks: Number(e.target.value || 50) }))}/></div>
+                    <div className="field"><label className="label">{'\u5c55\u793a\u76ee\u6807\u6570'}</label><input className="input" type="number" min="3" max="200" value={form.candidate_count} onChange={e => setForm(prev => ({ ...prev, candidate_count: Number(e.target.value || 12) }))}/></div>
+                    <div className="field"><label className="label">{'\u9057\u4f20\u4ee3\u6570'}</label><input className="input" type="number" min="0" max="8" value={form.gp_generations} onChange={e => setForm(prev => ({ ...prev, gp_generations: Number(e.target.value || 0) }))}/></div>
+                    <div className="field"><label className="label">{'\u8c03\u4ed3\u95f4\u9694'}</label><input className="input" type="number" min="1" max="60" value={form.rebalance_days} onChange={e => setForm(prev => ({ ...prev, rebalance_days: Number(e.target.value || 5) }))}/></div>
+                </div>
+            </section>
+
+            <div className="factor-mining-grid">
+                <section className="card factor-mining-panel space-y">
+                    <div className="factor-mining-statusbar">
+                        <div className="factor-mining-status-main">
+                            <span className={'factor-mining-status-dot ' + statusKind}></span>
+                            <span>{status ? (status.phase || status.status || '-') : '\u672a\u542f\u52a8'}</span>
+                        </div>
+                        <div>
+                            <div className="factor-mining-progress"><span style={{width: `${hitRate}%`}}></span></div>
+                            <div className="text-xs text-muted mt-2">{status ? status.message : '\u542f\u52a8\u540e\u5c06\u5b9e\u65f6\u663e\u793a\u6316\u6398\u6d41\u7a0b'}</div>
+                        </div>
+                        <div className="text-right text-xs text-muted">{sessionId ? `Session ${sessionId}` : '\u65e0\u4f1a\u8bdd'}</div>
+                    </div>
+                    <div className="factor-mining-stage">
+                        <div className={'factor-mining-miner ' + (isRunning ? 'digging' : 'idle')}>
+                            <div className="factor-mining-ground"></div>
+                            <div className="factor-mining-hole"></div>
+                            <div className="factor-mining-person">
+                                <div className="factor-mining-helmet"></div>
+                                <div className="factor-mining-head"></div>
+                                <div className="factor-mining-body"></div>
+                                <div className="factor-mining-arm"></div>
+                                <div className="factor-mining-pickaxe"></div>
+                            </div>
+                            <span className="factor-mining-spark s1"></span>
+                            <span className="factor-mining-spark s2"></span>
+                            <span className="factor-mining-spark s3"></span>
+                        </div>
+                        <div>
+                            <div className="factor-mining-stage-title">{isRunning ? '\u5c0f\u77ff\u5de5\u6b63\u5728\u6316\u6398\u6709\u6548\u56e0\u5b50' : '\u6316\u6398\u5668\u5f85\u547d'}</div>
+                            <div className="factor-mining-stage-copy">
+                                {isRunning ? '\u7cfb\u7edf\u6b63\u5728\u7528\u771f\u5b9e\u884c\u60c5\u5bf9\u5019\u9009\u56e0\u5b50\u505a IC\u3001IR\u3001\u5206\u6bb5\u9a8c\u8bc1\u548c\u4e0b\u4e00\u4ea4\u6613\u65e5\u56de\u6d4b\uff0c\u901a\u8fc7\u7b5b\u9009\u540e\u4f1a\u7acb\u5373\u51fa\u73b0\u5728\u53f3\u4fa7\u699c\u5355\u3002' : '\u8bbe\u7f6e\u80a1\u7968\u6c60\u548c\u56de\u6d4b\u533a\u95f4\u540e\u70b9\u51fb\u5f00\u59cb\uff0c\u5c31\u4f1a\u6301\u7eed\u641c\u7d22\u548c\u9a8c\u8bc1\u56e0\u5b50\u3002'}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="factor-mining-kpis">
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u6709\u6548\u80a1\u7968'}</div><div className="factor-mining-kpi-value">{status ? status.stock_count : '-'}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u5df2\u6d4b\u5019\u9009'}</div><div className="factor-mining-kpi-value">{status ? status.tested_count : '-'}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u5165\u9009\u56e0\u5b50'}</div><div className="factor-mining-kpi-value">{status ? status.accepted_count : results.length}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u6700\u4f73\u6536\u76ca'}</div><div className={'factor-mining-kpi-value ' + ((best && best.backtest_metrics && best.backtest_metrics.total_return >= 0) ? 'text-profit' : 'text-loss')}>{best ? pct(best.backtest_metrics.total_return) : '-'}</div></div>
+                    </div>
+                    <div className="factor-mining-chart">
+                        {chartData.length ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
+                                    <XAxis dataKey="date" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false} interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}/>
+                                    <YAxis tick={{fill:'#94a3b8',fontSize:10}} domain={chartYDomain} tickFormatter={v => Number(v).toFixed(2)}/>
+                                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
+                                    <Legend/>
+                                    {chartResults.map((item, idx) => <Line key={idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6}/>)}
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        ) : <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u8bc4\u4f30\u56e0\u5b50\u548c\u56de\u6d4b\u66f2\u7ebf...' : '\u5c1a\u672a\u8fd0\u884c\u6316\u6398'}</div>}
+                    </div>
+                    <div className="factor-mining-toggle">{'\u603b\u56fe\u4ec5\u5c55\u793a\u7efc\u5408\u8bc4\u5206 Top5 \u548c Bottom5\uff0c\u7eb5\u8f74\u6839\u636e\u5f53\u524d\u66f2\u7ebf\u81ea\u52a8\u6536\u7f29\u3002'}</div>
+                    <div className="factor-mining-log">
+                        {logs.length ? logs.slice().reverse().map((log, idx) => <div key={idx}>[{log.time}] {log.text}</div>) : <div>{'\u6682\u65e0\u6316\u6398\u65e5\u5fd7'}</div>}
+                    </div>
+                </section>
+
+                <section className="card factor-mining-panel">
+                    <div className="factor-mining-toolbar" style={{marginBottom:12}}>
+                        <div>
+                            <div className="card-title" style={{marginBottom:4}}>{'\u5019\u9009\u56e0\u5b50'}</div>
+                            <div className="text-xs text-muted">{'\u6309\u7efc\u5408\u8bc4\u5206\u6392\u5e8f\uff0c\u53ef\u76f4\u63a5\u4fdd\u5b58\u5230\u56e0\u5b50\u5e93\u3002'}</div>
+                        </div>
+                    </div>
+                    <div className="factor-mining-list">
+                        {results.length === 0 ? <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u751f\u6210\u5019\u9009...' : '\u6682\u65e0\u5019\u9009\u56e0\u5b50'}</div> : results.map((item, idx) => (
+                            <div key={item.expression + idx} className="factor-mining-item">
+                                <div className="factor-mining-item-head">
+                                    <div>
+                                        <div className="factor-mining-name">{idx + 1}. {item.name}</div>
+                                        <div className="factor-mining-meta">{item.description}</div>
+                                    </div>
+                                    <span className="factor-mining-badge">{item.source}</span>
+                                </div>
+                                <div className="factor-mining-meta">
+                                    {'\u8bc4\u5206'} {num(item.score, 4)} | IC {num(item.valid_metrics && item.valid_metrics.ic_mean, 4)} | IR {num(item.valid_metrics && item.valid_metrics.ic_ir, 3)} | {'\u56de\u6d4b'} {pct(item.backtest_metrics && item.backtest_metrics.total_return)} | {'\u56de\u64a4'} {pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}
+                                </div>
+                                <div className="factor-mining-metric-grid">
+                                    <div className="factor-mining-metric"><span>{'\u8bad\u7ec3 IC'}</span><b className={metricValueClass(item.train_metrics && item.train_metrics.ic_mean)}>{num(item.train_metrics && item.train_metrics.ic_mean, 4)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u9a8c\u8bc1 IC'}</span><b className={metricValueClass(item.valid_metrics && item.valid_metrics.ic_mean)}>{num(item.valid_metrics && item.valid_metrics.ic_mean, 4)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5 IC'}</span><b className={metricValueClass(item.test_metrics && item.test_metrics.ic_mean)}>{num(item.test_metrics && item.test_metrics.ic_mean, 4)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u9a8c\u8bc1 IR'}</span><b>{num(item.valid_metrics && item.valid_metrics.ic_ir, 3)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'IC \u80dc\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.ic_win_rate)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u591a\u7a7a\u80dc\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.long_short_win_rate)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u56de\u6d4b Sharpe'}</span><b>{num(item.backtest_metrics && item.backtest_metrics.sharpe_ratio, 3)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u56de\u6d4b\u6536\u76ca'}</span><b className={metricValueClass(item.backtest_metrics && item.backtest_metrics.total_return)}>{pct(item.backtest_metrics && item.backtest_metrics.total_return)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6700\u5927\u56de\u64a4'}</span><b className="text-loss">{pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u8986\u76d6\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.coverage_ratio)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6709\u6548\u80a1\u7968'}</span><b>{num(item.valid_metrics && item.valid_metrics.valid_stock_count, 0)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u65b9\u5411 / \u590d\u6742\u5ea6'}</span><b>{directionLabel(item.direction)} · {item.complexity}</b></div>
+                                </div>
+                                <div className="factor-mining-expression">{item.expression}</div>
+                                <div className="factor-mining-mini-chart">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={item.normalized_curve || []}>
+                                            <XAxis dataKey="date" hide/>
+                                            <YAxis hide domain={['dataMin', 'dataMax']}/>
+                                            <Line type="monotone" dataKey="value" dot={false} stroke={palette[idx % palette.length]} strokeWidth={1.8}/>
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <button className="btn btn-secondary" onClick={() => saveFactor(item)} disabled={savingExpression === item.expression}>
+                                    {savingExpression === item.expression ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u5230\u56e0\u5b50\u5e93'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            </div>
+
+            <section className="card factor-mining-panel">
+                <div className="factor-mining-toolbar" style={{marginBottom:12}}>
+                    <div>
+                        <div className="card-title" style={{marginBottom:4}}>{'\u56e0\u5b50\u6316\u6398\u6c47\u603b\u8868'}</div>
+                        <div className="text-xs text-muted">{'\u6c47\u603b\u6240\u6709\u5df2\u6316\u6398\u51fa\u7684\u56e0\u5b50\uff0c\u5305\u542b\u516c\u5f0f\u3001IC\u3001IR\u3001\u56de\u64a4\u548c\u5e74\u5316\u6536\u76ca\uff0c\u53ef\u4e0b\u8f7d\u5230\u672c\u5730\u3002'}</div>
+                    </div>
+                    <button className="btn btn-secondary" onClick={downloadSummary} disabled={!results.length}>{'\u4e0b\u8f7d CSV'}</button>
+                </div>
+                <div className="factor-mining-summary-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>{'\u56e0\u5b50\u540d\u79f0'}</th>
+                                <th>{'\u56e0\u5b50\u516c\u5f0f'}</th>
+                                <th>IC</th>
+                                <th>IR</th>
+                                <th>{'\u6700\u5927\u56de\u64a4'}</th>
+                                <th>{'\u5e74\u5316\u6536\u76ca'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {results.length === 0 ? (
+                                <tr><td colSpan="6" className="text-center text-muted">{'\u6682\u65e0\u6316\u6398\u7ed3\u679c'}</td></tr>
+                            ) : results.map(item => (
+                                <tr key={'summary-' + item.id}>
+                                    <td>{item.name || '-'}</td>
+                                    <td className="formula-cell" title={item.expression || ''}>{item.expression || '-'}</td>
+                                    <td className={metricValueClass(item.valid_metrics && item.valid_metrics.ic_mean)}>{num(item.valid_metrics && item.valid_metrics.ic_mean, 4)}</td>
+                                    <td>{num(item.valid_metrics && item.valid_metrics.ic_ir, 3)}</td>
+                                    <td className="text-loss">{pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}</td>
+                                    <td className={metricValueClass(item.backtest_metrics && item.backtest_metrics.annual_return)}>{pct(item.backtest_metrics && item.backtest_metrics.annual_return)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    );
+}
+
 /* ===== Main App ===== */
 function App() {
     const pageNavItems = [
@@ -8513,6 +9176,7 @@ function App() {
         { key: 'portfolio', label: '组合' },
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
+        { key: 'factormining', label: '\u56e0\u5b50\u6316\u6398' },
         { key: 'workflow', label: '因子工作流' },
         { key: 'factorboard', label: '因子看板' },
         { key: 'news', label: '新闻' },
@@ -8555,6 +9219,7 @@ function App() {
         { key: 'portfolio', label: '组合' },
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
+        { key: 'factormining', label: '\u56e0\u5b50\u6316\u6398' },
         { key: 'workflow', label: '因子工作流' },
         { key: 'factorboard', label: '因子看板' },
         { key: 'news', label: '新闻' },
@@ -8586,7 +9251,8 @@ function App() {
                 {page === 'backtest' && <BacktestPage showToast={showToast} openHistoryWithResult={() => setPage('history')} />}
                 {page === 'portfolio' && <PortfolioPage showToast={showToast} />}
                 {page === 'market' && <MarketPage showToast={showToast} />}
-                {page === 'factor' && <FactorPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
+                {page === 'factor' && <FactorPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} openBacktestWithStrategy={() => setPage('backtest')} />}
+                {page === 'factormining' && <FactorMiningPage showToast={showToast} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
                 {page === 'factorboard' && <FactorBoardPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}

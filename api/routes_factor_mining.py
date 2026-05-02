@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db
 from services.factor_mining_service import (
     get_factor_mining_options,
+    get_mining_research_report,
     get_streaming_mining_results,
     get_streaming_mining_status,
+    revalidate_mining_candidate,
     run_factor_mining_workflow,
     save_mined_factor,
     start_streaming_mining_session,
@@ -36,6 +38,15 @@ class FactorMiningRequest(BaseModel):
     max_depth: int = Field(default=4, ge=2, le=6)
     max_expression_length: int = Field(default=600, ge=120, le=1200)
     auto_stop_candidates: int = Field(default=0, ge=0, le=500)
+    protocol_version: str = "v4"
+    research_mode: str = "professional"
+    factor_themes: list[str] = Field(default_factory=list)
+    neutralize: str = "rank_zscore"
+    walk_forward_windows: int = Field(default=3, ge=2, le=8)
+    embargo_days: int = Field(default=5, ge=0, le=30)
+    max_trials: int = Field(default=0, ge=0, le=100000)
+    capacity_limit_pct: float = Field(default=0.10, ge=0.01, le=0.50)
+    min_dsr: float = Field(default=-0.25, ge=-5.0, le=5.0)
 
 
 class SaveMinedFactorRequest(BaseModel):
@@ -114,3 +125,27 @@ async def save_factor(req: SaveMinedFactorRequest, db: AsyncSession = Depends(ge
         return await save_mined_factor(db, req.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/candidates/{candidate_id}/revalidate")
+async def revalidate_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        return await revalidate_mining_candidate(db, candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/candidates/{candidate_id}/strict_revalidate")
+async def strict_revalidate_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        return await revalidate_mining_candidate(db, candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/research_report/{candidate_id}")
+async def research_report(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        return await get_mining_research_report(db, candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

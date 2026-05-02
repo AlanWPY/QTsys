@@ -88,6 +88,24 @@ class FactorEngine:
             rank = np.sum(x <= last)
             return rank / n
 
+        def _expanding_rank_pct(s):
+            """无未来函数的历史百分位排名：每个日期只使用当日及以前数据。"""
+            result = []
+            values = []
+            for value in pd.Series(s).values:
+                values.append(value)
+                valid = [item for item in values if pd.notna(item)]
+                if not valid or pd.isna(value):
+                    result.append(np.nan)
+                else:
+                    result.append(float(np.sum(np.array(valid) <= value) / len(valid)))
+            return pd.Series(result, index=s.index)
+
+        def _expanding_zscore(s):
+            mean = s.expanding(min_periods=2).mean()
+            std = s.expanding(min_periods=2).std()
+            return (s - mean) / std.replace(0, np.nan)
+
         def _ts_decay(s, window):
             """线性衰减加权均值"""
             weights = np.arange(1, window + 1, dtype=float)
@@ -98,14 +116,13 @@ class FactorEngine:
             return s.ewm(span=span).mean()
 
         def _cs_zscore(s):
-            m, st = s.mean(), s.std()
-            return (s - m) / st if st > 0 else s * 0
+            return _expanding_zscore(s).fillna(0.0)
 
         def _cs_percentile(s):
-            return s.rank(pct=True)
+            return _expanding_rank_pct(s)
 
         def _cs_demean(s):
-            return s - s.mean()
+            return s - s.expanding(min_periods=1).mean()
 
         def _clip_func(s, lower, upper):
             return s.clip(lower=lower, upper=upper)
@@ -170,11 +187,11 @@ class FactorEngine:
             return np.sign(s) * np.power(np.abs(s), exp)
 
         def _scale(s):
-            s_abs_sum = np.abs(s).sum()
-            return s / s_abs_sum if s_abs_sum > 0 else s * 0
+            s_abs_sum = np.abs(s).expanding(min_periods=1).sum()
+            return s / s_abs_sum.replace(0, np.nan)
 
         def _indneutralize(s):
-            return s - s.mean()
+            return _cs_demean(s)
 
         def _sequence(length):
             return pd.Series(range(1, length + 1))
@@ -215,7 +232,7 @@ class FactorEngine:
             "mean": lambda s, n: s.rolling(n).mean(),
             "std": lambda s, n: s.rolling(n).std(),
             "sum": lambda s, n: s.rolling(n).sum(),
-            "rank": lambda s: s.rank(pct=True),
+            "rank": _expanding_rank_pct,
             "delay": lambda s, n: s.shift(n),
             "delta": lambda s, n: s.diff(n),
             "pctchange": lambda s, n: s.pct_change(n),
@@ -237,7 +254,7 @@ class FactorEngine:
             "cs_zscore": _cs_zscore,
             "cs_percentile": _cs_percentile,
             "cs_demean": _cs_demean,
-            "cs_rank": lambda s: s.rank(pct=True),
+            "cs_rank": _expanding_rank_pct,
             "scale": _scale, "indneutralize": _indneutralize,
             "advm": lambda s, n: s.rolling(n).mean(),
             # 条件逻辑
@@ -354,6 +371,24 @@ class FactorEngine:
         prev_group_members = {g: set() for g in range(groups)}
         turnover_series = []
 
+        def _safe_corr(left: np.ndarray, right: np.ndarray) -> float:
+            left = np.asarray(left, dtype=float)
+            right = np.asarray(right, dtype=float)
+            mask = np.isfinite(left) & np.isfinite(right)
+            if mask.sum() < 2:
+                return float("nan")
+            left = left[mask]
+            right = right[mask]
+            if left.size < 2 or right.size < 2:
+                return float("nan")
+            if np.allclose(left, left[0]) or np.allclose(right, right[0]):
+                return float("nan")
+            left_std = float(np.std(left))
+            right_std = float(np.std(right))
+            if left_std <= 0 or right_std <= 0:
+                return float("nan")
+            return float(np.corrcoef(left, right)[0, 1])
+
         for dt in dates:
             fvals, frets = [], []
             stock_list = []
@@ -375,7 +410,7 @@ class FactorEngine:
             # IC: Spearman rank correlation
             rank_f = pd.Series(fv_arr).rank().values
             rank_r = pd.Series(fr_arr).rank().values
-            ic = np.corrcoef(rank_f, rank_r)[0, 1]
+            ic = _safe_corr(rank_f, rank_r)
             date_str = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)[:10].replace("-", "")
             ic_series.append({"date": date_str, "ic": round(float(ic), 4) if not np.isnan(ic) else 0.0})
 

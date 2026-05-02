@@ -1,5 +1,6 @@
 """因子服务。"""
 import asyncio
+import inspect
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -12,6 +13,653 @@ from factor.factor_engine import FactorEngine
 from factor.genetic import run_gp
 from services.backtest_service import resolve_backtest_universe
 from services.settings_service import get_or_create_settings
+
+
+def build_factor_compute_code(factor: Factor) -> str:
+    """生成可复制的因子计算函数代码。"""
+    expression = str(factor.expression or "")
+    factor_name = str(factor.name or f"factor_{factor.id}")
+    builtin_name = expression[8:] if expression.startswith("builtin:") else ""
+    builtin_source = ""
+    if builtin_name:
+        try:
+            from factor.builtin_factors import BUILTIN_FACTORS
+
+            func = BUILTIN_FACTORS.get(builtin_name, {}).get("func")
+            if func:
+                builtin_source = inspect.getsource(func).strip()
+        except Exception:
+            builtin_source = ""
+
+    builtin_note = ""
+    if builtin_source:
+        builtin_note = f'''
+
+# 内置因子原始实现，供阅读和复核：
+{builtin_source}
+'''
+
+    return f'''"""
+QTsys 因子计算代码
+因子ID: {factor.id}
+因子名称: {factor_name}
+因子表达式: {expression}
+
+说明：
+1. calculate_factor(cache, ts_code, start_date, end_date) 与系统因子引擎一致，适合在 QTsys 项目内直接复用。
+2. calculate_factor_from_daily_frame(df, daily_basic=None) 适合已拿到单只股票行情 DataFrame 时直接计算。
+3. df 至少需要包含 trade_date/open/high/low/close/vol/amount 字段；daily_basic 可选，用于 pe/pb/ps/市值/换手率类因子。
+"""
+import numpy as np
+import pandas as pd
+
+from factor.factor_engine import FactorEngine
+from factor.builtin_factors import BUILTIN_FACTORS
+
+
+FACTOR_ID = {factor.id!r}
+FACTOR_NAME = {factor_name!r}
+FACTOR_EXPRESSION = {expression!r}
+
+
+def calculate_factor(cache, ts_code, start_date, end_date):
+    """使用 QTsys DataCache + FactorEngine 计算单只股票的完整因子时间序列。"""
+    engine = FactorEngine(cache)
+    return engine.compute_factor_values(FACTOR_EXPRESSION, ts_code, start_date, end_date)
+
+
+def _daily_basic_to_dict(daily_basic, trade_index):
+    """将 Tushare daily_basic 结果对齐为 FactorEngine 需要的字段字典。"""
+    if daily_basic is None or daily_basic.empty:
+        return {{}}
+    basic = daily_basic.copy()
+    basic["trade_date"] = pd.to_datetime(basic["trade_date"], errors="coerce")
+    basic = basic.dropna(subset=["trade_date"]).set_index("trade_date").sort_index()
+    aligned = basic.reindex(trade_index).ffill()
+    result = {{}}
+    for col in ["pe", "pe_ttm", "pb", "ps", "ps_ttm", "total_mv", "circ_mv", "turnover_rate", "turnover_rate_f"]:
+        if col in aligned.columns:
+            result[col] = pd.to_numeric(aligned[col], errors="coerce")
+    return result
+
+
+def calculate_factor_from_daily_frame(df, daily_basic=None):
+    """基于已加载行情 DataFrame 计算因子值，返回 pandas.Series，索引为交易日。"""
+    if df is None or df.empty:
+        return pd.Series(dtype=float)
+
+    data = df.copy()
+    data["trade_date"] = pd.to_datetime(data["trade_date"], errors="coerce")
+    data = data.dropna(subset=["trade_date"]).sort_values("trade_date").set_index("trade_date")
+
+    closes = pd.to_numeric(data["close"], errors="coerce")
+    highs = pd.to_numeric(data["high"], errors="coerce")
+    lows = pd.to_numeric(data["low"], errors="coerce")
+    volumes = pd.to_numeric(data["vol"], errors="coerce")
+    opens = pd.to_numeric(data["open"], errors="coerce") if "open" in data.columns else closes.shift(1)
+    amounts = pd.to_numeric(data["amount"], errors="coerce") if "amount" in data.columns else volumes * closes
+
+    if FACTOR_EXPRESSION.startswith("builtin:"):
+        factor_key = FACTOR_EXPRESSION[8:]
+        info = BUILTIN_FACTORS.get(factor_key)
+        if not info:
+            raise ValueError(f"unknown builtin factor: {{factor_key}}")
+        return info["func"](closes, highs, lows, volumes)
+
+    basic_data = _daily_basic_to_dict(daily_basic, data.index)
+    engine = FactorEngine(cache=None)
+    result = engine._eval_expression(
+        FACTOR_EXPRESSION,
+        closes,
+        highs,
+        lows,
+        volumes,
+        opens,
+        basic_data,
+        amounts,
+    )
+    return result if result is not None else pd.Series(dtype=float)
+{builtin_note}'''
+
+
+def build_joinquant_backtest_code(
+    factor: Factor,
+    *,
+    index_symbol: str = "000300.XSHG",
+    benchmark: str = "000300.XSHG",
+    start_date: str = "",
+    end_date: str = "",
+    top_n: int = 10,
+    rebalance_days: int = 5,
+    lookback: int = 260,
+    high_is_better: bool = True,
+    target_exposure: float = 0.95,
+    max_position_pct: float = 0.12,
+    min_trade_lot: int = 100,
+    stop_loss_pct: float = 0.0,
+    take_profit_pct: float = 0.0,
+    include_star_market: bool = False,
+    exclude_star_market: bool | None = None,
+    exclude_st: bool = True,
+    slippage: float = 0.002,
+) -> str:
+    """生成可直接复制到聚宽的因子截面选股回测代码。"""
+    expression = str(factor.expression or "")
+    factor_name = str(factor.name or f"factor_{factor.id}")
+    top_n = max(1, min(int(top_n or 10), 200))
+    rebalance_days = max(1, min(int(rebalance_days or 5), 60))
+    lookback = max(60, min(int(lookback or 260), 1200))
+    target_exposure = max(0.0, min(float(target_exposure or 0.95), 1.0))
+    max_position_pct = max(0.0, min(float(max_position_pct or 0.12), 1.0))
+    min_trade_lot = max(100, int(min_trade_lot or 100))
+    stop_loss_pct = max(0.0, min(float(stop_loss_pct or 0.0), 0.95))
+    take_profit_pct = max(0.0, min(float(take_profit_pct or 0.0), 10.0))
+    if exclude_star_market is not None:
+        include_star_market = not bool(exclude_star_market)
+    include_star_market = bool(include_star_market)
+    exclude_st = bool(exclude_st)
+    slippage = max(0.0, min(float(slippage or 0.0), 0.05))
+    index_symbol = str(index_symbol or "000300.XSHG").strip()
+    benchmark = str(benchmark or index_symbol or "000300.XSHG").strip()
+    start_date = str(start_date or "").strip()
+    end_date = str(end_date or "").strip()
+    template = r'''
+# -*- coding: utf-8 -*-
+"""
+QTsys -> JoinQuant 因子回测模板
+因子名称: __FACTOR_NAME__
+因子表达式: __FACTOR_EXPRESSION__
+
+使用方法：
+1. 将本文件完整复制到聚宽策略编辑器。
+2. 默认只做多 A 股，所有开仓和平仓都按 100 股整数倍处理，避免小于一手的订单失败。
+3. 如需反向验证，将 g.high_is_better 改为 False。
+4. 本模板只使用调仓日前已存在的历史数据；调仓在 run_daily(open) 中执行，避免使用未来函数。
+"""
+try:
+    from jqdata import *
+except Exception:
+    pass
+
+import numpy as np
+import pandas as pd
+
+
+FACTOR_ID = __FACTOR_ID__
+FACTOR_NAME = __FACTOR_NAME_REPR__
+FACTOR_EXPRESSION = __FACTOR_EXPRESSION_REPR__
+
+
+def initialize(context):
+    set_benchmark(__BENCHMARK_REPR__)
+    set_option('use_real_price', True)
+    set_slippage(FixedSlippage(__SLIPPAGE__))
+    try:
+        log.set_level('order', 'error')
+    except Exception:
+        pass
+
+    set_order_cost(OrderCost(
+        open_tax=0,
+        close_tax=0.001,
+        open_commission=0.0003,
+        close_commission=0.0003,
+        close_today_commission=0,
+        min_commission=5
+    ), type='stock')
+
+    g.index_symbol = __INDEX_SYMBOL_REPR__  # 000300.XSHG 沪深300；000016.XSHG 上证50；000905.XSHG 中证500
+    g.top_n = __TOP_N__                     # 持仓股票数量
+    g.lookback = __LOOKBACK__               # 单股历史数据窗口，复杂长窗口因子可调大
+    g.rebalance_days = __REBALANCE_DAYS__   # 调仓间隔
+    g.high_is_better = __HIGH_IS_BETTER__   # False 表示因子值越小越好
+    g.max_position_pct = __MAX_POSITION_PCT__  # 单股最大权重
+    g.target_exposure = __TARGET_EXPOSURE__    # 总股票仓位
+    g.min_trade_lot = __MIN_TRADE_LOT__        # A股一手=100股，低于一手不下单
+    g.stop_loss_pct = __STOP_LOSS_PCT__        # 0 表示关闭止损；如 0.08 表示亏损8%止损
+    g.take_profit_pct = __TAKE_PROFIT_PCT__    # 0 表示关闭止盈；如 0.20 表示盈利20%止盈
+    g.include_star_market = __INCLUDE_STAR_MARKET__  # 默认过滤科创板，避免市价单保护限价问题
+    g.day_count = 0
+
+    run_daily(rebalance, time='open')
+
+
+def rebalance(context):
+    apply_risk_controls(context)
+
+    g.day_count += 1
+    if g.day_count % g.rebalance_days != 1:
+        return
+
+    stocks = get_index_stocks(g.index_symbol)
+    stocks = filter_tradable_stocks(stocks)
+    scores = score_universe(stocks)
+    if len(scores) == 0:
+        log.info('本次调仓无有效因子值')
+        return
+
+    scores = sorted(scores, key=lambda item: item[1], reverse=g.high_is_better)
+    selected = [stock for stock, value in scores[:max(1, int(g.top_n))]]
+    target_weight = min(g.max_position_pct, g.target_exposure / max(len(selected), 1))
+    target_value = context.portfolio.total_value * target_weight
+
+    current_positions = list(context.portfolio.positions.keys())
+    for stock in current_positions:
+        if stock not in selected:
+            safe_order_target_value(context, stock, 0)
+
+    for stock in selected:
+        safe_order_target_value(context, stock, target_value)
+
+    log.info('调仓完成：%s' % ','.join(selected))
+
+
+def apply_risk_controls(context):
+    """可选止盈止损；只做多，不开空。"""
+    if g.stop_loss_pct <= 0 and g.take_profit_pct <= 0:
+        return
+    for stock, position in list(context.portfolio.positions.items()):
+        amount = int(getattr(position, 'total_amount', 0) or 0)
+        if amount < g.min_trade_lot:
+            continue
+        avg_cost = float(getattr(position, 'avg_cost', 0) or 0)
+        price = float(getattr(position, 'price', 0) or 0)
+        if avg_cost <= 0 or price <= 0:
+            continue
+        ret = price / avg_cost - 1.0
+        if g.stop_loss_pct > 0 and ret <= -g.stop_loss_pct:
+            safe_order_target_value(context, stock, 0)
+            log.info('%s 触发止损 %.2f%%' % (stock, ret * 100))
+        elif g.take_profit_pct > 0 and ret >= g.take_profit_pct:
+            safe_order_target_value(context, stock, 0)
+            log.info('%s 触发止盈 %.2f%%' % (stock, ret * 100))
+
+
+def safe_order_target_value(context, stock, target_value):
+    """A股安全下单：避免开仓/平仓数量小于100导致聚宽报错。"""
+    current_data = get_current_data()
+    try:
+        price = float(current_data[stock].last_price)
+    except Exception:
+        price = 0.0
+    if price <= 0 or np.isnan(price):
+        try:
+            price = float(attribute_history(stock, 1, '1d', ['close'], skip_paused=True, df=True, fq='pre')['close'].iloc[-1])
+        except Exception:
+            return
+    if price <= 0 or np.isnan(price):
+        return
+
+    if stock in context.portfolio.positions:
+        position = context.portfolio.positions[stock]
+        current_amount = int(getattr(position, 'total_amount', 0) or 0)
+    else:
+        position = None
+        current_amount = 0
+    target_amount = int(float(target_value) / price / g.min_trade_lot) * g.min_trade_lot
+    target_amount = max(0, target_amount)
+    delta_amount = target_amount - current_amount
+
+    if target_amount == 0:
+        if current_amount >= g.min_trade_lot:
+            order_target(stock, 0)
+        return
+
+    if abs(delta_amount) < g.min_trade_lot:
+        return
+
+    if is_star_market(stock):
+        limit_price = round(price * 1.02, 2) if target_amount > current_amount else round(price * 0.98, 2)
+        order_target(stock, target_amount, style=LimitOrderStyle(limit_price))
+    else:
+        order_target(stock, target_amount)
+
+
+def filter_tradable_stocks(stocks):
+    current_data = get_current_data()
+    result = []
+    for stock in stocks:
+        try:
+            if (not g.include_star_market) and is_star_market(stock):
+                continue
+            data = current_data[stock]
+            name = getattr(data, 'name', '') or ''
+            if data.paused or data.is_st or ('ST' in name) or ('*' in name) or ('退' in name):
+                continue
+            result.append(stock)
+        except Exception:
+            continue
+    return result
+
+
+def is_star_market(stock):
+    """科创板证券代码通常以 688 开头。"""
+    return str(stock).startswith('688')
+
+
+def score_universe(stocks):
+    rows = []
+    for stock in stocks:
+        value = calculate_latest_factor_value(stock)
+        if value is None:
+            continue
+        try:
+            value = float(value)
+        except Exception:
+            continue
+        if np.isfinite(value):
+            rows.append((stock, value))
+    return rows
+
+
+def calculate_latest_factor_value(stock):
+    df = attribute_history(
+        stock,
+        count=int(g.lookback),
+        unit='1d',
+        fields=['open', 'high', 'low', 'close', 'volume', 'money'],
+        skip_paused=True,
+        df=True,
+        fq='pre'
+    )
+    if df is None or df.empty or len(df) < 30:
+        return None
+
+    daily = df.copy()
+    daily['trade_date'] = pd.to_datetime(daily.index)
+    daily = daily.rename(columns={'volume': 'vol', 'money': 'amount'})
+    valuation_data = load_valuation_history(stock, daily['trade_date'])
+    series = calculate_factor_from_daily_frame(daily, valuation_data)
+    if series is None or len(series.dropna()) == 0:
+        return None
+    return series.dropna().iloc[-1]
+
+
+def load_valuation_history(stock, trade_dates):
+    """尽量拉取聚宽估值时序；失败时返回空字典，纯量价因子不受影响。"""
+    result = {}
+    if trade_dates is None or len(trade_dates) == 0:
+        return result
+    end_date = pd.to_datetime(trade_dates.iloc[-1]).date()
+    count = len(trade_dates)
+    field_map = {
+        'pe': 'pe_ratio',
+        'pe_ttm': 'pe_ratio',
+        'pb': 'pb_ratio',
+        'ps': 'ps_ratio',
+        'ps_ttm': 'ps_ratio',
+        'total_mv': 'market_cap',
+        'circ_mv': 'circulating_market_cap',
+        'turnover_rate': 'turnover_ratio',
+        'turnover_rate_f': 'turnover_ratio',
+    }
+    raw = None
+    try:
+        q = query(
+            valuation.code,
+            valuation.pe_ratio,
+            valuation.pb_ratio,
+            valuation.ps_ratio,
+            valuation.market_cap,
+            valuation.circulating_market_cap,
+            valuation.turnover_ratio
+        ).filter(valuation.code == stock)
+        raw = get_fundamentals_continuously(q, end_date=end_date, count=count, panel=False)
+    except Exception:
+        raw = None
+
+    if raw is not None and not raw.empty:
+        frame = raw.copy()
+        if isinstance(frame.index, pd.MultiIndex):
+            frame = frame.reset_index()
+        date_col = 'day' if 'day' in frame.columns else ('date' if 'date' in frame.columns else None)
+        if date_col is not None:
+            frame[date_col] = pd.to_datetime(frame[date_col], errors='coerce')
+            frame = frame.dropna(subset=[date_col]).set_index(date_col).sort_index()
+            aligned_index = pd.to_datetime(trade_dates)
+            for target, source in field_map.items():
+                if source in frame.columns:
+                    result[target] = pd.to_numeric(frame[source], errors='coerce').reindex(aligned_index).ffill()
+            return result
+
+    try:
+        q = query(
+            valuation.code,
+            valuation.pe_ratio,
+            valuation.pb_ratio,
+            valuation.ps_ratio,
+            valuation.market_cap,
+            valuation.circulating_market_cap,
+            valuation.turnover_ratio
+        ).filter(valuation.code == stock)
+        snapshot = get_fundamentals(q, date=end_date)
+        if snapshot is not None and not snapshot.empty:
+            idx = pd.to_datetime(trade_dates)
+            row = snapshot.iloc[0]
+            for target, source in field_map.items():
+                if source in snapshot.columns:
+                    result[target] = pd.Series(float(row[source]) if pd.notna(row[source]) else np.nan, index=idx)
+    except Exception:
+        pass
+    return result
+
+
+def calculate_factor_from_daily_frame(df, valuation_data=None):
+    data = df.copy()
+    data['trade_date'] = pd.to_datetime(data['trade_date'], errors='coerce')
+    data = data.dropna(subset=['trade_date']).sort_values('trade_date').set_index('trade_date')
+
+    close = pd.to_numeric(data['close'], errors='coerce')
+    high = pd.to_numeric(data['high'], errors='coerce')
+    low = pd.to_numeric(data['low'], errors='coerce')
+    open_ = pd.to_numeric(data['open'], errors='coerce') if 'open' in data.columns else close.shift(1)
+    volume = pd.to_numeric(data['vol'], errors='coerce') if 'vol' in data.columns else pd.to_numeric(data['volume'], errors='coerce')
+    amount = pd.to_numeric(data['amount'], errors='coerce') if 'amount' in data.columns else volume * close
+
+    if FACTOR_EXPRESSION.startswith('builtin:'):
+        return calc_builtin_factor(FACTOR_EXPRESSION[8:], close, high, low, volume)
+
+    return eval_expression(FACTOR_EXPRESSION, close, high, low, open_, volume, amount, valuation_data or {})
+
+
+def calc_builtin_factor(name, close, high, low, volume):
+    if name == 'momentum_5':
+        return close.pct_change(5)
+    if name == 'momentum_20':
+        return close.pct_change(20)
+    if name == 'momentum_60':
+        return close.pct_change(60)
+    if name == 'reversal_5':
+        return -close.pct_change(5)
+    if name == 'reversal_20':
+        return -close.pct_change(20)
+    if name == 'volatility_20':
+        return close.pct_change().rolling(20).std()
+    if name == 'atr_14':
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        return tr.rolling(14).mean() / close.replace(0, np.nan)
+    if name == 'volume_ratio_5':
+        return volume / volume.rolling(5).mean().replace(0, np.nan)
+    if name == 'volume_momentum':
+        return volume.rolling(5).mean() / volume.rolling(20).mean().replace(0, np.nan)
+    if name == 'rsi_14':
+        delta = close.diff()
+        gain = delta.clip(lower=0).rolling(14).mean()
+        loss = (-delta.clip(upper=0)).rolling(14).mean()
+        rs = gain / loss.replace(0, np.nan)
+        return 100 - 100 / (1 + rs)
+    if name == 'bias_20':
+        ma = close.rolling(20).mean()
+        return (close - ma) / ma.replace(0, np.nan)
+    if name == 'ma_position':
+        score = pd.Series(0.0, index=close.index)
+        for period in [5, 10, 20, 60]:
+            score += (close > close.rolling(period).mean()).astype(float)
+        return score / 4.0
+    if name == 'high_low_range':
+        return ((high - low) / close.replace(0, np.nan)).rolling(20).mean()
+    if name == 'upper_shadow':
+        open_proxy = close.shift(1)
+        body = (close - open_proxy).abs()
+        upper = high - pd.concat([close, open_proxy], axis=1).max(axis=1)
+        return (upper / body.replace(0, np.nan)).rolling(20).mean()
+    raise ValueError('unknown builtin factor: %s' % name)
+
+
+def eval_expression(expr, close, high, low, open_, volume, amount, valuation_data):
+    empty = pd.Series(np.nan, index=close.index)
+    pe = valuation_data.get('pe_ttm', valuation_data.get('pe', empty))
+    pb = valuation_data.get('pb', empty)
+    ps = valuation_data.get('ps_ttm', valuation_data.get('ps', empty))
+    total_mv = valuation_data.get('total_mv', empty)
+    circ_mv = valuation_data.get('circ_mv', empty)
+    turnover_rate = valuation_data.get('turnover_rate', empty)
+
+    def _ts_rank_func(x):
+        n = len(x)
+        if n == 0 or np.isnan(x[-1]):
+            return np.nan
+        return np.sum(x <= x[-1]) / float(n)
+
+    def _expanding_rank_pct(s):
+        result = []
+        values = []
+        for value in pd.Series(s).values:
+            values.append(value)
+            valid = [item for item in values if pd.notna(item)]
+            if not valid or pd.isna(value):
+                result.append(np.nan)
+            else:
+                result.append(float(np.sum(np.array(valid) <= value) / len(valid)))
+        return pd.Series(result, index=s.index)
+
+    def _expanding_zscore(s):
+        mean = s.expanding(min_periods=2).mean()
+        std = s.expanding(min_periods=2).std()
+        return ((s - mean) / std.replace(0, np.nan)).fillna(0.0)
+
+    def _wma(s, window):
+        weights = np.arange(1, int(window) + 1, dtype=float)
+        return s.rolling(int(window)).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+
+    def _decaylinear(s, window):
+        weights = np.arange(int(window), 0, -1, dtype=float)
+        return s.rolling(int(window)).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+
+    def _sma(s, window, weight):
+        result = s.copy()
+        alpha = float(weight) / float(window)
+        for i in range(1, len(s)):
+            if pd.notna(s.iloc[i]) and pd.notna(result.iloc[i - 1]):
+                result.iloc[i] = alpha * s.iloc[i] + (1 - alpha) * result.iloc[i - 1]
+        return result
+
+    def _regbeta(x, y, window):
+        values = []
+        window = int(window)
+        for i in range(len(x)):
+            if i < window - 1:
+                values.append(np.nan)
+                continue
+            xa = x.iloc[i - window + 1:i + 1].values
+            ya = y.iloc[i - window + 1:i + 1].values
+            var = np.nanvar(xa)
+            values.append(np.nan if var <= 0 else np.nan_to_num(np.cov(xa, ya)[0, 1] / var))
+        return pd.Series(values, index=x.index)
+
+    def _regresi(x, y, window):
+        beta = _regbeta(x, y, window)
+        alpha = y.rolling(int(window)).mean() - beta * x.rolling(int(window)).mean()
+        return y - (alpha + beta * x)
+
+    vwap = amount / volume.replace(0, np.nan)
+    returns = close.pct_change()
+    dtm = pd.Series(np.where(open_ <= open_.shift(1), 0, np.maximum(high - open_, open_ - open_.shift(1))), index=open_.index)
+    dbm = pd.Series(np.where(open_ >= open_.shift(1), 0, np.maximum(open_ - low, open_ - open_.shift(1))), index=open_.index)
+    tr = pd.Series(np.maximum(np.maximum(high - low, np.abs(high - close.shift(1))), np.abs(low - close.shift(1))), index=close.index)
+    hd = high - high.shift(1)
+    ld = low.shift(1) - low
+
+    safe_ns = {
+        'np': np, 'pd': pd,
+        'close': close, 'high': high, 'low': low, 'open': open_,
+        'vol': volume, 'volume': volume, 'amount': amount, 'vwap': vwap,
+        'returns': returns, 'dtm': dtm, 'dbm': dbm, 'tr': tr, 'hd': hd, 'ld': ld,
+        'pe': pe, 'pb': pb, 'ps': ps, 'total_mv': total_mv, 'circ_mv': circ_mv, 'turnover_rate': turnover_rate,
+        'abs': np.abs, 'log': np.log, 'sqrt': np.sqrt, 'sign': np.sign,
+        'floor': np.floor, 'ceil': np.ceil, 'round_val': np.round,
+        'power': lambda s, exp: np.power(s, exp),
+        'signedpower': lambda s, exp: np.sign(s) * np.power(np.abs(s), exp),
+        'neg': lambda s: -s,
+        'max': np.maximum, 'min': np.minimum,
+        'clip': lambda s, lower, upper: s.clip(lower=lower, upper=upper),
+        'mean': lambda s, n: s.rolling(int(n)).mean(),
+        'std': lambda s, n: s.rolling(int(n)).std(),
+        'sum': lambda s, n: s.rolling(int(n)).sum(),
+        'rank': _expanding_rank_pct,
+        'delay': lambda s, n: s.shift(int(n)),
+        'delta': lambda s, n: s.diff(int(n)),
+        'pctchange': lambda s, n: s.pct_change(int(n)),
+        'corr': lambda a, b, n: a.rolling(int(n)).corr(b),
+        'cov': lambda a, b, n: a.rolling(int(n)).cov(b),
+        'ts_max': lambda s, n: s.rolling(int(n)).max(),
+        'ts_min': lambda s, n: s.rolling(int(n)).min(),
+        'ts_rank': lambda s, n: s.rolling(int(n)).apply(_ts_rank_func, raw=True),
+        'wma': _wma, 'decaylinear': _decaylinear, 'sma': _sma,
+        'regbeta': _regbeta, 'regresi': _regresi,
+        'scale': lambda s: s / np.abs(s).expanding(min_periods=1).sum().replace(0, np.nan),
+        'cs_rank': _expanding_rank_pct,
+        'cs_zscore': _expanding_zscore,
+        'cs_percentile': _expanding_rank_pct,
+        'cs_demean': lambda s: s - s.expanding(min_periods=1).mean(),
+        'indneutralize': lambda s: s - s.expanding(min_periods=1).mean(),
+        'advm': lambda s, n: s.rolling(int(n)).mean(),
+        'where': lambda cond, t, f: pd.Series(np.where(cond, t, f), index=close.index),
+        'ternary': lambda cond, t, f: pd.Series(np.where(cond, t, f), index=close.index),
+        'ts_argmax': lambda s, n: s.rolling(int(n)).apply(lambda x: x.argmax(), raw=True),
+        'ts_argmin': lambda s, n: s.rolling(int(n)).apply(lambda x: x.argmin(), raw=True),
+        'ts_product': lambda s, n: s.rolling(int(n)).apply(lambda x: np.prod(x), raw=True),
+        'highday': lambda s, n: s.rolling(int(n)).apply(lambda x: int(n) - 1 - x.argmax(), raw=True),
+        'lowday': lambda s, n: s.rolling(int(n)).apply(lambda x: int(n) - 1 - x.argmin(), raw=True),
+        'sequence': lambda length: pd.Series(range(1, int(length) + 1)),
+        'sumif': lambda s, condition, n: (s * condition).rolling(int(n)).sum(),
+    }
+    try:
+        result = eval(expr, {'__builtins__': {}}, safe_ns)
+    except Exception as exc:
+        log.info('因子表达式计算失败: %s' % exc)
+        return pd.Series(dtype=float)
+    if isinstance(result, pd.Series):
+        return result
+    return pd.Series(result, index=close.index)
+'''
+    return (
+        template
+        .replace("__FACTOR_ID__", repr(factor.id))
+        .replace("__FACTOR_NAME__", factor_name)
+        .replace("__FACTOR_NAME_REPR__", repr(factor_name))
+        .replace("__FACTOR_EXPRESSION__", expression)
+        .replace("__FACTOR_EXPRESSION_REPR__", repr(expression))
+        .replace("__INDEX_SYMBOL_REPR__", repr(index_symbol))
+        .replace("__BENCHMARK_REPR__", repr(benchmark))
+        .replace("__TOP_N__", repr(top_n))
+        .replace("__LOOKBACK__", repr(lookback))
+        .replace("__REBALANCE_DAYS__", repr(rebalance_days))
+        .replace("__HIGH_IS_BETTER__", "True" if high_is_better else "False")
+        .replace("__MAX_POSITION_PCT__", repr(round(max_position_pct, 6)))
+        .replace("__TARGET_EXPOSURE__", repr(round(target_exposure, 6)))
+        .replace("__MIN_TRADE_LOT__", repr(min_trade_lot))
+        .replace("__STOP_LOSS_PCT__", repr(round(stop_loss_pct, 6)))
+        .replace("__TAKE_PROFIT_PCT__", repr(round(take_profit_pct, 6)))
+        .replace("__INCLUDE_STAR_MARKET__", "True" if include_star_market else "False")
+        .replace("__SLIPPAGE__", repr(round(slippage, 6)))
+        .replace("__START_DATE_REPR__", repr(start_date))
+        .replace("__END_DATE_REPR__", repr(end_date))
+        .replace("__EXCLUDE_ST__", "True" if exclude_st else "False")
+    )
 
 
 async def evaluate_factor_workflow(
@@ -130,10 +778,9 @@ def build_factor_strategy_code(factor_id: int, factor_name: str, direction: str 
     context.max_positions = 10
     context.rebalance_days = 5
     context.factor_direction_high_is_better = {reverse}
+    context.day_count = 0
 
 def handle_data(context):
-    if not hasattr(context, "day_count"):
-        context.day_count = 0
     context.day_count += 1
     if context.day_count % context.rebalance_days != 1:
         return
@@ -228,6 +875,7 @@ async def rank_factor_cross_section_workflow(
         universe_type=universe_type or "system",
         universe_code=universe_code or "000300.SH",
         custom_pool_id=custom_pool_id,
+        as_of_date=trade_date,
     )
     codes = list(resolved.get("codes") or [])[:800]
     if not codes:

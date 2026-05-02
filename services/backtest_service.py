@@ -80,6 +80,11 @@ def _normalize_stock_items(stock_items: list[dict]) -> list[dict]:
     return normalized
 
 
+def _normalize_trade_date(value: Optional[str]) -> str:
+    text = str(value or "").replace("-", "").strip()
+    return text[:8] if len(text) >= 8 else ""
+
+
 def _build_universe_label(
     universe_type: str,
     universe_code: str,
@@ -109,6 +114,7 @@ async def resolve_backtest_universe(
     universe_name: Optional[str] = None,
     custom_pool_id: Optional[int] = None,
     stock_items: Optional[list[dict]] = None,
+    as_of_date: Optional[str] = None,
 ) -> dict:
     explicit_codes = _normalize_codes(universe or [])
     normalized_type = str(universe_type or "").strip().lower()
@@ -145,8 +151,9 @@ async def resolve_backtest_universe(
             raise ValueError("系统股票池不存在")
         client = TushareClient(settings.tushare_token)
         aux_cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
-        end_date = pd.Timestamp.today().strftime("%Y%m%d")
-        start_date = (pd.Timestamp.today() - pd.Timedelta(days=365)).strftime("%Y%m%d")
+        resolved_as_of = _normalize_trade_date(as_of_date) or pd.Timestamp.today().strftime("%Y%m%d")
+        end_date = resolved_as_of
+        start_date = (pd.to_datetime(resolved_as_of) - pd.Timedelta(days=365 * 5)).strftime("%Y%m%d")
         try:
             index_weight = aux_cache.get_index_weight(normalized_code, start_date, end_date)
         finally:
@@ -161,6 +168,9 @@ async def resolve_backtest_universe(
         frame["trade_date"] = frame["trade_date"].astype(str).str.replace("-", "", regex=False).str[:8]
         frame["con_code"] = frame["con_code"].astype(str).str.strip().str.upper()
         frame["weight"] = pd.to_numeric(frame.get("weight", 0), errors="coerce").fillna(0.0)
+        frame = frame[frame["trade_date"] <= resolved_as_of]
+        if frame.empty:
+            raise ValueError("绯荤粺鑲＄エ姹犲湪鍥炴祴璧风偣鍓嶆殏鏃犲彲鐢ㄦ垚鍒嗚偂")
         latest_trade_date = str(frame["trade_date"].max() or "")
         latest = frame[frame["trade_date"] == latest_trade_date].copy()
         latest = latest.sort_values(["weight", "con_code"], ascending=[False, True])
@@ -174,6 +184,7 @@ async def resolve_backtest_universe(
             "universe_code": normalized_code,
             "universe_name": resolved_name,
             "universe_label": _build_universe_label("system", normalized_code, resolved_name, codes),
+            "universe_as_of_date": latest_trade_date,
         }
 
     if not explicit_codes:
@@ -224,6 +235,7 @@ async def run_backtest_workflow(
         universe_name=universe_name,
         custom_pool_id=custom_pool_id,
         stock_items=stock_items,
+        as_of_date=start_date,
     )
     resolved_codes = resolved_universe["codes"]
 
@@ -255,6 +267,22 @@ async def run_backtest_workflow(
     if "error" in result_data:
         raise ValueError(result_data["error"])
 
+    data_coverage = {
+        **(result_data.get("data_coverage") or {}),
+        "universe_type": resolved_universe.get("universe_type", ""),
+        "universe_code": resolved_universe.get("universe_code", ""),
+        "universe_name": resolved_universe.get("universe_name", ""),
+        "universe_label": resolved_universe.get("universe_label", ""),
+        "universe_as_of_date": resolved_universe.get("universe_as_of_date", ""),
+    }
+    execution_model = result_data.get("execution_model") or {}
+    persisted_metrics = {
+        **(result_data["metrics"] or {}),
+        "data_coverage": data_coverage,
+        "execution_model": execution_model,
+        "validation_note": "信号按截至当日数据生成，订单下一交易日开盘执行；系统股票池按回测起点前成分股快照解析。",
+    }
+
     bt_result = BacktestResult(
         strategy_id=strategy.id,
         strategy_name=strategy.name,
@@ -263,7 +291,7 @@ async def run_backtest_workflow(
         universe=resolved_universe["universe_label"],
         initial_cash=initial_cash,
         final_value=result_data["final_value"],
-        metrics=result_data["metrics"],
+        metrics=persisted_metrics,
         equity_curve=result_data["equity_curve"],
         trades=result_data["trades"],
         daily_returns=result_data["daily_returns"],
@@ -287,4 +315,7 @@ async def run_backtest_workflow(
         "resolved_universe_count": len(resolved_codes),
         "strategy_profile": strategy_profile,
         "factor_catalog_count": len(factor_catalog),
+        "data_coverage": data_coverage,
+        "execution_model": execution_model,
+        "validation_note": persisted_metrics["validation_note"],
     }

@@ -1,0 +1,2 @@
+"""QTsys desktop launcher package."""
+

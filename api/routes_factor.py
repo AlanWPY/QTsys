@@ -15,6 +15,8 @@ from factor.alpha191_templates import get_alpha191_formula
 from factor.expression_to_graph import ExpressionToGraph
 from services.factor_catalog_service import load_factor_catalog
 from services.factor_service import (
+    build_factor_compute_code,
+    build_joinquant_backtest_code,
     create_strategy_from_factor_workflow,
     evaluate_factor_workflow,
     mine_gp_workflow,
@@ -69,6 +71,26 @@ class FactorRankRequest(BaseModel):
     n: int = 10
 
 
+class JoinQuantCodeRequest(BaseModel):
+    index_symbol: str = "000300.XSHG"
+    benchmark: str = "000300.XSHG"
+    start_date: str = ""
+    end_date: str = ""
+    top_n: int = 10
+    rebalance_days: int = 5
+    lookback: int = 260
+    high_is_better: bool = True
+    target_exposure: float = 0.95
+    max_position_pct: float = 0.12
+    min_trade_lot: int = 100
+    stop_loss_pct: float = 0.0
+    take_profit_pct: float = 0.0
+    include_star_market: bool = False
+    exclude_star_market: Optional[bool] = None
+    exclude_st: bool = True
+    slippage: float = 0.002
+
+
 # ===== 因子CRUD =====
 
 @router.get("")
@@ -114,6 +136,77 @@ async def delete_factor(factor_id: int, db: AsyncSession = Depends(get_db)):
     return {"message": "已删除"}
 
 
+@router.get("/{factor_id}/code")
+async def get_factor_code(factor_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Factor).where(Factor.id == factor_id))
+    factor = result.scalar_one_or_none()
+    if not factor:
+        raise HTTPException(status_code=404, detail="因子不存在")
+    return {
+        "id": factor.id,
+        "name": factor.name,
+        "expression": factor.expression,
+        "category": factor.category,
+        "source": factor.source,
+        "code": build_factor_compute_code(factor),
+    }
+
+
+@router.get("/{factor_id}/joinquant_code")
+async def get_factor_joinquant_code(factor_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Factor).where(Factor.id == factor_id))
+    factor = result.scalar_one_or_none()
+    if not factor:
+        raise HTTPException(status_code=404, detail="因子不存在")
+    return {
+        "id": factor.id,
+        "name": factor.name,
+        "expression": factor.expression,
+        "category": factor.category,
+        "source": factor.source,
+        "code": build_joinquant_backtest_code(factor),
+    }
+
+
+@router.post("/{factor_id}/joinquant_code")
+async def create_factor_joinquant_code(
+    factor_id: int,
+    req: JoinQuantCodeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Factor).where(Factor.id == factor_id))
+    factor = result.scalar_one_or_none()
+    if not factor:
+        raise HTTPException(status_code=404, detail="因子不存在")
+    return {
+        "id": factor.id,
+        "name": factor.name,
+        "expression": factor.expression,
+        "category": factor.category,
+        "source": factor.source,
+        "code": build_joinquant_backtest_code(
+            factor,
+            index_symbol=req.index_symbol,
+            benchmark=req.benchmark,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            top_n=req.top_n,
+            rebalance_days=req.rebalance_days,
+            lookback=req.lookback,
+            high_is_better=req.high_is_better,
+            target_exposure=req.target_exposure,
+            max_position_pct=req.max_position_pct,
+            min_trade_lot=req.min_trade_lot,
+            stop_loss_pct=req.stop_loss_pct,
+            take_profit_pct=req.take_profit_pct,
+            include_star_market=req.include_star_market,
+            exclude_star_market=req.exclude_star_market,
+            exclude_st=req.exclude_st,
+            slippage=req.slippage,
+        ),
+    }
+
+
 @router.post("/init_builtin")
 async def init_builtin_factors(db: AsyncSession = Depends(get_db)):
     """初始化内置因子"""
@@ -152,51 +245,6 @@ async def evaluate_factor(req: FactorEvalRequest, db: AsyncSession = Depends(get
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-    result = await db.execute(select(Factor).where(Factor.id == req.factor_id))
-    factor = result.scalar_one_or_none()
-    if not factor:
-        raise HTTPException(status_code=404, detail="因子不存在")
-
-    settings_r = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = settings_r.scalar_one_or_none()
-    if not settings or not settings.tushare_token:
-        raise HTTPException(status_code=400, detail="请先配置Tushare Token")
-
-    from data.tushare_client import TushareClient
-    from data.data_cache import DataCache
-    from factor.factor_engine import FactorEngine
-
-    client = TushareClient(settings.tushare_token)
-    from data.data_cache import make_mysql_conn
-    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
-    engine = FactorEngine(cache)
-
-    eval_result = await asyncio.to_thread(
-        engine.evaluate, factor.expression,
-        req.universe, req.start_date, req.end_date, req.groups,
-        req.forward_days,
-    )
-
-    if "error" in eval_result:
-        raise HTTPException(status_code=400, detail=eval_result["error"])
-
-    # 保存结果
-    fr = FactorResult(
-        factor_id=factor.id, factor_name=factor.name,
-        universe=",".join(req.universe),
-        start_date=req.start_date, end_date=req.end_date,
-        metrics=eval_result["metrics"],
-        ic_series=eval_result["ic_series"],
-        group_returns=eval_result["group_returns"],
-        turnover_series=eval_result["turnover_series"],
-        long_short_curve=eval_result["long_short_curve"],
-    )
-    db.add(fr)
-    await db.commit()
-
-    return eval_result
-
 
 @router.post("/{factor_id}/create_strategy")
 async def create_strategy_from_factor(
@@ -244,43 +292,6 @@ async def mine_gp(req: GPMineRequest, db: AsyncSession = Depends(get_db)):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-    settings_r = await db.execute(select(Settings).where(Settings.id == 1))
-    settings = settings_r.scalar_one_or_none()
-    if not settings or not settings.tushare_token:
-        raise HTTPException(status_code=400, detail="请先配置Tushare Token")
-
-    from data.tushare_client import TushareClient
-    from data.data_cache import DataCache
-    from factor.factor_engine import FactorEngine
-    from factor.genetic import run_gp
-
-    client = TushareClient(settings.tushare_token)
-    from data.data_cache import make_mysql_conn
-    cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
-    engine = FactorEngine(cache)
-
-    results = await asyncio.to_thread(
-        run_gp, engine, req.universe,
-        req.start_date, req.end_date,
-        req.pop_size, req.generations,
-    )
-
-    # 自动保存发现的因子
-    saved = []
-    for i, r in enumerate(results):
-        name = f"GP因子_{i+1}"
-        f = Factor(
-            name=name, description=f"遗传算法挖掘 (适应度={r['fitness']})",
-            expression=r["expression"],
-            category="GP挖掘", source="gp",
-        )
-        db.add(f)
-        saved.append({"name": name, **r})
-    await db.commit()
-
-    return {"factors": saved}
-
 
 # ===== LLM挖掘 =====
 

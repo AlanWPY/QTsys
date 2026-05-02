@@ -73,6 +73,9 @@ FORBIDDEN_ITEMS = [
     "eval",
     "exec",
     "__import__",
+    "hasattr",
+    "getattr",
+    "setattr",
 ]
 
 DEFAULT_REPLY = "已根据你的要求生成可直接保存并用于回测的策略草稿。"
@@ -266,7 +269,7 @@ def validate_strategy_code(code: str) -> Optional[str]:
             if root in FORBIDDEN_ITEMS:
                 return f"禁止导入模块: {root}"
         elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec", "__import__"}:
+            if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec", "__import__", "hasattr", "getattr", "setattr"}:
                 return f"禁止使用危险函数: {node.func.id}"
         elif isinstance(node, ast.Attribute):
             if node.attr.startswith("__") and node.attr not in {"__init__", "__name__"}:
@@ -427,13 +430,16 @@ def _build_system_prompt(
 14. 输出保持紧凑，策略代码尽量控制在 140 行以内，避免冗长注释和大段说明。
 15. 如果你无法稳定输出完整 JSON，也必须优先保证 `strategy.code` 字段里是完整可运行的 Python 代码，不能留空。
 16. 优先考虑复用系统因子库，可通过 `context.get_factor('因子名', ts_code)` 获取当前因子值，或 `context.get_factor_history('因子名', ts_code, count)` 获取因子时间序列。
+17. 禁止使用 hasattr/getattr/setattr；需要状态变量时必须在 initialize(context) 中直接初始化，例如 context.day_count = 0。
 
 推荐模板骨架（可在此基础上改写）：
 def initialize(context):
     context.lookback = 20
     context.target_pct = 0.1
+    context.day_count = 0
 
 def handle_data(context):
+    context.day_count += 1
     for ts_code in context.universe:
         closes = context.get_history(ts_code, context.lookback + 1, "close")
         if len(closes) < context.lookback + 1:
@@ -479,6 +485,7 @@ strategy 中必须包含 name、description、code、logic_points、risk_points�
 股票池必须使用 context.universe。
 策略必须至少包含一种下单动作：`context.order(...)`、`context.order_value(...)` 或 `context.order_target_percent(...)`。
 优先复用因子库：context.get_factor / context.get_factor_history。
+禁止使用 hasattr/getattr/setattr；状态变量必须在 initialize(context) 中初始化。
 
 {factor_catalog_text}
 {current_block}

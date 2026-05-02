@@ -23,6 +23,7 @@ def run_selection_backtest(
     # 1. 收集所有股票的因子值和收盘价
     stock_factors = {}  # {ts_code: Series(date->factor_value)}
     stock_closes = {}  # {ts_code: Series(date->close)}
+    stock_opens = {}  # {ts_code: Series(date->open)}
 
     for ts_code in universe:
         fv = factor_engine.compute_factor_values(expression, ts_code, start_date, end_date)
@@ -31,9 +32,12 @@ def run_selection_backtest(
         df = cache.get_daily(ts_code, start_date, end_date)
         if df.empty:
             continue
-        closes = df.set_index("trade_date")["close"]
+        indexed = df.set_index("trade_date")
+        closes = indexed["close"]
+        opens = indexed["open"] if "open" in indexed.columns else indexed["close"]
         stock_factors[ts_code] = fv
         stock_closes[ts_code] = closes
+        stock_opens[ts_code] = opens
 
     if len(stock_factors) < 5:
         return {"error": f"有效股票不足(仅{len(stock_factors)}只)"}
@@ -52,16 +56,18 @@ def run_selection_backtest(
     stock_pool_history = []
     prev_value = initial_cash
 
-    rebalance_idx = list(range(0, len(all_dates), rebalance_days))
+    rebalance_idx = set(range(0, len(all_dates) - 1, rebalance_days))
 
     for i, dt in enumerate(all_dates):
         # 调仓日
-        if i in rebalance_idx:
-            # 计算当日因子值
+        if i > 0 and (i - 1) in rebalance_idx:
+            signal_dt = all_dates[i - 1]
+            exec_dt = dt
+            # 使用上一交易日因子值，下一交易日开盘成交
             scores = {}
             for ts_code, fv in stock_factors.items():
-                if dt in fv.index and pd.notna(fv.loc[dt]):
-                    scores[ts_code] = fv.loc[dt]
+                if signal_dt in fv.index and pd.notna(fv.loc[signal_dt]):
+                    scores[ts_code] = fv.loc[signal_dt]
 
             if len(scores) < 3:
                 continue
@@ -78,10 +84,10 @@ def run_selection_backtest(
 
             # 卖出不在新组合中的持仓
             for ts_code in list(holdings.keys()):
-                if ts_code not in selected and ts_code in stock_closes:
-                    price = stock_closes[ts_code].get(dt)
+                if ts_code not in selected and ts_code in stock_opens:
+                    price = stock_opens[ts_code].get(exec_dt)
                     if price and holdings[ts_code] > 0:
-                        sell_val = holdings[ts_code] * price
+                        sell_val = holdings[ts_code] * price * (1 - 0.0003 - 0.001)
                         cash += sell_val
                         trades.append({"date": str(dt)[:10], "code": ts_code,
                                        "action": "sell", "price": float(price),
@@ -97,14 +103,14 @@ def run_selection_backtest(
             for ts_code in selected:
                 if ts_code not in stock_closes:
                     continue
-                price = stock_closes[ts_code].get(dt)
+                price = stock_opens.get(ts_code, pd.Series(dtype=float)).get(exec_dt)
                 if not price or price <= 0:
                     continue
                 target_shares = int(per_stock / price / 100) * 100
                 current = holdings.get(ts_code, 0)
                 diff = target_shares - current
                 if diff > 0:
-                    cost = diff * price
+                    cost = diff * price * (1 + 0.0003)
                     if cost <= cash:
                         cash -= cost
                         holdings[ts_code] = target_shares
@@ -112,7 +118,7 @@ def run_selection_backtest(
                                        "action": "buy", "price": float(price),
                                        "shares": diff})
                 elif diff < 0:
-                    cash += abs(diff) * price
+                    cash += abs(diff) * price * (1 - 0.0003 - 0.001)
                     holdings[ts_code] = target_shares
 
         # 计算当日组合价值
@@ -190,9 +196,12 @@ def run_technical_backtest(
         trades = []
         daily_ret = []
 
-        for dt in closes.index:
+        dates = list(closes.index)
+        for idx, dt in enumerate(dates):
             price = closes.loc[dt]
-            fval = fv.get(dt) if dt in fv.index else None
+            signal_dt = dates[idx - 1] if idx > 0 else None
+            fval = fv.get(signal_dt) if signal_dt is not None and signal_dt in fv.index else None
+            exec_price = df.set_index("trade_date")["open"].get(dt) if "open" in df.columns else price
 
             if fval is not None and pd.notna(fval):
                 # 开仓信号
@@ -208,19 +217,19 @@ def run_technical_backtest(
 
                 date_str = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)
 
-                if should_open and position == 0 and price > 0:
-                    shares = int(cash / price / 100) * 100
+                if should_open and position == 0 and exec_price > 0:
+                    shares = int(cash / exec_price / 100) * 100
                     if shares > 0:
-                        cash -= shares * price
+                        cash -= shares * exec_price * (1 + 0.0003)
                         position = shares
                         trades.append({"date": date_str, "code": ts_code,
-                                       "action": "buy", "price": float(price),
+                                       "action": "buy", "price": float(exec_price),
                                        "shares": shares})
 
                 elif should_close and position > 0:
-                    cash += position * price
+                    cash += position * exec_price * (1 - 0.0003 - 0.001)
                     trades.append({"date": date_str, "code": ts_code,
-                                   "action": "sell", "price": float(price),
+                                   "action": "sell", "price": float(exec_price),
                                    "shares": position})
                     position = 0
 

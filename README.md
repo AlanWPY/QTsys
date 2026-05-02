@@ -1,5 +1,9 @@
 # QTsys
 
+## 推荐启动方式：桌面启动器
+
+Windows 用户可在项目根目录双击 `QTsys启动器.exe`。启动器支持一键启动后端并打开 WebUI、检查 GitHub 更新、保存并测试 Tushare Token、AI 大模型配置和 MySQL 缓存配置。若本地未生成 EXE，可执行 `python scripts/build_launcher_exe.py` 重新构建；详细说明见 `docs/launcher_guide.md`。
+
 QTsys 是一个面向量化研究、策略生成、真实数据回测、因子评估与组合分析的一体化本地系统。系统围绕“设置数据源 → 编写/生成策略 → 回测验证 → 因子研究 → 组合决策”这一完整研究链路设计，适合个人研究者和策略开发者持续迭代使用。
 
 ## 系统亮点
@@ -123,7 +127,28 @@ python -m venv .venv
 
 - `http://127.0.0.1:8000`
 
+### 3. 运行健康检查
+
+发布或排查问题前可执行：
+
+```bash
+.\.venv\Scripts\python.exe scripts/health_check.py
+```
+
+该脚本会依次检查 Python 语法、敏感信息、反未来函数约束、核心后端接口和前端页面是否可正常打开。
+
 ## 推荐使用顺序
+
+## 回测真实性口径
+
+为避免“曲线好看但不可复现”的问题，系统统一采用以下口径：
+
+- 策略回测：策略在交易日 `T` 使用截至 `T` 的历史数据形成信号，订单在下一交易日开盘按滑点、手续费、印花税和成交量限制撮合。
+- 系统股票池：回测使用回测起点之前可获得的指数成分股快照，不使用当前最新成分股回测历史区间，降低幸存者偏差。
+- 因子表达式：单股票时间序列表达式中的 `rank/cs_rank/cs_zscore` 不允许使用全样本未来数据；需要横截面排序时由评估/选股流程在同一交易日股票池内完成。
+- 因子看板：Alpha191 分组收益使用信号日后一交易日开盘建仓、下一调仓执行日开盘调仓，并扣除交易成本。
+- 因子挖掘：新版本采用 `Institutional Factor Lab v4`，候选因子必须通过真实行情、embargo walk-forward 样本外验证、下一交易日开盘执行、统计显著性、DSR/PBO 过拟合控制、多重检验惩罚、基准超额收益、容量评分、稳健性评分和 A 股交易约束检查；历史挖掘结果若生成于旧版本，必须重新严格验证后再使用。
+- 自动检查：发布前建议运行 `.\.venv\Scripts\python.exe scripts/health_check.py`，或单独运行 `scripts/validate_factor_no_lookahead.py` 与 `scripts/security_check.py`。
 
 ### 第一步：完成基础配置
 
@@ -239,6 +264,7 @@ def handle_data(context):
 - 如需在新机器上继续使用原有密文配置，请同时迁移主密钥，或设置环境变量 `QTSYS_MASTER_KEY`
 - 若主密钥丢失，已保存的密文配置将无法解密，需要重新在“设置”页填写
 - 发布前可执行 `.\.venv\Scripts\python.exe scripts/security_check.py` 扫描当前工作区中的疑似明文密钥
+- GitHub 发布前建议执行 `.\.venv\Scripts\python.exe scripts/health_check.py`，并确认 `runtime/`、`logs/`、`tmp/`、`data/cache/*.pkl` 等本地运行产物未进入提交列表
 
 ## 目录结构
 
@@ -262,6 +288,7 @@ def handle_data(context):
 - `docs/project_structure.md`
 - `docs/factor_board_guide.md`
 - `docs/ai_strategy_assistant.md`
+- `docs/validation_report.md`
 - `docs/delivery_summary.md`
 
 ## 常见问题

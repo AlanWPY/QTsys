@@ -37,9 +37,17 @@ Thumbs.db
 *.bak
 *.spec
 .qtsys_dbmanager.json
+build/
+dist/
+QTsys启动器.exe
 
 # Runtime artifacts
 runtime/
 tmp/*
 !tmp/.gitkeep
 static/debug/
+test-results/
+playwright-report/
+*.trace.zip
+data/cache/*.pkl
+runtime/secrets/

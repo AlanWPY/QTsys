@@ -2,6 +2,8 @@
 import sys
 import os
 import asyncio
+import importlib.metadata
+import platform
 from contextlib import asynccontextmanager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -11,11 +13,13 @@ from logging_config import setup_logging, get_logger
 setup_logging()
 logger = get_logger("qtsys.main")
 
-from config import VERSION
+from config import VERSION, DB_PATH, CACHE_DIR
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database.connection import init_db
+from sqlalchemy import text
+from database.connection import init_db, get_session_factory
+from services.settings_service import get_or_create_settings
 from api.routes_settings import router as settings_router
 from api.routes_data import router as data_router
 from api.routes_strategy import router as strategy_router
@@ -130,6 +134,82 @@ async def get_version():
     """获取系统版本和本地commit信息（不联网）"""
     from updater import get_local_info
     return get_local_info()
+
+
+@app.get("/api/system/health")
+async def get_system_health():
+    """Return a non-sensitive runtime health snapshot."""
+    db_ok = False
+    db_error = ""
+    settings_state = {
+        "has_tushare_token": False,
+        "has_llm_api_key": False,
+        "has_mysql_config": False,
+        "use_mysql_cache": False,
+    }
+    table_counts = {}
+    try:
+        async with get_session_factory()() as db:
+            await db.execute(text("SELECT 1"))
+            db_ok = True
+            settings = await get_or_create_settings(db)
+            settings_state = {
+                "has_tushare_token": bool(settings.tushare_token),
+                "has_llm_api_key": bool(settings.llm_api_key),
+                "has_mysql_config": bool(settings.mysql_host and settings.mysql_user and settings.mysql_database),
+                "use_mysql_cache": bool(settings.use_mysql),
+            }
+            for table_name in ("strategies", "backtest_results", "factors", "factor_mining_sessions"):
+                try:
+                    count = (await db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))).scalar_one()
+                    table_counts[table_name] = int(count or 0)
+                except Exception as exc:
+                    table_counts[table_name] = f"unavailable: {exc}"
+    except Exception as exc:
+        db_error = str(exc)
+
+    def _pkg_version(package_name: str) -> str:
+        try:
+            return importlib.metadata.version(package_name)
+        except Exception:
+            return "missing"
+
+    try:
+        from services.factor_mining_service import MINING_MANAGER
+        mining_state = MINING_MANAGER.snapshot()
+    except Exception as exc:
+        mining_state = {"running": False, "error": str(exc)}
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "version": VERSION,
+        "python": platform.python_version(),
+        "database": {
+            "ok": db_ok,
+            "type": "sqlite",
+            "path": DB_PATH,
+            "error": db_error,
+            "table_counts": table_counts,
+        },
+        "settings": settings_state,
+        "dependencies": {
+            "fastapi": _pkg_version("fastapi"),
+            "sqlalchemy": _pkg_version("sqlalchemy"),
+            "pandas": _pkg_version("pandas"),
+            "numpy": _pkg_version("numpy"),
+            "tushare": _pkg_version("tushare"),
+        },
+        "runtime": {
+            "cache_dir": CACHE_DIR,
+            "news_refresh_running": bool(_news_refresh_task and not _news_refresh_task.done()),
+            "factor_mining": mining_state,
+        },
+        "checks": [
+            "No secrets are returned by this endpoint.",
+            "Backtests use T-day signals and next-trading-day open execution.",
+            "System universes are resolved as of the backtest start date.",
+        ],
+    }
 
 
 @app.post("/api/system/check_update")

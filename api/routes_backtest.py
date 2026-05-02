@@ -115,9 +115,11 @@ async def list_results(db: AsyncSession = Depends(get_db)):
             "universe": normalize_universe_label(r.universe),
             "initial_cash": r.initial_cash,
             "final_value": r.final_value,
-            "metrics": r.metrics,
-            "created_at": r.created_at.isoformat() if r.created_at else "",
-        })
+        "metrics": r.metrics,
+        "data_coverage": (r.metrics or {}).get("data_coverage", {}),
+        "validation_note": (r.metrics or {}).get("validation_note", ""),
+        "created_at": r.created_at.isoformat() if r.created_at else "",
+    })
         for r in results
     ]
 
@@ -139,6 +141,9 @@ async def get_result(result_id: int, db: AsyncSession = Depends(get_db)):
         "initial_cash": r.initial_cash,
         "final_value": r.final_value,
         "metrics": r.metrics,
+        "data_coverage": (r.metrics or {}).get("data_coverage", {}),
+        "execution_model": (r.metrics or {}).get("execution_model", {}),
+        "validation_note": (r.metrics or {}).get("validation_note", ""),
         "equity_curve": r.equity_curve,
         "trades": r.trades,
         "daily_returns": r.daily_returns,
@@ -190,6 +195,7 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db)):
         universe_name=req.universe_name,
         custom_pool_id=req.custom_pool_id,
         stock_items=req.stock_items,
+        as_of_date=req.start_date,
     )
 
     results = await asyncio.to_thread(
@@ -257,6 +263,7 @@ async def walk_forward_validate(req: WalkForwardRequest, db: AsyncSession = Depe
         universe_name=req.universe_name,
         custom_pool_id=req.custom_pool_id,
         stock_items=req.stock_items,
+        as_of_date=req.start_date,
     )
 
     wf_result = await asyncio.to_thread(

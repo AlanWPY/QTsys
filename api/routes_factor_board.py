@@ -451,7 +451,10 @@ async def get_latest_results():
         db.close()
         return results.to_dict("records")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        with analysis_status_lock:
+            analysis_status["message"] = f"因子看板数据库不可用：{exc}"
+            analysis_status["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        return []
 
 
 @router.post("/stop_analysis")

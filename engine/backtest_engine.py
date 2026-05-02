@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import traceback
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -38,6 +39,13 @@ DAILY_BASIC_FIELDS = {
     "total_mv",
     "circ_mv",
 }
+
+
+def _warmup_start_date(start_date: str, days: int = 540) -> str:
+    try:
+        return (datetime.strptime(str(start_date), "%Y%m%d") - timedelta(days=days)).strftime("%Y%m%d")
+    except Exception:
+        return start_date
 
 
 class BacktestEngine:
@@ -470,6 +478,36 @@ class BacktestEngine:
         merged["pre_close"] = merged["pre_close"].fillna(merged["close"])
         return merged.sort_values("trade_date").reset_index(drop=True)
 
+    def _build_data_coverage_summary(self, requested_universe: list[str], daily_basic_fields: list[str]) -> dict:
+        requested = list(requested_universe or [])
+        loaded = sorted(self.all_data.keys())
+        missing = sorted(set(requested) - set(loaded))
+        rows_by_symbol = {code: int(len(self.all_data.get(code, []))) for code in loaded}
+        return {
+            "requested_stock_count": len(requested),
+            "loaded_stock_count": len(loaded),
+            "missing_stock_count": len(missing),
+            "missing_stocks": missing[:50],
+            "trade_date_count": len(self.trade_dates),
+            "start_date": self.trade_dates[0] if self.trade_dates else "",
+            "end_date": self.trade_dates[-1] if self.trade_dates else "",
+            "daily_basic_fields": daily_basic_fields,
+            "min_rows_per_stock": min(rows_by_symbol.values()) if rows_by_symbol else 0,
+            "max_rows_per_stock": max(rows_by_symbol.values()) if rows_by_symbol else 0,
+        }
+
+    def _build_execution_model_summary(self) -> dict:
+        return {
+            "signal_timing": "策略在交易日 T 使用截至 T 的历史数据形成信号",
+            "execution_timing": "订单在下一交易日开盘撮合",
+            "market_rules": "A股100股整数手、T+1可卖、涨跌停和成交量限制",
+            "commission_rate": self.broker.commission_rate,
+            "stamp_tax_rate": self.broker.stamp_tax_rate,
+            "slippage": self.broker.slippage,
+            "max_position_pct": self.max_position_pct,
+            "max_drawdown_limit": self.max_drawdown_limit,
+        }
+
     def run(
         self,
         universe: list[str],
@@ -483,7 +521,7 @@ class BacktestEngine:
     ) -> dict:
         self.reset()
         self.universe = universe
-        self.factor_run_start = start_date
+        self.factor_run_start = _warmup_start_date(start_date)
         self.factor_run_end = end_date
         self.set_factor_catalog(factor_catalog)
 
@@ -559,6 +597,8 @@ class BacktestEngine:
             "benchmark_curve": self._build_benchmark_curve(),
             "logs": self.log_messages[-500:],
             "final_value": round(self.portfolio_value, 2),
+            "data_coverage": self._build_data_coverage_summary(universe, daily_basic_fields),
+            "execution_model": self._build_execution_model_summary(),
         }
 
     def _build_benchmark_curve(self) -> list[dict]:

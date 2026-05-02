@@ -62,6 +62,30 @@ select.input { cursor: pointer; }
 .btn-danger:hover { text-decoration: underline; }
 .btn-link { color: var(--accent-light); background: none; border: none; font-size: 13px; cursor: pointer; padding: 0; }
 .btn-link:hover { text-decoration: underline; }
+.health-strip {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    min-height: 34px; padding: 6px 24px; border-bottom: 1px solid rgba(148,163,184,0.10);
+    font-size: 12px; color: var(--text-300); background: rgba(15,23,42,0.72);
+}
+.health-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--text-500); box-shadow: 0 0 0 3px rgba(148,163,184,0.10); }
+.health-ok .health-dot { background: var(--profit); box-shadow: 0 0 0 3px rgba(34,197,94,0.14); }
+.health-warn .health-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.16); }
+.health-checking .health-dot { background: var(--accent-light); animation: pulse 1.2s ease-in-out infinite; }
+.empty-state { text-align: center; padding: 36px 18px; color: var(--text-400); border: 1px dashed rgba(148,163,184,0.18); border-radius: 16px; background: rgba(15,23,42,0.35); }
+.empty-state-icon { width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 14px; display: grid; place-items: center; background: rgba(99,102,241,0.12); color: var(--accent-light); font-weight: 800; }
+.empty-state-title { color: var(--text-100); font-weight: 700; margin-bottom: 6px; }
+.empty-state-desc { font-size: 12px; line-height: 1.7; }
+.app-fallback { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, rgba(99,102,241,0.22), transparent 42%), var(--bg-900); }
+.app-fallback-card { max-width: 760px; width: 100%; padding: 24px; border-radius: 18px; background: var(--bg-700); border: 1px solid rgba(239,68,68,0.24); box-shadow: 0 22px 60px rgba(2,6,23,0.42); }
+.app-fallback-title { font-size: 20px; font-weight: 800; color: #fecaca; }
+.app-fallback-copy { margin: 8px 0 14px; color: var(--text-300); line-height: 1.7; }
+.app-fallback pre { white-space: pre-wrap; max-height: 260px; overflow: auto; padding: 12px; border-radius: 12px; background: var(--bg-900); color: #fecaca; margin-bottom: 14px; }
+.trust-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.trust-card { padding: 12px 14px; border-radius: 14px; background: rgba(15,23,42,0.58); border: 1px solid rgba(148,163,184,0.10); }
+.trust-label { font-size: 11px; color: var(--text-500); text-transform: uppercase; letter-spacing: 0.05em; }
+.trust-value { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--text-100); line-height: 1.5; }
+.trust-note { margin-top: 10px; font-size: 12px; color: var(--text-400); line-height: 1.7; }
+@keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
 
 /* ===== Grid ===== */
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -364,6 +388,10 @@ tr:hover td { background: var(--bg-600); }
     .strategy-ai-panel { grid-column: 1 / -1; position: static; max-height: none; }
 }
 @media (max-width: 960px) {
+    .header { height: auto; min-height: 56px; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 16px; }
+    .nav { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+    .main { padding: 16px; }
+    .trust-grid { grid-template-columns: 1fr; }
     .strategy-layout { grid-template-columns: 1fr; }
     .strategy-sidebar, .strategy-ai-panel { position: static; max-height: none; }
     .strategy-form-grid { grid-template-columns: 1fr; }
@@ -456,6 +484,19 @@ tr:hover td { background: var(--bg-600); }
 .factor-rank-toolbar { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
 .factor-rank-toolbar .field { min-width: 140px; }
 .factor-rank-toolbar .wide { min-width: 220px; }
+.factor-code-view {
+    max-height: min(68vh, 760px);
+    overflow: auto;
+    white-space: pre;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(2, 6, 23, 0.72);
+    color: #dbeafe;
+    font-family: Consolas, Monaco, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.65;
+}
 @media (max-width: 980px) { .factor-rank-grid { grid-template-columns: 1fr; } }
 
 /* ===== 新闻页面 ===== */
@@ -1073,7 +1114,7 @@ body::after {
 .factor-mining-copy { color: var(--text-400); font-size: 13px; line-height: 1.7; max-width: 860px; }
 .factor-mining-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .factor-mining-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.factor-mining-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.factor-mining-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
 .factor-mining-kpi { padding: 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.68); border: 1px solid rgba(148, 163, 184, 0.1); }
 .factor-mining-kpi-label { color: var(--text-500); font-size: 11px; margin-bottom: 6px; }
 .factor-mining-kpi-value { color: #f8fafc; font-size: 18px; font-weight: 800; }
@@ -1086,6 +1127,8 @@ body::after {
 .factor-mining-expression { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(2, 6, 23, 0.5); color: #cbd5e1; font-size: 12px; font-family: Consolas, Monaco, monospace; overflow-x: auto; white-space: nowrap; }
 .factor-mining-mini-chart { height: 120px; margin-top: 10px; }
 .factor-mining-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 8px; font-size: 11px; background: rgba(99, 102, 241, 0.14); color: #c7d2fe; }
+.factor-mining-warning { margin-top: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.10); color: #fbbf24; font-size: 12px; line-height: 1.5; }
+.factor-mining-actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .factor-mining-empty { padding: 36px 16px; text-align: center; color: var(--text-500); border: 1px dashed rgba(148, 163, 184, 0.18); border-radius: 8px; background: rgba(15, 23, 42, 0.38); }
 .factor-mining-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .factor-mining-metric { padding: 8px 9px; border-radius: 8px; background: rgba(15,23,42,0.54); border: 1px solid rgba(148,163,184,0.08); }
@@ -1196,18 +1239,63 @@ body::after {
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const { ComposedChart, AreaChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, Cell } = Recharts;
 
-const _rejectHttp = (r) => r.text().then(t => { try { return Promise.reject(JSON.parse(t)); } catch(_) { return Promise.reject({ detail: 'HTTP ' + r.status }); } });
+function normalizeApiError(payload, fallback) {
+    const detail = payload && payload.detail !== undefined ? payload.detail : payload;
+    if (Array.isArray(detail)) {
+        return detail.map(item => item.msg || item.message || JSON.stringify(item)).join('；') || fallback;
+    }
+    if (detail && typeof detail === 'object') {
+        return detail.message || detail.error || JSON.stringify(detail);
+    }
+    return String(detail || fallback || '请求失败');
+}
+
+function apiRequest(url, options = {}) {
+    const timeoutMs = options.timeoutMs || 180000;
+    const controller = window.AbortController ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const fetchOptions = { ...options };
+    delete fetchOptions.timeoutMs;
+    if (controller) fetchOptions.signal = controller.signal;
+    return fetch(url, fetchOptions)
+        .then(async r => {
+            const text = await r.text();
+            let payload = null;
+            if (text) {
+                try { payload = JSON.parse(text); } catch (_) { payload = text; }
+            }
+            if (!r.ok) {
+                const err = new Error(normalizeApiError(payload, 'HTTP ' + r.status));
+                err.detail = normalizeApiError(payload, 'HTTP ' + r.status);
+                err.status = r.status;
+                err.payload = payload;
+                throw err;
+            }
+            return payload === null ? {} : payload;
+        })
+        .catch(err => {
+            if (err && err.name === 'AbortError') {
+                const timeoutErr = new Error('请求超时，请检查后端是否仍在运行，或稍后重试');
+                timeoutErr.detail = timeoutErr.message;
+                throw timeoutErr;
+            }
+            if (err && !err.detail) err.detail = err.message || '网络请求失败';
+            throw err;
+        })
+        .finally(() => { if (timer) clearTimeout(timer); });
+}
+
 const api = {
-    get: (url) => fetch(url).then(r => r.ok ? r.json() : _rejectHttp(r)),
-    post: (url, data) => fetch(url, {
+    get: (url, options = {}) => apiRequest(url, { method: 'GET', timeoutMs: 60000, ...options }),
+    post: (url, data, options = {}) => apiRequest(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    }).then(r => r.ok ? r.json() : _rejectHttp(r)),
-    put: (url, data) => fetch(url, {
+        body: JSON.stringify(data), ...options
+    }),
+    put: (url, data, options = {}) => apiRequest(url, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    }).then(r => r.ok ? r.json() : _rejectHttp(r)),
-    remove: (url) => fetch(url, { method: 'DELETE' }).then(r => r.ok ? r.json() : _rejectHttp(r)),
+        body: JSON.stringify(data), ...options
+    }),
+    remove: (url, options = {}) => apiRequest(url, { method: 'DELETE', timeoutMs: 60000, ...options }),
 };
 
 function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-8') {
@@ -1511,6 +1599,65 @@ const METRIC_LABELS = {
 function Toast({ message, type, onClose }) {
     useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
     return <div className={`toast toast-${type}`}>{message}</div>;
+}
+
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error) {
+        return { error };
+    }
+    componentDidCatch(error, info) {
+        console.error('QTsys UI error', error, info);
+    }
+    render() {
+        if (!this.state.error) return this.props.children;
+        const message = this.state.error && (this.state.error.message || String(this.state.error));
+        return (
+            <div className="app-fallback">
+                <div className="app-fallback-card">
+                    <div className="app-fallback-title">页面组件异常</div>
+                    <div className="app-fallback-copy">系统已拦截前端错误，后端服务不会因此停止。请复制错误信息并查看日志。</div>
+                    <pre>{message}</pre>
+                    <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                        <button className="btn btn-primary" onClick={() => window.location.reload()}>刷新页面</button>
+                        <button className="btn btn-secondary" onClick={() => navigator.clipboard && navigator.clipboard.writeText(message)}>复制错误</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+}
+
+function EmptyState({ title = '暂无数据', description = '完成配置或运行任务后，这里会显示结果。', action }) {
+    return (
+        <div className="empty-state">
+            <div className="empty-state-icon">∅</div>
+            <div className="empty-state-title">{title}</div>
+            <div className="empty-state-desc">{description}</div>
+            {action || null}
+        </div>
+    );
+}
+
+function SystemHealthStrip({ health, onRefresh }) {
+    const status = health && health.status ? health.status : 'checking';
+    const dbOk = !!(health && health.database && health.database.ok);
+    const settings = (health && health.settings) || {};
+    const mining = (((health || {}).runtime || {}).factor_mining) || {};
+    const cls = status === 'ok' && dbOk ? 'health-ok' : status === 'checking' ? 'health-checking' : 'health-warn';
+    return (
+        <div className={'health-strip ' + cls}>
+            <span className="health-dot" />
+            <span>{status === 'checking' ? '系统健康检查中' : dbOk ? '系统运行正常' : '系统降级运行'}</span>
+            <span>数据源：{settings.has_tushare_token ? 'Tushare 已配置' : 'Tushare 未配置'}</span>
+            <span>AI：{settings.has_llm_api_key ? '已配置' : '未配置'}</span>
+            {mining.running ? <span>因子挖掘运行中：{mining.active_session_id}</span> : <span>后台挖掘空闲</span>}
+            <button className="btn-link" onClick={onRefresh}>刷新</button>
+        </div>
+    );
 }
 
 /* ===== CodeEditor ===== */
@@ -3598,6 +3745,7 @@ function BacktestResultView({ result, tab, setTab, logs, onOpenHistory }) {
                     </div>
                 </div>
             ) : null}
+            <BacktestTrustPanel result={result} />
             <BacktestInsightPanel result={result} />
             <div className="card" style={{padding:0}}>
                 <div className="tabs" style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingRight:12}}>
@@ -5342,7 +5490,7 @@ function FactorCreatePanel({ newName, setNewName, newExpr, setNewExpr, newDesc, 
     );
 }
 
-function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor, openStrategyFromFactor, createBacktestFromFactor }) {
+function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, setEvalStart, evalEnd, setEvalEnd, evalGroups, setEvalGroups, forwardDays, setForwardDays, loading, evaluateFactor, openStrategyFromFactor, createBacktestFromFactor, openFactorCode, openJoinQuantCode }) {
     const POOL_PRESETS = {
         '': '',
         '沪深300': '000001.SZ,000002.SZ,600036.SH,601318.SH,600519.SH,000858.SZ,601166.SH,600276.SH,000333.SZ,002415.SZ',
@@ -5399,7 +5547,38 @@ function FactorEvalPanel({ selected, evalUniverse, setEvalUniverse, evalStart, s
                 <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => createBacktestFromFactor && createBacktestFromFactor(selected)}>
                     {'\u751f\u6210\u56e0\u5b50\u7b56\u7565\u5e76\u56de\u6d4b'}
                 </button>
+                <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => openFactorCode && openFactorCode(selected)}>
+                    {'\u67e5\u770b\u56e0\u5b50\u4ee3\u7801'}
+                </button>
+                <button className="btn btn-secondary mt-2" style={{marginTop:0}} onClick={() => openJoinQuantCode && openJoinQuantCode(selected)}>
+                    {'\u751f\u6210\u56de\u6d4b\u4ee3\u7801'}
+                </button>
             </div>
+        </div>
+    );
+}
+
+function BacktestTrustPanel({ result }) {
+    const coverage = (result && result.data_coverage) || (result && result.metrics && result.metrics.data_coverage) || {};
+    const execution = (result && result.execution_model) || (result && result.metrics && result.metrics.execution_model) || {};
+    const note = (result && result.validation_note) || (result && result.metrics && result.metrics.validation_note) || '';
+    const hasCoverage = coverage && Object.keys(coverage).length > 0;
+    const missing = Number(coverage.missing_stock_count || 0);
+    return (
+        <div className="card" style={{padding:'14px 16px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:10}}>
+                <div>
+                    <div style={{fontSize:12,color:'var(--text-500)',textTransform:'uppercase',letterSpacing:'0.06em'}}>可信度摘要</div>
+                    <div style={{fontSize:15,fontWeight:800,color:'var(--text-100)',marginTop:4}}>{hasCoverage ? '真实行情 · 下一交易日执行 · 股票池历史快照' : '旧版本结果 · 建议重新验证'}</div>
+                </div>
+                {!hasCoverage ? <span className="backtest-badge" style={{color:'#fed7aa',borderColor:'rgba(251,146,60,0.25)',background:'rgba(251,146,60,0.10)'}}>请重新运行</span> : missing > 0 ? <span className="backtest-badge" style={{color:'#fed7aa',borderColor:'rgba(251,146,60,0.25)',background:'rgba(251,146,60,0.10)'}}>缺失 {missing} 只</span> : <span className="backtest-badge">数据覆盖正常</span>}
+            </div>
+            <div className="trust-grid">
+                <div className="trust-card"><div className="trust-label">股票池</div><div className="trust-value">{coverage.universe_label || result.universe || '-'}<br/>快照：{coverage.universe_as_of_date || '按输入列表'}</div></div>
+                <div className="trust-card"><div className="trust-label">行情覆盖</div><div className="trust-value">{coverage.loaded_stock_count ?? '-'} / {coverage.requested_stock_count ?? '-'} 只<br/>{coverage.trade_date_count ?? '-'} 个交易日</div></div>
+                <div className="trust-card"><div className="trust-label">交易口径</div><div className="trust-value">{execution.execution_timing || '下一交易日开盘执行'}<br/>滑点 {execution.slippage ?? '-'} / 佣金 {execution.commission_rate ?? '-'}</div></div>
+            </div>
+            <div className="trust-note">{hasCoverage ? (note || '信号只使用当日及以前数据，订单下一交易日执行；系统股票池按回测起点前成分股快照解析。') : '该结果缺少新版数据覆盖摘要，可能生成于旧口径。为了避免误用高估曲线，建议用当前版本重新运行回测。'}</div>
         </div>
     );
 }
@@ -6451,6 +6630,22 @@ function FactorPage({ showToast, openStrategyWorkspace, openBacktestWithStrategy
     const [evalResult, setEvalResult] = useState(null);
     const [evalTab, setEvalTab] = useState('ic');
     const [loading, setLoading] = useState(false);
+    const [factorCodeModal, setFactorCodeModal] = useState(null);
+    const [factorCodeLoading, setFactorCodeLoading] = useState(false);
+    const [joinQuantConfig, setJoinQuantConfig] = useState({
+        index_symbol: '000300.XSHG',
+        benchmark: '000300.XSHG',
+        top_n: 10,
+        rebalance_days: 5,
+        lookback: 260,
+        high_is_better: true,
+        target_exposure: 0.95,
+        max_position_pct: 0.12,
+        min_trade_lot: 100,
+        stop_loss_pct: 0,
+        take_profit_pct: 0,
+        include_star_market: false,
+    });
     const [mineTab, setMineTab] = useState('none');
 
     // 新建因子表单
@@ -6628,6 +6823,73 @@ function FactorPage({ showToast, openStrategyWorkspace, openBacktestWithStrategy
         }
     };
 
+    const copyFactorCode = async () => {
+        const code = factorCodeModal && factorCodeModal.code ? factorCodeModal.code : '';
+        if (!code) return;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(code);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+            showToast('\u56e0\u5b50\u4ee3\u7801\u5df2\u590d\u5236', 'success');
+        } catch (e) {
+            showToast('\u590d\u5236\u5931\u8d25\uff0c\u8bf7\u624b\u52a8\u9009\u4e2d\u4ee3\u7801\u590d\u5236', 'error');
+        }
+    };
+
+    const openFactorCode = async (factor) => {
+        if (!factor) {
+            showToast('\u8bf7\u5148\u9009\u62e9\u56e0\u5b50', 'error');
+            return;
+        }
+        setFactorCodeModal({ title: '\u56e0\u5b50\u8ba1\u7b97\u4ee3\u7801', name: factor.name, expression: factor.expression, code: '' });
+        setFactorCodeLoading(true);
+        try {
+            const res = await api.get(`/api/factors/${factor.id}/code`);
+            setFactorCodeModal({ ...res, title: '\u56e0\u5b50\u8ba1\u7b97\u4ee3\u7801' });
+        } catch (e) {
+            setFactorCodeModal(null);
+            showToast((e && e.detail) || '\u52a0\u8f7d\u56e0\u5b50\u4ee3\u7801\u5931\u8d25', 'error');
+        }
+        setFactorCodeLoading(false);
+    };
+
+    const openJoinQuantCode = async (factor) => {
+        if (!factor) {
+            showToast('\u8bf7\u5148\u9009\u62e9\u56e0\u5b50', 'error');
+            return;
+        }
+        setFactorCodeModal({ title: '\u805a\u5bbd\u56de\u6d4b\u4ee3\u7801', name: factor.name, expression: factor.expression, code: '' });
+        setFactorCodeLoading(true);
+        try {
+            const res = await api.post(`/api/factors/${factor.id}/joinquant_code`, {
+                ...joinQuantConfig,
+                top_n: Number(joinQuantConfig.top_n || 10),
+                rebalance_days: Number(joinQuantConfig.rebalance_days || 5),
+                lookback: Number(joinQuantConfig.lookback || 260),
+                target_exposure: Number(joinQuantConfig.target_exposure || 0.95),
+                max_position_pct: Number(joinQuantConfig.max_position_pct || 0.12),
+                min_trade_lot: Number(joinQuantConfig.min_trade_lot || 100),
+                stop_loss_pct: Number(joinQuantConfig.stop_loss_pct || 0),
+                take_profit_pct: Number(joinQuantConfig.take_profit_pct || 0),
+                include_star_market: !!joinQuantConfig.include_star_market,
+            });
+            setFactorCodeModal({ ...res, title: '\u805a\u5bbd\u56de\u6d4b\u4ee3\u7801' });
+        } catch (e) {
+            setFactorCodeModal(null);
+            showToast((e && e.detail) || '\u751f\u6210\u805a\u5bbd\u56de\u6d4b\u4ee3\u7801\u5931\u8d25', 'error');
+        }
+        setFactorCodeLoading(false);
+    };
+
     return (
         <div className="fade-in factor-layout">
             <FactorSidebar factors={factors} selected={selected} setSelected={(f) => { setSelected(f); setEvalResult(null); }}
@@ -6639,7 +6901,40 @@ function FactorPage({ showToast, openStrategyWorkspace, openBacktestWithStrategy
                     evalStart={evalStart} setEvalStart={setEvalStart} evalEnd={evalEnd} setEvalEnd={setEvalEnd}
                     evalGroups={evalGroups} setEvalGroups={setEvalGroups} forwardDays={forwardDays} setForwardDays={setForwardDays}
                     loading={loading} evaluateFactor={evaluateFactor} openStrategyFromFactor={openStrategyFromFactor}
-                    createBacktestFromFactor={createBacktestFromFactor} />}
+                    createBacktestFromFactor={createBacktestFromFactor} openFactorCode={openFactorCode} openJoinQuantCode={openJoinQuantCode} />}
+                {selected && (
+                    <div className="card" style={{padding:14}}>
+                        <div className="card-title" style={{marginBottom:8}}>{'\u805a\u5bbd\u56de\u6d4b\u4ee3\u7801\u53c2\u6570'}</div>
+                        <div className="text-xs text-muted" style={{marginBottom:10}}>
+                            {'\u8fd9\u4e9b\u53c2\u6570\u4f1a\u5199\u5165\u805a\u5bbd\u7b56\u7565\u4ee3\u7801\uff1b\u4ee3\u7801\u5df2\u6309 A \u80a1 100 \u80a1\u6574\u6570\u500d\u4e0b\u5355\uff0c\u9ed8\u8ba4\u8fc7\u6ee4\u79d1\u521b\u677f\uff0c\u907f\u514d\u5c0f\u989d\u59d4\u6258\u548c\u79d1\u521b\u677f\u5e02\u4ef7\u5355\u9650\u4ef7\u62a5\u9519\u3002'}
+                        </div>
+                        <div className="factor-rank-toolbar">
+                            <div className="field">
+                                <label className="label">{'\u80a1\u7968\u6c60'}</label>
+                                <select className="input" value={joinQuantConfig.index_symbol} onChange={e => setJoinQuantConfig(prev => ({...prev, index_symbol: e.target.value, benchmark: e.target.value}))}>
+                                    <option value="000300.XSHG">{'\u6caa\u6df1300'}</option>
+                                    <option value="000016.XSHG">{'\u4e0a\u8bc150'}</option>
+                                    <option value="000905.XSHG">{'\u4e2d\u8bc1500'}</option>
+                                    <option value="000852.XSHG">{'\u4e2d\u8bc11000'}</option>
+                                    <option value="000001.XSHG">{'\u4e0a\u8bc1\u6307\u6570'}</option>
+                                    <option value="399001.XSHE">{'\u6df1\u8bc1\u6210\u6307'}</option>
+                                </select>
+                            </div>
+                            <div className="field"><label className="label">{'\u6301\u4ed3\u6570'}</label><input className="input" type="number" min="1" value={joinQuantConfig.top_n} onChange={e => setJoinQuantConfig(prev => ({...prev, top_n: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u8c03\u4ed3\u95f4\u9694'}</label><input className="input" type="number" min="1" value={joinQuantConfig.rebalance_days} onChange={e => setJoinQuantConfig(prev => ({...prev, rebalance_days: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u5386\u53f2\u7a97\u53e3'}</label><input className="input" type="number" min="60" value={joinQuantConfig.lookback} onChange={e => setJoinQuantConfig(prev => ({...prev, lookback: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u56e0\u5b50\u65b9\u5411'}</label><select className="input" value={joinQuantConfig.high_is_better ? 'high' : 'low'} onChange={e => setJoinQuantConfig(prev => ({...prev, high_is_better: e.target.value === 'high'}))}><option value="high">{'\u56e0\u5b50\u503c\u8d8a\u5927\u8d8a\u597d'}</option><option value="low">{'\u56e0\u5b50\u503c\u8d8a\u5c0f\u8d8a\u597d'}</option></select></div>
+                            <div className="field"><label className="label">{'\u603b\u4ed3\u4f4d'}</label><input className="input" type="number" step="0.05" min="0" max="1" value={joinQuantConfig.target_exposure} onChange={e => setJoinQuantConfig(prev => ({...prev, target_exposure: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u5355\u80a1\u4e0a\u9650'}</label><input className="input" type="number" step="0.01" min="0" max="1" value={joinQuantConfig.max_position_pct} onChange={e => setJoinQuantConfig(prev => ({...prev, max_position_pct: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u6b62\u635f'}</label><input className="input" type="number" step="0.01" min="0" value={joinQuantConfig.stop_loss_pct} onChange={e => setJoinQuantConfig(prev => ({...prev, stop_loss_pct: e.target.value}))} /></div>
+                            <div className="field"><label className="label">{'\u6b62\u76c8'}</label><input className="input" type="number" step="0.01" min="0" value={joinQuantConfig.take_profit_pct} onChange={e => setJoinQuantConfig(prev => ({...prev, take_profit_pct: e.target.value}))} /></div>
+                            <label className="field" style={{display:'flex',alignItems:'center',gap:8,minWidth:180,paddingBottom:8}}>
+                                <input type="checkbox" checked={!!joinQuantConfig.include_star_market} onChange={e => setJoinQuantConfig(prev => ({...prev, include_star_market: e.target.checked}))} />
+                                <span className="label" style={{margin:0}}>{'\u5305\u542b\u79d1\u521b\u677f'}</span>
+                            </label>
+                        </div>
+                    </div>
+                )}
                 {evalResult && <FactorResultView result={evalResult} tab={evalTab} setTab={setEvalTab}
                     onGenerateStrategy={() => openStrategyFromFactor(selected, evalResult)} />}
                 {selected && <FactorCrossSectionPanel selected={selected} showToast={showToast} />}
@@ -6649,6 +6944,29 @@ function FactorPage({ showToast, openStrategyWorkspace, openBacktestWithStrategy
                     llmCount={llmCount} setLlmCount={setLlmCount} llmHint={llmHint} setLlmHint={setLlmHint}
                     llmRunning={llmRunning} runLLM={runLLM} />
             </div>
+            {factorCodeModal && (
+                <div className="factor-board-modal" onClick={() => setFactorCodeModal(null)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()} style={{width:'min(1120px, 100%)'}}>
+                        <div className="factor-board-modal-head">
+                            <div>
+                                <div className="factor-board-modal-title">{factorCodeModal.title || '\u56e0\u5b50\u8ba1\u7b97\u4ee3\u7801'}</div>
+                                <div className="factor-board-modal-copy">
+                                    {(factorCodeModal.name || '-') + ' | ' + (factorCodeModal.expression || '-')}
+                                </div>
+                            </div>
+                            <div className="factor-board-toolbar-right">
+                                <button className="btn btn-primary" onClick={copyFactorCode} disabled={factorCodeLoading || !factorCodeModal.code}>{'\u590d\u5236\u5168\u90e8\u4ee3\u7801'}</button>
+                                <button className="btn btn-secondary" onClick={() => setFactorCodeModal(null)}>{'\u5173\u95ed'}</button>
+                            </div>
+                        </div>
+                        {factorCodeLoading ? (
+                            <div className="factor-board-empty"><span className="spinner"/> {'\u6b63\u5728\u751f\u6210\u56e0\u5b50\u4ee3\u7801...'}</div>
+                        ) : (
+                            <pre className="factor-code-view">{factorCodeModal.code || ''}</pre>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -8740,6 +9058,15 @@ function FactorMiningPage({ showToast }) {
         gp_population: 12,
         select_pct: 0.1,
         rebalance_days: 5,
+        protocol_version: 'v4',
+        research_mode: 'professional',
+        factor_themes: [],
+        neutralize: 'rank_zscore',
+        walk_forward_windows: 3,
+        embargo_days: 5,
+        max_trials: 0,
+        capacity_limit_pct: 0.10,
+        min_dsr: -0.25,
     });
     const [starting, setStarting] = useState(false);
     const [stopping, setStopping] = useState(false);
@@ -8749,6 +9076,9 @@ function FactorMiningPage({ showToast }) {
     const [lastId, setLastId] = useState(0);
     const [logs, setLogs] = useState([]);
     const [savingExpression, setSavingExpression] = useState('');
+    const [revalidatingId, setRevalidatingId] = useState(null);
+    const [reportModal, setReportModal] = useState(null);
+    const [reportLoadingId, setReportLoadingId] = useState(null);
     const pollRef = useRef(null);
     const lastIdRef = useRef(0);
 
@@ -8762,7 +9092,11 @@ function FactorMiningPage({ showToast }) {
 
     const best = results.length ? results[0] : null;
     const chartResults = useMemo(() => {
-        const sorted = [...results].sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+        const sorted = [...results].sort((a, b) => {
+            const ax = Number(a && (a.test_excess_return ?? (a.backtest_metrics && a.backtest_metrics.excess_return)));
+            const bx = Number(b && (b.test_excess_return ?? (b.backtest_metrics && b.backtest_metrics.excess_return)));
+            return (Number.isFinite(bx) ? bx : Number(b.score || 0)) - (Number.isFinite(ax) ? ax : Number(a.score || 0));
+        });
         const top = sorted.slice(0, 5);
         const bottom = sorted.length > 5 ? sorted.slice(-5) : [];
         const map = new Map();
@@ -8781,8 +9115,24 @@ function FactorMiningPage({ showToast }) {
                 map[date]['f' + idx] = Number(point.value || 0);
             });
         });
+        if (best && Array.isArray(best.benchmark_normalized_curve)) {
+            best.benchmark_normalized_curve.forEach(point => {
+                const date = String(point.date || '');
+                if (!date) return;
+                if (!map[date]) map[date] = { date };
+                map[date].benchmark = Number(point.value || 0);
+            });
+        }
+        if (best && Array.isArray(best.excess_curve)) {
+            best.excess_curve.forEach(point => {
+                const date = String(point.date || '');
+                if (!date) return;
+                if (!map[date]) map[date] = { date };
+                map[date].excess = Number(point.value || 0);
+            });
+        }
         return Object.values(map).sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    }, [chartResults]);
+    }, [chartResults, best]);
     const chartYDomain = useMemo(() => {
         const values = [];
         chartData.forEach(row => {
@@ -8807,6 +9157,11 @@ function FactorMiningPage({ showToast }) {
         const n = Number(value);
         return Number.isFinite(n) ? n.toFixed(digits) : '-';
     };
+    const rankScore = (item) => {
+        const excess = Number(item && (item.test_excess_return ?? (item.backtest_metrics && item.backtest_metrics.excess_return)));
+        if (Number.isFinite(excess)) return excess;
+        return Number(item && item.score || 0);
+    };
     const isRunning = !!(status && status.running);
     const tested = Number(status && status.tested_count || 0);
     const accepted = Number(status && status.accepted_count || 0);
@@ -8820,14 +9175,20 @@ function FactorMiningPage({ showToast }) {
     };
     const csvEscape = (value) => `"${String(value === undefined || value === null ? '' : value).replace(/"/g, '""')}"`;
     const downloadSummary = () => {
-        const headers = ['因子名称', '因子公式', 'IC值', 'IR值', '最大回撤', '年化收益'];
+        const headers = ['因子名称', '主题', '因子公式', 'IC值', 'IR值', 'p-value', 'DSR', 'PBO风险', '最大回撤', '测试超额', '年化收益', '协议版本'];
         const rows = results.map(item => [
             item.name || '',
+            item.theme || '',
             item.expression || '',
             num(item.valid_metrics && item.valid_metrics.ic_mean, 6),
             num(item.valid_metrics && item.valid_metrics.ic_ir, 6),
+            num(item.p_value, 6),
+            num(item.dsr, 4),
+            item.pbo_risk || '',
             pct(item.backtest_metrics && item.backtest_metrics.max_drawdown),
+            pct(item.backtest_metrics && item.backtest_metrics.excess_return),
             pct(item.backtest_metrics && item.backtest_metrics.annual_return),
+            item.protocol_version || '',
         ]);
         const csv = '\ufeff' + [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -8855,7 +9216,7 @@ function FactorMiningPage({ showToast }) {
         setResults(prev => {
             const map = new Map(prev.map(item => [item.id, item]));
             items.forEach(item => map.set(item.id, item));
-            return Array.from(map.values()).sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+            return Array.from(map.values()).sort((a, b) => rankScore(b) - rankScore(a));
         });
     };
 
@@ -8912,6 +9273,15 @@ function FactorMiningPage({ showToast }) {
                 max_depth: 4,
                 max_expression_length: 600,
                 auto_stop_candidates: 0,
+                protocol_version: 'v4',
+                research_mode: form.research_mode || 'professional',
+                factor_themes: Array.isArray(form.factor_themes) ? form.factor_themes : [],
+                neutralize: form.neutralize || 'rank_zscore',
+                walk_forward_windows: Number(form.walk_forward_windows || 3),
+                embargo_days: Number(form.embargo_days || 5),
+                max_trials: Number(form.max_trials || 0),
+                capacity_limit_pct: Number(form.capacity_limit_pct || 0.10),
+                min_dsr: Number(form.min_dsr ?? -0.25),
             };
             const data = await api.post('/api/factor_mining/sessions', payload);
             const sid = data.session_id;
@@ -8949,7 +9319,7 @@ function FactorMiningPage({ showToast }) {
         try {
             const res = await api.post('/api/factor_mining/save_factor', {
                 name: item.name || '\u6316\u6398\u56e0\u5b50',
-                description: `${item.description || ''}\nIC=${num(item.metrics && item.metrics.ic_mean)}; return=${pct(item.backtest_metrics && item.backtest_metrics.total_return)}`,
+                description: `${item.description || ''}\nprotocol=${item.protocol_version || 'legacy_unverified'}; test_ic=${num(item.test_metrics && item.test_metrics.ic_mean)}; test_excess=${pct(item.backtest_metrics && item.backtest_metrics.excess_return)}; return=${pct(item.backtest_metrics && item.backtest_metrics.total_return)}`,
                 expression: item.expression,
                 candidate_id: item.id,
             });
@@ -8958,6 +9328,35 @@ function FactorMiningPage({ showToast }) {
             showToast((e && e.detail) || '\u4fdd\u5b58\u56e0\u5b50\u5931\u8d25', 'error');
         }
         setSavingExpression('');
+    };
+
+    const revalidateCandidate = async (item) => {
+        if (!item || !item.id) return;
+        setRevalidatingId(item.id);
+        try {
+            const res = await api.post(`/api/factor_mining/candidates/${item.id}/revalidate`, {});
+            if (res && res.success && res.candidate) {
+                mergeResults([res.candidate]);
+                showToast('\u5df2\u6309\u4e25\u683c\u6837\u672c\u5916\u53e3\u5f84\u91cd\u65b0\u9a8c\u8bc1', 'success');
+            } else {
+                showToast((res && res.message) || '\u5019\u9009\u672a\u901a\u8fc7\u4e25\u683c\u9a8c\u8bc1', 'warning');
+            }
+        } catch (e) {
+            showToast((e && e.detail) || '\u91cd\u65b0\u9a8c\u8bc1\u5931\u8d25', 'error');
+        }
+        setRevalidatingId(null);
+    };
+
+    const openResearchReport = async (item) => {
+        if (!item || !item.id) return;
+        setReportLoadingId(item.id);
+        try {
+            const res = await api.get(`/api/factor_mining/research_report/${item.id}`);
+            setReportModal(res && res.research_card ? res.research_card : null);
+        } catch (e) {
+            showToast((e && e.detail) || '\u7814\u7a76\u62a5\u544a\u52a0\u8f7d\u5931\u8d25', 'error');
+        }
+        setReportLoadingId(null);
     };
 
     return (
@@ -9010,6 +9409,43 @@ function FactorMiningPage({ showToast }) {
                     <div className="field"><label className="label">{'\u5c55\u793a\u76ee\u6807\u6570'}</label><input className="input" type="number" min="3" max="200" value={form.candidate_count} onChange={e => setForm(prev => ({ ...prev, candidate_count: Number(e.target.value || 12) }))}/></div>
                     <div className="field"><label className="label">{'\u9057\u4f20\u4ee3\u6570'}</label><input className="input" type="number" min="0" max="8" value={form.gp_generations} onChange={e => setForm(prev => ({ ...prev, gp_generations: Number(e.target.value || 0) }))}/></div>
                     <div className="field"><label className="label">{'\u8c03\u4ed3\u95f4\u9694'}</label><input className="input" type="number" min="1" max="60" value={form.rebalance_days} onChange={e => setForm(prev => ({ ...prev, rebalance_days: Number(e.target.value || 5) }))}/></div>
+                    <div className="field">
+                        <label className="label">{'\u9884\u5904\u7406\u53e3\u5f84'}</label>
+                        <select className="input" value={form.neutralize} onChange={e => setForm(prev => ({ ...prev, neutralize: e.target.value }))}>
+                            <option value="rank_zscore">{'\u53bb\u6781\u503c + Rank + ZScore'}</option>
+                            <option value="rank">{'\u53bb\u6781\u503c + Rank'}</option>
+                            <option value="zscore">{'\u53bb\u6781\u503c + ZScore'}</option>
+                        </select>
+                    </div>
+                    <div className="field"><label className="label">{'Walk-forward \u7a97\u53e3'}</label><input className="input" type="number" min="2" max="8" value={form.walk_forward_windows} onChange={e => setForm(prev => ({ ...prev, walk_forward_windows: Number(e.target.value || 3) }))}/></div>
+                    <div className="field"><label className="label">{'Embargo \u5929\u6570'}</label><input className="input" type="number" min="0" max="30" value={form.embargo_days} onChange={e => setForm(prev => ({ ...prev, embargo_days: Number(e.target.value || 5) }))}/></div>
+                    <div className="field"><label className="label">{'\u6700\u5927\u5c1d\u8bd5\u6570'}</label><input className="input" type="number" min="0" max="100000" value={form.max_trials} onChange={e => setForm(prev => ({ ...prev, max_trials: Number(e.target.value || 0) }))}/></div>
+                    <div className="field"><label className="label">{'\u5bb9\u91cf\u4e0a\u9650'}</label><input className="input" type="number" step="0.01" min="0.01" max="0.5" value={form.capacity_limit_pct} onChange={e => setForm(prev => ({ ...prev, capacity_limit_pct: Number(e.target.value || 0.1) }))}/></div>
+                    <div className="field"><label className="label">{'DSR \u95e8\u69db'}</label><input className="input" type="number" step="0.05" min="-5" max="5" value={form.min_dsr} onChange={e => setForm(prev => ({ ...prev, min_dsr: Number(e.target.value || -0.25) }))}/></div>
+                </div>
+                <div className="factor-mining-toggle" style={{marginTop:10}}>
+                    {'v4 \u673a\u6784\u7814\u7a76\u534f\u8bae\uff1a\u52a0\u5165 embargo walk-forward\u3001DSR/PBO \u8fc7\u62df\u5408\u68c0\u6d4b\u3001\u7a33\u5065\u6027\u8bc4\u5206\u3001\u5bb9\u91cf\u8bc4\u5206\u548c\u56e0\u5b50\u6307\u7eb9\uff0c\u4ec5\u5c55\u793a\u771f\u5b9e\u53ef\u4ea4\u6613\u7684\u6837\u672c\u5916\u5019\u9009\u3002'}
+                </div>
+                <div className="factor-mining-toggle" style={{marginTop:8,alignItems:'flex-start',flexWrap:'wrap'}}>
+                    <span style={{fontWeight:700,color:'#e2e8f0'}}>{'\u4e13\u4e1a\u56e0\u5b50\u4e3b\u9898\uff1a'}</span>
+                    <label style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                        <input type="checkbox" checked={!form.factor_themes.length} onChange={e => setForm(prev => ({...prev, factor_themes: e.target.checked ? [] : prev.factor_themes}))}/>
+                        {'\u5168\u90e8'}
+                    </label>
+                    {(options.factor_themes || []).map(theme => (
+                        <label key={theme.name} style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                            <input
+                                type="checkbox"
+                                checked={form.factor_themes.includes(theme.name)}
+                                onChange={e => setForm(prev => {
+                                    const current = new Set(prev.factor_themes || []);
+                                    if (e.target.checked) current.add(theme.name); else current.delete(theme.name);
+                                    return {...prev, factor_themes: Array.from(current)};
+                                })}
+                            />
+                            {theme.name}
+                        </label>
+                    ))}
                 </div>
             </section>
 
@@ -9052,7 +9488,9 @@ function FactorMiningPage({ showToast }) {
                         <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u6709\u6548\u80a1\u7968'}</div><div className="factor-mining-kpi-value">{status ? status.stock_count : '-'}</div></div>
                         <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u5df2\u6d4b\u5019\u9009'}</div><div className="factor-mining-kpi-value">{status ? status.tested_count : '-'}</div></div>
                         <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u5165\u9009\u56e0\u5b50'}</div><div className="factor-mining-kpi-value">{status ? status.accepted_count : results.length}</div></div>
-                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u6700\u4f73\u6536\u76ca'}</div><div className={'factor-mining-kpi-value ' + ((best && best.backtest_metrics && best.backtest_metrics.total_return >= 0) ? 'text-profit' : 'text-loss')}>{best ? pct(best.backtest_metrics.total_return) : '-'}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u6700\u4f73\u6d4b\u8bd5\u8d85\u989d'}</div><div className={'factor-mining-kpi-value ' + ((best && rankScore(best) >= 0) ? 'text-profit' : 'text-loss')}>{best ? pct(rankScore(best)) : '-'}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u7814\u7a76\u53e3\u5f84'}</div><div className="factor-mining-kpi-value" style={{fontSize:13}}>{(status && status.protocol_version) || 'v4'}</div></div>
+                        <div className="factor-mining-kpi"><div className="factor-mining-kpi-label">{'\u9884\u5904\u7406'}</div><div className="factor-mining-kpi-value" style={{fontSize:13}}>{(status && status.neutralize) || form.neutralize}</div></div>
                     </div>
                     <div className="factor-mining-chart">
                         {chartData.length ? (
@@ -9061,9 +9499,11 @@ function FactorMiningPage({ showToast }) {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#2d3348"/>
                                     <XAxis dataKey="date" tick={{fill:'#94a3b8',fontSize:10}} tickLine={false} interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}/>
                                     <YAxis tick={{fill:'#94a3b8',fontSize:10}} domain={chartYDomain} tickFormatter={v => Number(v).toFixed(2)}/>
-                                    <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
-                                    <Legend/>
-                                    {chartResults.map((item, idx) => <Line key={idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6}/>)}
+                                     <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}}/>
+                                     <Legend/>
+                                    {best && <Line type="monotone" dataKey="benchmark" name={'\u57fa\u51c6'} dot={false} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.6}/>}
+                                    {best && <Line type="monotone" dataKey="excess" name={'\u8d85\u989d'} dot={false} stroke="#22c55e" strokeDasharray="2 2" strokeWidth={1.8}/>}
+                                     {chartResults.map((item, idx) => <Line key={idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6}/>)}
                                 </ComposedChart>
                             </ResponsiveContainer>
                         ) : <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u8bc4\u4f30\u56e0\u5b50\u548c\u56de\u6d4b\u66f2\u7ebf...' : '\u5c1a\u672a\u8fd0\u884c\u6316\u6398'}</div>}
@@ -9092,18 +9532,29 @@ function FactorMiningPage({ showToast }) {
                                     <span className="factor-mining-badge">{item.source}</span>
                                 </div>
                                 <div className="factor-mining-meta">
-                                    {'\u8bc4\u5206'} {num(item.score, 4)} | IC {num(item.valid_metrics && item.valid_metrics.ic_mean, 4)} | IR {num(item.valid_metrics && item.valid_metrics.ic_ir, 3)} | {'\u56de\u6d4b'} {pct(item.backtest_metrics && item.backtest_metrics.total_return)} | {'\u56de\u64a4'} {pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}
+                                    {'\u6837\u672c\u5916\u8bc4\u5206'} {num(item.score, 4)} | {'\u6d4b\u8bd5IC'} {num(item.test_metrics && item.test_metrics.ic_mean, 4)} | {'\u6d4b\u8bd5IR'} {num(item.test_metrics && item.test_metrics.ic_ir, 3)} | {'\u6d4b\u8bd5\u8d85\u989d'} {pct(item.backtest_metrics && item.backtest_metrics.excess_return)} | {'\u53e3\u5f84'} {item.protocol_version || 'legacy_unverified'}
                                 </div>
+                                <div className="factor-mining-meta">
+                                    {'\u4e3b\u9898'} {item.theme || '-'} | {'\u5047\u8bbe'} {item.hypothesis || '-'}
+                                </div>
+                                {item.legacy_warning && <div className="factor-mining-warning">{'\u65e7\u6316\u6398\u53e3\u5f84\uff0c\u53ef\u80fd\u5b58\u5728\u8fc7\u62df\u5408\u6216\u56de\u6d4b\u504f\u4e50\u89c2\uff0c\u5efa\u8bae\u70b9\u51fb\u91cd\u65b0\u4e25\u683c\u9a8c\u8bc1\u3002'}</div>}
                                 <div className="factor-mining-metric-grid">
                                     <div className="factor-mining-metric"><span>{'\u8bad\u7ec3 IC'}</span><b className={metricValueClass(item.train_metrics && item.train_metrics.ic_mean)}>{num(item.train_metrics && item.train_metrics.ic_mean, 4)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u9a8c\u8bc1 IC'}</span><b className={metricValueClass(item.valid_metrics && item.valid_metrics.ic_mean)}>{num(item.valid_metrics && item.valid_metrics.ic_mean, 4)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5 IC'}</span><b className={metricValueClass(item.test_metrics && item.test_metrics.ic_mean)}>{num(item.test_metrics && item.test_metrics.ic_mean, 4)}</b></div>
-                                    <div className="factor-mining-metric"><span>{'\u9a8c\u8bc1 IR'}</span><b>{num(item.valid_metrics && item.valid_metrics.ic_ir, 3)}</b></div>
-                                    <div className="factor-mining-metric"><span>{'IC \u80dc\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.ic_win_rate)}</b></div>
-                                    <div className="factor-mining-metric"><span>{'\u591a\u7a7a\u80dc\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.long_short_win_rate)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5 IR'}</span><b>{num(item.test_metrics && item.test_metrics.ic_ir, 3)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5\u8d85\u989d'}</span><b className={metricValueClass(item.backtest_metrics && item.backtest_metrics.excess_return)}>{pct(item.backtest_metrics && item.backtest_metrics.excess_return)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u57fa\u51c6\u6536\u76ca'}</span><b className={metricValueClass(item.backtest_metrics && item.backtest_metrics.benchmark_return)}>{pct(item.backtest_metrics && item.backtest_metrics.benchmark_return)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u6362\u624b / \u4ea4\u6613'}</span><b>{pct(item.backtest_metrics && item.backtest_metrics.turnover)} / {num(item.backtest_metrics && item.backtest_metrics.trade_count, 0)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u56de\u6d4b Sharpe'}</span><b>{num(item.backtest_metrics && item.backtest_metrics.sharpe_ratio, 3)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u56de\u6d4b\u6536\u76ca'}</span><b className={metricValueClass(item.backtest_metrics && item.backtest_metrics.total_return)}>{pct(item.backtest_metrics && item.backtest_metrics.total_return)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u6700\u5927\u56de\u64a4'}</span><b className="text-loss">{pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'p-value / DSR'}</span><b>{num(item.p_value, 4)} / {num(item.dsr, 3)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'PBO \u98ce\u9669'}</span><b>{item.pbo_risk || '-'}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u5355\u8c03\u6027 / \u5bb9\u91cf'}</span><b>{num(item.monotonicity_score, 1)} / {num(item.capacity_score, 1)}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u7a33\u5065\u5206 / WF'}</span><b>{num(item.robustness_score, 1)} / {num(Number(item.walk_forward_pass_ratio || 0) * 100, 0)}%</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u56e0\u5b50\u5bb6\u65cf'}</span><b>{item.fingerprint && item.fingerprint.family || '-'}</b></div>
+                                    <div className="factor-mining-metric"><span>{'\u76f8\u5173\u6027\u7c07'}</span><b>{item.correlation_cluster || '-'}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u8986\u76d6\u7387'}</span><b>{pct(item.valid_metrics && item.valid_metrics.coverage_ratio)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u6709\u6548\u80a1\u7968'}</span><b>{num(item.valid_metrics && item.valid_metrics.valid_stock_count, 0)}</b></div>
                                     <div className="factor-mining-metric"><span>{'\u65b9\u5411 / \u590d\u6742\u5ea6'}</span><b>{directionLabel(item.direction)} · {item.complexity}</b></div>
@@ -9118,9 +9569,17 @@ function FactorMiningPage({ showToast }) {
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
-                                <button className="btn btn-secondary" onClick={() => saveFactor(item)} disabled={savingExpression === item.expression}>
-                                    {savingExpression === item.expression ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u5230\u56e0\u5b50\u5e93'}
-                                </button>
+                                <div className="factor-mining-actions-row">
+                                    <button className="btn btn-secondary" onClick={() => openResearchReport(item)} disabled={reportLoadingId === item.id}>
+                                        {reportLoadingId === item.id ? '\u52a0\u8f7d\u4e2d...' : '\u7814\u7a76\u62a5\u544a'}
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => revalidateCandidate(item)} disabled={revalidatingId === item.id}>
+                                        {revalidatingId === item.id ? '\u9a8c\u8bc1\u4e2d...' : '\u91cd\u65b0\u4e25\u683c\u9a8c\u8bc1'}
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => saveFactor(item)} disabled={savingExpression === item.expression || item.legacy_warning}>
+                                        {savingExpression === item.expression ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u5230\u56e0\u5b50\u5e93'}
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -9144,26 +9603,63 @@ function FactorMiningPage({ showToast }) {
                                 <th>IC</th>
                                 <th>IR</th>
                                 <th>{'\u6700\u5927\u56de\u64a4'}</th>
+                                <th>{'\u6d4b\u8bd5\u8d85\u989d'}</th>
+                                <th>{'\u57fa\u51c6\u6536\u76ca'}</th>
                                 <th>{'\u5e74\u5316\u6536\u76ca'}</th>
+                                <th>{'\u53e3\u5f84'}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {results.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center text-muted">{'\u6682\u65e0\u6316\u6398\u7ed3\u679c'}</td></tr>
+                                <tr><td colSpan="9" className="text-center text-muted">{'\u6682\u65e0\u6316\u6398\u7ed3\u679c'}</td></tr>
                             ) : results.map(item => (
                                 <tr key={'summary-' + item.id}>
                                     <td>{item.name || '-'}</td>
                                     <td className="formula-cell" title={item.expression || ''}>{item.expression || '-'}</td>
-                                    <td className={metricValueClass(item.valid_metrics && item.valid_metrics.ic_mean)}>{num(item.valid_metrics && item.valid_metrics.ic_mean, 4)}</td>
-                                    <td>{num(item.valid_metrics && item.valid_metrics.ic_ir, 3)}</td>
+                                    <td className={metricValueClass(item.test_metrics && item.test_metrics.ic_mean)}>{num(item.test_metrics && item.test_metrics.ic_mean, 4)}</td>
+                                    <td>{num(item.test_metrics && item.test_metrics.ic_ir, 3)}</td>
                                     <td className="text-loss">{pct(item.backtest_metrics && item.backtest_metrics.max_drawdown)}</td>
+                                    <td className={metricValueClass(item.backtest_metrics && item.backtest_metrics.excess_return)}>{pct(item.backtest_metrics && item.backtest_metrics.excess_return)}</td>
+                                    <td className={metricValueClass(item.backtest_metrics && item.backtest_metrics.benchmark_return)}>{pct(item.backtest_metrics && item.backtest_metrics.benchmark_return)}</td>
                                     <td className={metricValueClass(item.backtest_metrics && item.backtest_metrics.annual_return)}>{pct(item.backtest_metrics && item.backtest_metrics.annual_return)}</td>
+                                    <td>{item.protocol_version || 'legacy_unverified'}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </section>
+            {reportModal && (
+                <div className="factor-board-modal" onClick={() => setReportModal(null)}>
+                    <div className="factor-board-modal-card" onClick={e => e.stopPropagation()} style={{width:'min(1120px, 100%)'}}>
+                        <div className="factor-board-modal-head">
+                            <div>
+                                <div className="factor-board-modal-title">{reportModal.title || '\u56e0\u5b50\u7814\u7a76\u62a5\u544a'}</div>
+                                <div className="factor-board-modal-copy">{reportModal.theme || '-'} | {reportModal.protocol || '-'}</div>
+                            </div>
+                            <button className="btn btn-secondary" onClick={() => setReportModal(null)}>{'\u5173\u95ed'}</button>
+                        </div>
+                        <div className="factor-mining-metric-grid" style={{marginBottom:12}}>
+                            <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5IC'}</span><b>{num(reportModal.metrics && reportModal.metrics.test && reportModal.metrics.test.ic_mean, 4)}</b></div>
+                            <div className="factor-mining-metric"><span>{'\u6d4b\u8bd5IR'}</span><b>{num(reportModal.metrics && reportModal.metrics.test && reportModal.metrics.test.ic_ir, 3)}</b></div>
+                            <div className="factor-mining-metric"><span>{'p-value'}</span><b>{num(reportModal.significance && reportModal.significance.p_value, 4)}</b></div>
+                            <div className="factor-mining-metric"><span>{'DSR'}</span><b>{num(reportModal.significance && reportModal.significance.dsr, 3)}</b></div>
+                            <div className="factor-mining-metric"><span>{'PBO'}</span><b>{reportModal.overfit_risk && reportModal.overfit_risk.pbo_risk || '-'}</b></div>
+                            <div className="factor-mining-metric"><span>{'\u5bb9\u91cf\u5206'}</span><b>{num(reportModal.capacity && reportModal.capacity.capacity_score, 1)}</b></div>
+                            <div className="factor-mining-metric"><span>{'\u7a33\u5065\u5206'}</span><b>{num(reportModal.robustness && reportModal.robustness.robustness_score, 1)}</b></div>
+                            <div className="factor-mining-metric"><span>{'\u56e0\u5b50\u5bb6\u65cf'}</span><b>{reportModal.fingerprint && reportModal.fingerprint.family || '-'}</b></div>
+                        </div>
+                        <div className="factor-mining-expression" style={{whiteSpace:'pre-wrap'}}>
+                            {'\u7ecf\u6d4e\u5b66\u5047\u8bbe\uff1a'}{reportModal.hypothesis || '-'}{'\n\n'}
+                            {'\u56e0\u5b50\u516c\u5f0f\uff1a'}{reportModal.formula || '-'}{'\n\n'}
+                            {'\u9884\u5904\u7406\uff1a'}{JSON.stringify(reportModal.preprocessing || {}, null, 2)}{'\n\n'}
+                            {'\u7a33\u5065\u6027\uff1a'}{JSON.stringify(reportModal.robustness || {}, null, 2)}{'\n\n'}
+                            {'\u56e0\u5b50\u6307\u7eb9\uff1a'}{JSON.stringify(reportModal.fingerprint || {}, null, 2)}{'\n\n'}
+                            {'JoinQuant \u590d\u9a8c\u8bf4\u660e\uff1a'}{JSON.stringify(reportModal.joinquant || {}, null, 2)}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -9198,11 +9694,18 @@ function App() {
     const [page, setPage] = useState(resolveInitialPage);
     const [toast, setToast] = useState(null);
     const [sysVersion, setSysVersion] = useState('');
+    const [health, setHealth] = useState({ status: 'checking' });
     const showToast = (message, type) => setToast({ message, type: type || 'info' });
+    const loadHealth = useCallback(() => {
+        api.get('/api/system/health', { timeoutMs: 12000 })
+            .then(setHealth)
+            .catch(e => setHealth({ status: 'degraded', database: { ok: false, error: (e && e.detail) || '健康检查失败' }, settings: {} }));
+    }, []);
 
     useEffect(() => {
         api.get('/api/system/version').then(v => setSysVersion(v.version || '')).catch(() => {});
-    }, []);
+        loadHealth();
+    }, [loadHealth]);
 
     useEffect(() => {
         try {
@@ -9245,6 +9748,7 @@ function App() {
                     ))}
                 </nav>
             </header>
+            <SystemHealthStrip health={health} onRefresh={loadHealth} />
             <main className="main">
                 {page === 'settings' && <SettingsPage showToast={showToast} />}
                 {page === 'strategy' && <StrategyPage showToast={showToast} openBacktestWithStrategy={() => setPage('backtest')} />}
@@ -9264,7 +9768,7 @@ function App() {
     );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>

@@ -174,25 +174,40 @@ class FactorBoardAnalyzer:
         benchmark_prices = {}
         if benchmark_data is not None and not benchmark_data.empty:
             benchmark_prices = {
-                self._normalize_date(row.trade_date): float(row.close)
+                self._normalize_date(row.trade_date): {
+                    "open": float(getattr(row, "open", row.close) or row.close),
+                    "close": float(row.close),
+                }
                 for row in benchmark_data.itertuples()
             }
 
         dates = sorted(factor_values.keys())
-        rebalance_dates = dates[:: self.rebalance_days]
         first_date = None
         last_date = None
 
-        for idx, date in enumerate(rebalance_dates[:-1]):
-            next_date = rebalance_dates[idx + 1]
-            factors = factor_values.get(date) or {}
-            current_prices = market_data[market_data["trade_date"] == date].set_index("ts_code")["close"]
-            future_prices = market_data[market_data["trade_date"] == next_date].set_index("ts_code")["close"]
+        rebalance_indices = list(range(0, len(dates) - 1, max(1, self.rebalance_days)))
+        for signal_idx in rebalance_indices:
+            entry_idx = signal_idx + 1
+            next_signal_idx = signal_idx + max(1, self.rebalance_days)
+            if entry_idx >= len(dates) or next_signal_idx >= len(dates):
+                continue
+            exit_idx = min(next_signal_idx + 1, len(dates) - 1)
+            if exit_idx <= entry_idx:
+                continue
 
-            common_stocks = set(factors.keys()) & set(current_prices.index) & set(future_prices.index)
-            eligible_stocks = self._eligible_stocks(date, common_stocks, membership_by_date)
+            signal_date = dates[signal_idx]
+            entry_date = dates[entry_idx]
+            exit_date = dates[exit_idx]
+            factors = factor_values.get(signal_date) or {}
+            entry_frame = market_data[market_data["trade_date"] == entry_date].set_index("ts_code")
+            exit_frame = market_data[market_data["trade_date"] == exit_date].set_index("ts_code")
+            entry_prices = entry_frame["open"] if "open" in entry_frame.columns else entry_frame["close"]
+            exit_prices = exit_frame["open"] if "open" in exit_frame.columns else exit_frame["close"]
+
+            common_stocks = set(factors.keys()) & set(entry_prices.index) & set(exit_prices.index)
+            eligible_stocks = self._eligible_stocks(signal_date, common_stocks, membership_by_date)
             if membership_by_date:
-                date_key = self._normalize_date(date)
+                date_key = self._normalize_date(signal_date)
                 members = membership_by_date.get(date_key, set())
                 if members:
                     coverage_ratios.append(len(eligible_stocks) / len(members))
@@ -205,16 +220,18 @@ class FactorBoardAnalyzer:
                 continue
 
             if first_date is None:
-                first_date = date
-            last_date = next_date
+                first_date = entry_date
+            last_date = exit_date
 
-            date_key = self._normalize_date(date)
-            next_date_key = self._normalize_date(next_date)
-            if date_key in benchmark_prices and next_date_key in benchmark_prices:
-                benchmark_ret = benchmark_prices[next_date_key] / benchmark_prices[date_key] - 1
+            entry_date_key = self._normalize_date(entry_date)
+            exit_date_key = self._normalize_date(exit_date)
+            if entry_date_key in benchmark_prices and exit_date_key in benchmark_prices:
+                entry_benchmark = benchmark_prices[entry_date_key].get("open") or benchmark_prices[entry_date_key].get("close")
+                exit_benchmark = benchmark_prices[exit_date_key].get("open") or benchmark_prices[exit_date_key].get("close")
+                benchmark_ret = exit_benchmark / entry_benchmark - 1 if entry_benchmark else 0.0
                 benchmark_value *= (1 + benchmark_ret)
             elif eligible_stocks:
-                benchmark_returns = [future_prices[s] / current_prices[s] - 1 for s in eligible_stocks]
+                benchmark_returns = [exit_prices[s] / entry_prices[s] - 1 for s in eligible_stocks]
                 if benchmark_returns:
                     benchmark_value *= (1 + float(np.mean(benchmark_returns)))
 
@@ -235,14 +252,14 @@ class FactorBoardAnalyzer:
 
                 for stock, factor_value in quantile_stocks:
                     holdings_data.append({
-                        "date": next_date_key,
+                        "date": exit_date_key,
                         "stock": stock,
                         "factor_value": factor_value,
                         "quantile": q,
                         "weight": weight,
                     })
 
-                gross_returns = [future_prices[s] / current_prices[s] - 1 for s, _ in quantile_stocks]
+                gross_returns = [exit_prices[s] / entry_prices[s] - 1 for s, _ in quantile_stocks]
                 gross_return = float(np.mean(gross_returns)) if gross_returns else 0.0
                 if prev_weights[q]:
                     cost = (
@@ -256,7 +273,7 @@ class FactorBoardAnalyzer:
                 new_value = portfolio_values[q][-1] * (1 + net_return)
                 portfolio_values[q].append(new_value)
                 returns_data.append({
-                    "date": next_date_key,
+                    "date": exit_date_key,
                     "quantile": q,
                     "portfolio_value": new_value,
                     "daily_return": net_return,

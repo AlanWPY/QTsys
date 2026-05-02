@@ -63,7 +63,7 @@ async def _init_schema(engine):
     async with engine.begin() as conn:
         from database.models import (
             Settings, Strategy, BacktestResult, Factor, FactorResult,
-            FactorMiningSession, FactorMiningCandidate,
+            FactorMiningSession, FactorMiningCandidate, FactorMiningTrialLog, FactorCorrelationCluster,
             FactorBacktestResult, NewsArticle, StockPool,
             DailyQuote, DailyBasic, IndexDaily, TradeCalendar,
         )
@@ -82,6 +82,26 @@ async def _init_schema(engine):
             ("factors", "graph_json", "DEFAULT NULL"),
             ("factors", "factor_type", "DEFAULT 'technical'"),
             ("factors", "updated_at", "DEFAULT NULL"),
+            ("factor_mining_sessions", "protocol_version", "VARCHAR(40) DEFAULT 'legacy_unverified'"),
+            ("factor_mining_sessions", "research_mode", "VARCHAR(40) DEFAULT 'professional'"),
+            ("factor_mining_sessions", "factor_themes", "JSON DEFAULT '[]'"),
+            ("factor_mining_sessions", "neutralize", "VARCHAR(40) DEFAULT 'rank'"),
+            ("factor_mining_sessions", "walk_forward_windows", "INTEGER DEFAULT 3"),
+            ("factor_mining_sessions", "embargo_days", "INTEGER DEFAULT 5"),
+            ("factor_mining_sessions", "max_trials", "INTEGER DEFAULT 0"),
+            ("factor_mining_sessions", "capacity_limit_pct", "FLOAT DEFAULT 0.10"),
+            ("factor_mining_sessions", "min_dsr", "FLOAT DEFAULT -0.25"),
+            ("factor_mining_candidates", "protocol_version", "VARCHAR(40) DEFAULT 'legacy_unverified'"),
+            ("factor_mining_candidates", "theme", "VARCHAR(80) DEFAULT ''"),
+            ("factor_mining_candidates", "hypothesis", "TEXT DEFAULT ''"),
+            ("factor_mining_candidates", "preprocessing", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "significance", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "overfit_risk", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "capacity", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "robustness", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "fingerprint", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "correlation_cluster", "VARCHAR(80) DEFAULT ''"),
+            ("factor_mining_candidates", "revalidation_status", "VARCHAR(40) DEFAULT ''"),
         ]
         for table, col, typedef in _migrate_cols:
             try:

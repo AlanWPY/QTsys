@@ -87,6 +87,15 @@ class FactorMiningSession(Base):
     start_date = Column(String(10), nullable=False)
     end_date = Column(String(10), nullable=False)
     params = Column(JSON, default=dict)
+    protocol_version = Column(String(40), default="legacy_unverified")
+    research_mode = Column(String(40), default="professional")
+    factor_themes = Column(JSON, default=list)
+    neutralize = Column(String(40), default="rank")
+    walk_forward_windows = Column(Integer, default=3)
+    embargo_days = Column(Integer, default=5)
+    max_trials = Column(Integer, default=0)
+    capacity_limit_pct = Column(Float, default=0.10)
+    min_dsr = Column(Float, default=-0.25)
     tested_count = Column(Integer, default=0)
     accepted_count = Column(Integer, default=0)
     best_score = Column(Float, default=0.0)
@@ -106,6 +115,17 @@ class FactorMiningCandidate(Base):
     description = Column(Text, default="")
     expression = Column(Text, nullable=False)
     source = Column(String(40), default="")
+    protocol_version = Column(String(40), default="legacy_unverified")
+    theme = Column(String(80), default="")
+    hypothesis = Column(Text, default="")
+    preprocessing = Column(JSON, default=dict)
+    significance = Column(JSON, default=dict)
+    overfit_risk = Column(JSON, default=dict)
+    capacity = Column(JSON, default=dict)
+    robustness = Column(JSON, default=dict)
+    fingerprint = Column(JSON, default=dict)
+    correlation_cluster = Column(String(80), default="")
+    revalidation_status = Column(String(40), default="")
     direction = Column(String(10), default="top")
     complexity = Column(Integer, default=0)
     score = Column(Float, default=0.0)
@@ -118,6 +138,38 @@ class FactorMiningCandidate(Base):
     normalized_curve = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (UniqueConstraint("session_id", "expression_hash"),)
+
+
+class FactorMiningTrialLog(Base):
+    __tablename__ = "factor_mining_trial_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(40), nullable=False)
+    expression_hash = Column(String(64), nullable=False)
+    name = Column(String(100), default="")
+    source = Column(String(40), default="")
+    theme = Column(String(80), default="")
+    expression = Column(Text, default="")
+    stage = Column(String(40), default="")
+    score = Column(Float, default=0.0)
+    metrics = Column(JSON, default=dict)
+    rejection_reasons = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("session_id", "expression_hash", "stage"),)
+
+
+class FactorCorrelationCluster(Base):
+    __tablename__ = "factor_correlation_clusters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(40), nullable=False)
+    cluster_key = Column(String(80), nullable=False)
+    representative_candidate_id = Column(Integer, default=None)
+    members = Column(JSON, default=list)
+    max_abs_corr = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("session_id", "cluster_key"),)
 
 
 class FactorResult(Base):

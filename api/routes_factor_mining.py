@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from services.factor_mining_service import (
+    get_active_or_latest_mining_session,
     get_factor_mining_options,
     get_mining_research_report,
     get_streaming_mining_results,
@@ -88,6 +89,11 @@ async def start_session(req: FactorMiningRequest, db: AsyncSession = Depends(get
         return await start_streaming_mining_session(db, req.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/sessions/active")
+async def active_session(db: AsyncSession = Depends(get_db)):
+    return await get_active_or_latest_mining_session(db)
 
 
 @router.get("/sessions/{session_id}/status")

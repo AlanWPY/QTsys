@@ -18,6 +18,7 @@
 - 旧版本保存的因子挖掘结果建议重新验证后再用于策略或外部平台复测。
 - 因子挖掘新口径为 `Institutional Factor Lab v4`：候选生成只使用训练/验证信息，最终展示只使用测试集样本外曲线；测试集收益、测试 IC、测试 IR 不得参与候选打分或参数选择。
 - v4 候选必须保存研究主题、经济学假设、预处理口径、统计显著性、DSR/PBO 风险、embargo walk-forward 稳健性、容量评分、因子指纹、相关性簇和 JoinQuant 复验说明。
+- v4 展示逻辑不再只展示“严格通过”结果；完成真实样本外评估的候选均会入库并按 `institutional_pass`、`research_candidate`、`evaluated_weak` 分层，避免用户长时间只看到 0 个结果，同时保持结果真实性。
 
 ## 已执行验证
 
@@ -43,3 +44,27 @@
 2. 对旧版本挖掘出的高收益因子重新运行系统内回测，再生成 JoinQuant 代码复测。
 3. 发布 GitHub 前再次运行 `scripts/health_check.py`，确认安全扫描、反未来函数检查、后端接口和前端冒烟测试均通过。
 4. 确认 `runtime/`、`logs/`、`tmp/`、`data/cache/*.pkl`、本地数据库和密钥文件没有进入 Git 提交列表。
+
+## 2026-05-11 统一执行核心验证
+
+- 新增 `engine/execution_simulator.py`，作为因子挖掘与后续策略回测统一接入的标准执行仿真核心。
+- 因子挖掘内部 `_backtest_from_factors` 已改为调用 `CanonicalExecutionSimulator`，不再使用独立手写的简化买卖逻辑。
+- 新执行口径覆盖：T 日信号、下一交易日开盘成交、收盘计值、A 股只做多、100 股整数手、佣金/最低佣金/印花税/滑点/过户费、涨跌停拦截、停牌/无量过滤、科创板默认过滤、单票上限和成交量容量约束。
+- 新增 `scripts/validate_execution_simulator.py`，验证下一交易日开盘执行、整手撮合、涨停不可买和成交量容量限制。
+- `scripts/health_check.py` 已纳入统一执行核心验证项。
+- 已执行 `python scripts/health_check.py --skip-frontend`，结果通过：Python 编译、反未来函数、统一执行规则、安全扫描、后端接口冒烟均为 OK。
+
+## 2026-05-11 回测/聚宽一致性增强
+
+- 主策略回测 `BacktestEngine` 已增加拒单追踪，回测结果会返回 `order_rejections` 和 `order_trace`，用于解释未成交、涨跌停、科创板过滤、无行情等差异。
+- 新增 `/api/backtest/parity_package/{result_id}`，用于查看本地回测的执行假设、曲线、交易记录、按日期聚合成交和拒单摘要。
+- 新增 `/api/backtest/parity_export/{result_id}`，用于下载本地对账 CSV，方便与 JoinQuant 日志逐日核对。
+- 因子选股回测 `factor/factor_backtest.py` 已改为使用 `CanonicalExecutionSimulator`，不再使用独立简化口径。
+- JoinQuant 因子模板已改为从系统设置/请求参数注入 `commission_rate`、`stamp_tax_rate`、`min_commission`、`slippage`，不再硬编码核心交易成本。
+- 回测结果页新增“执行对账”页签和“导出对账”按钮，用户可直接查看执行假设、拒单摘要和订单追踪。
+
+## 2026-05-11 细节加固
+
+- `CanonicalExecutionSimulator` 现在直接返回完整 `daily_returns`，避免因子选股回测从降采样净值曲线反推日收益。
+- 因子选股回测保留统一执行器输出的完整日收益序列，提升风险指标、任务结果和后续分析的一致性。
+- 回测 CSV 和对账 CSV 增加 UTF-8 BOM，降低 Windows/Excel 打开中文字段时出现乱码的概率。

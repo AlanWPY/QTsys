@@ -1,8 +1,7 @@
 """因子回测引擎 - 选股因子回测 + 技术因子回测"""
 import numpy as np
 import pandas as pd
-from typing import Optional
-from engine.metrics import calc_metrics
+from engine.execution_simulator import CanonicalExecutionSimulator, ExecutionSettings, PanelMarketData
 from logging_config import get_logger
 
 logger = get_logger("qtsys.factor.backtest")
@@ -14,16 +13,17 @@ def run_selection_backtest(
     select_mode: str = "top", select_pct: float = 0.1,
     rebalance_days: int = 5, initial_cash: float = 1_000_000,
     benchmark: str = "000300.SH",
+    commission_rate: float = 0.0003,
+    stamp_tax_rate: float = 0.001,
+    slippage: float = 0.001,
 ) -> dict:
     """选股因子回测
     每个调仓日: 计算全股票池因子值 → 排序 → 选取top/bottom N% → 等权买入
     """
     logger.info(f"选股回测: {expression}, 股票池={len(universe)}, {start_date}-{end_date}")
 
-    # 1. 收集所有股票的因子值和收盘价
-    stock_factors = {}  # {ts_code: Series(date->factor_value)}
-    stock_closes = {}  # {ts_code: Series(date->close)}
-    stock_opens = {}  # {ts_code: Series(date->open)}
+    stock_factors = {}
+    stock_data = {}
 
     for ts_code in universe:
         fv = factor_engine.compute_factor_values(expression, ts_code, start_date, end_date)
@@ -32,134 +32,79 @@ def run_selection_backtest(
         df = cache.get_daily(ts_code, start_date, end_date)
         if df.empty:
             continue
-        indexed = df.set_index("trade_date")
-        closes = indexed["close"]
-        opens = indexed["open"] if "open" in indexed.columns else indexed["close"]
-        stock_factors[ts_code] = fv
-        stock_closes[ts_code] = closes
-        stock_opens[ts_code] = opens
+        frame = df.copy()
+        frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
+        frame = frame.dropna(subset=["trade_date"]).sort_values("trade_date")
+        if frame.empty or "close" not in frame.columns:
+            continue
+        indexed = frame.set_index("trade_date")
+        factor_series = pd.Series(fv).copy()
+        factor_series.index = pd.to_datetime(factor_series.index, errors="coerce")
+        factor_series = pd.to_numeric(factor_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if factor_series.empty:
+            continue
+        closes = pd.to_numeric(indexed["close"], errors="coerce")
+        opens = pd.to_numeric(indexed["open"], errors="coerce") if "open" in indexed.columns else closes.shift(1)
+        highs = pd.to_numeric(indexed["high"], errors="coerce") if "high" in indexed.columns else pd.concat([opens, closes], axis=1).max(axis=1)
+        lows = pd.to_numeric(indexed["low"], errors="coerce") if "low" in indexed.columns else pd.concat([opens, closes], axis=1).min(axis=1)
+        vols = pd.to_numeric(indexed["vol"], errors="coerce") if "vol" in indexed.columns else pd.Series(0, index=indexed.index, dtype=float)
+        pre_close = pd.to_numeric(indexed["pre_close"], errors="coerce") if "pre_close" in indexed.columns else closes.shift(1)
+        stock_factors[ts_code] = factor_series
+        stock_data[ts_code] = {
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "vol": vols,
+            "pre_close": pre_close.fillna(closes),
+            "prev_close": pre_close.fillna(closes),
+        }
 
     if len(stock_factors) < 5:
         return {"error": f"有效股票不足(仅{len(stock_factors)}只)"}
 
-    # 2. 获取所有交易日
-    all_dates = sorted(set().union(*[s.index for s in stock_closes.values()]))
+    all_dates = sorted(set().union(*[data["close"].dropna().index for data in stock_data.values()]))
     if len(all_dates) < rebalance_days * 2:
         return {"error": "交易日不足"}
 
-    # 3. 模拟回测
-    cash = initial_cash
-    holdings = {}  # {ts_code: shares}
-    equity_curve = []
-    daily_returns = []
-    trades = []
-    stock_pool_history = []
-    prev_value = initial_cash
-
-    rebalance_idx = set(range(0, len(all_dates) - 1, rebalance_days))
-
-    for i, dt in enumerate(all_dates):
-        # 调仓日
-        if i > 0 and (i - 1) in rebalance_idx:
-            signal_dt = all_dates[i - 1]
-            exec_dt = dt
-            # 使用上一交易日因子值，下一交易日开盘成交
-            scores = {}
-            for ts_code, fv in stock_factors.items():
-                if signal_dt in fv.index and pd.notna(fv.loc[signal_dt]):
-                    scores[ts_code] = fv.loc[signal_dt]
-
-            if len(scores) < 3:
-                continue
-
-            # 排序选股
-            sorted_stocks = sorted(scores.items(), key=lambda x: x[1],
-                                   reverse=(select_mode == "top"))
-            n_select = max(1, int(len(sorted_stocks) * select_pct))
-            selected = [s[0] for s in sorted_stocks[:n_select]]
-            stock_pool_history.append({
-                "date": dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt),
-                "stocks": selected,
-            })
-
-            # 卖出不在新组合中的持仓
-            for ts_code in list(holdings.keys()):
-                if ts_code not in selected and ts_code in stock_opens:
-                    price = stock_opens[ts_code].get(exec_dt)
-                    if price and holdings[ts_code] > 0:
-                        sell_val = holdings[ts_code] * price * (1 - 0.0003 - 0.001)
-                        cash += sell_val
-                        trades.append({"date": str(dt)[:10], "code": ts_code,
-                                       "action": "sell", "price": float(price),
-                                       "shares": holdings[ts_code]})
-                        del holdings[ts_code]
-
-            # 等权买入新选股
-            total_val = cash + sum(
-                holdings.get(c, 0) * stock_closes[c].get(dt, 0)
-                for c in holdings if c in stock_closes
-            )
-            per_stock = total_val / n_select if n_select > 0 else 0
-            for ts_code in selected:
-                if ts_code not in stock_closes:
-                    continue
-                price = stock_opens.get(ts_code, pd.Series(dtype=float)).get(exec_dt)
-                if not price or price <= 0:
-                    continue
-                target_shares = int(per_stock / price / 100) * 100
-                current = holdings.get(ts_code, 0)
-                diff = target_shares - current
-                if diff > 0:
-                    cost = diff * price * (1 + 0.0003)
-                    if cost <= cash:
-                        cash -= cost
-                        holdings[ts_code] = target_shares
-                        trades.append({"date": str(dt)[:10], "code": ts_code,
-                                       "action": "buy", "price": float(price),
-                                       "shares": diff})
-                elif diff < 0:
-                    cash += abs(diff) * price * (1 - 0.0003 - 0.001)
-                    holdings[ts_code] = target_shares
-
-        # 计算当日组合价值
-        port_val = cash
-        for ts_code, shares in holdings.items():
-            if ts_code in stock_closes:
-                p = stock_closes[ts_code].get(dt)
-                if p:
-                    port_val += shares * p
-
-        date_str = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)
-        equity_curve.append({"date": date_str, "value": round(port_val, 2)})
-        day_ret = (port_val - prev_value) / prev_value if prev_value > 0 else 0.0
-        daily_returns.append(round(day_ret, 6))
-        prev_value = port_val
-
-    if not equity_curve:
-        return {"error": "回测无有效数据"}
-
-    final_value = equity_curve[-1]["value"]
-
-    # 4. 基准收益
-    benchmark_returns = []
+    benchmark_close = pd.Series(dtype=float)
     try:
         bench_df = cache.get_index_daily(benchmark, start_date, end_date)
-        if not bench_df.empty:
-            bench_close = bench_df.set_index("trade_date")["close"]
-            benchmark_returns = bench_close.pct_change().dropna().tolist()
+        if bench_df is not None and not bench_df.empty and "close" in bench_df.columns:
+            bench = bench_df.copy()
+            bench["trade_date"] = pd.to_datetime(bench["trade_date"], errors="coerce")
+            bench = bench.dropna(subset=["trade_date"]).sort_values("trade_date")
+            benchmark_close = pd.to_numeric(bench.set_index("trade_date")["close"], errors="coerce").dropna()
     except Exception:
-        pass
+        benchmark_close = pd.Series(dtype=float)
 
-    # 5. 计算指标
-    metrics = calc_metrics(daily_returns, benchmark_returns, initial_cash, final_value)
-
-    return {
-        "metrics": metrics,
-        "equity_curve": equity_curve,
-        "trades": trades[:500],
-        "daily_returns": daily_returns,
-        "stock_pool_history": stock_pool_history,
-    }
+    simulator = CanonicalExecutionSimulator(
+        ExecutionSettings(
+            initial_cash=float(initial_cash or 1_000_000),
+            commission_rate=max(0.0, float(commission_rate or 0.0)),
+            stamp_tax_rate=max(0.0, float(stamp_tax_rate or 0.0)),
+            slippage=max(0.0, float(slippage or 0.0)),
+            volume_limit_pct=0.10,
+            max_position_pct=0.12,
+            target_exposure=0.95,
+            exclude_star_market=True,
+            exclude_st=True,
+            protocol_version="factor_selection_canonical_v1",
+        )
+    )
+    market = PanelMarketData(stock_data, all_dates, benchmark_close=benchmark_close, benchmark_code=benchmark)
+    result = simulator.run_factor_selection(
+        factors=stock_factors,
+        market=market,
+        select_pct=select_pct,
+        rebalance_days=rebalance_days,
+        direction="top" if select_mode == "top" else "bottom",
+    )
+    if "error" in result:
+        return result
+    result["daily_returns"] = result.get("daily_returns", [])
+    result["stock_pool_history"] = []
+    return result
 
 
 def run_technical_backtest(

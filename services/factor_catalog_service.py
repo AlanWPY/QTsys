@@ -5,16 +5,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Factor
-from factor.builtin_factors import BUILTIN_FACTORS
+from factor.builtin_factors import BUILTIN_FACTORS, category_label, normalize_category
 
 
 def _normalize_factor_item(item: dict) -> dict:
+    category = normalize_category(item.get("category"))
     return {
         "id": item.get("id"),
         "name": str(item.get("name") or "").strip(),
+        "display_name": str(item.get("display_name") or item.get("name") or "").strip(),
         "description": str(item.get("description") or "").strip(),
         "expression": str(item.get("expression") or "").strip(),
-        "category": str(item.get("category") or "custom").strip() or "custom",
+        "category": category,
+        "category_label": category_label(category),
         "source": str(item.get("source") or "user").strip() or "user",
     }
 
@@ -51,6 +54,7 @@ async def load_factor_catalog(db: AsyncSession) -> list[dict]:
                 {
                     "id": builtin_id_seed,
                     "name": name,
+                    "display_name": info.get("display_name", name),
                     "description": info.get("description", ""),
                     "expression": info.get("expression", f"builtin:{name}"),
                     "category": info.get("category", "builtin"),

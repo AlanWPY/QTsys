@@ -280,6 +280,7 @@ async def run_backtest_workflow(
         **(result_data["metrics"] or {}),
         "data_coverage": data_coverage,
         "execution_model": execution_model,
+        "order_trace": result_data.get("order_trace", [])[-1000:],
         "validation_note": "信号按截至当日数据生成，订单下一交易日开盘执行；系统股票池按回测起点前成分股快照解析。",
     }
 
@@ -308,6 +309,8 @@ async def run_backtest_workflow(
         "metrics": result_data["metrics"],
         "equity_curve": result_data["equity_curve"],
         "trades": result_data["trades"],
+        "order_rejections": result_data.get("order_rejections", []),
+        "order_trace": result_data.get("order_trace", []),
         "logs": result_data.get("logs", []),
         "final_value": result_data["final_value"],
         "benchmark_curve": result_data.get("benchmark_curve", []),

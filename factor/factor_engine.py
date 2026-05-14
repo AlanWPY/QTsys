@@ -45,7 +45,15 @@ class FactorEngine:
             name = expression[8:]
             if name in BUILTIN_FACTORS:
                 func = BUILTIN_FACTORS[name]["func"]
-                return func(closes, highs, lows, volumes)
+                return func(
+                    closes,
+                    highs,
+                    lows,
+                    volumes,
+                    opens=opens,
+                    amounts=amounts,
+                    basic_data=basic_data,
+                )
             return None
 
         # 自定义表达式因子
@@ -338,6 +346,7 @@ class FactorEngine:
             lows = indexed["low"]
             volumes = indexed["vol"]
             opens = indexed["open"] if "open" in indexed.columns else closes.shift(1)
+            amounts = indexed["amount"] if "amount" in indexed.columns else volumes * closes
 
             # 加载财务指标
             basic_data = self._load_daily_basic(ts_code, start_date, end_date, indexed.index)
@@ -346,9 +355,17 @@ class FactorEngine:
                 name = expression[8:]
                 if name not in BUILTIN_FACTORS:
                     return {"error": f"未知内置因子: {name}"}
-                fv = BUILTIN_FACTORS[name]["func"](closes, highs, lows, volumes)
+                fv = BUILTIN_FACTORS[name]["func"](
+                    closes,
+                    highs,
+                    lows,
+                    volumes,
+                    opens=opens,
+                    amounts=amounts,
+                    basic_data=basic_data,
+                )
             else:
-                fv = self._eval_expression(expression, closes, highs, lows, volumes, opens, basic_data)
+                fv = self._eval_expression(expression, closes, highs, lows, volumes, opens, basic_data, amounts)
 
             if fv is None:
                 continue

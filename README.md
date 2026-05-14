@@ -2,7 +2,7 @@
 
 ## 推荐启动方式：桌面启动器
 
-Windows 用户可在项目根目录双击 `QTsys启动器.exe`。启动器支持一键启动后端并打开 WebUI、检查 GitHub 更新、保存并测试 Tushare Token、AI 大模型配置和 MySQL 缓存配置。若本地未生成 EXE，可执行 `python scripts/build_launcher_exe.py` 重新构建；详细说明见 `docs/launcher_guide.md`。
+Windows 用户可在项目根目录双击 `QTsys启动器.exe`。启动器已升级为专业金融终端风格，支持一键启动后端并打开 WebUI、检查 GitHub 更新、运行系统健康检查、保存并测试 Tushare Token、AI 大模型配置和 MySQL 缓存配置。若本地未生成 EXE，可执行 `python scripts/build_launcher_exe.py` 重新构建；详细说明见 `docs/launcher_guide.md`。
 
 QTsys 是一个面向量化研究、策略生成、真实数据回测、因子评估与组合分析的一体化本地系统。系统围绕“设置数据源 → 编写/生成策略 → 回测验证 → 因子研究 → 组合决策”这一完整研究链路设计，适合个人研究者和策略开发者持续迭代使用。
 
@@ -14,6 +14,11 @@ QTsys 是一个面向量化研究、策略生成、真实数据回测、因子�
 - 因子看板：批量评估 Alpha191 因子表现，查看超额、IC、覆盖率、分位曲线和因子详情
 - 组合分析：对多个回测结果做横向比较、相关性分析和组合优化
 - 新闻与看盘：结合市场快照、新闻流和情绪信息辅助策略判断
+- 机构级研究辅助：已接入量化研究、交易分析和市场数据类 agent skill；AI 策略助手内置 walk-forward、样本外、交易成本、过拟合风险和真实数据约束
+
+## 量化研究 Skill
+
+本地 Codex 环境已安装 `quantitative-research`、`trading-quant`、`market-data` 三类金融/量化 skill。项目内配置记录见 `config/quant_research_skills.json`，使用说明见 `docs/quant_research_skills.md`。这些 skill 重启 Codex 后会进入可用技能列表；QTsys 当前已将其中的研究约束写入 AI 策略助手提示词，确保策略草稿更重视真实数据、样本外验证、交易成本和过拟合风险。
 
 ## 系统架构
 
@@ -147,7 +152,7 @@ python -m venv .venv
 - 系统股票池：回测使用回测起点之前可获得的指数成分股快照，不使用当前最新成分股回测历史区间，降低幸存者偏差。
 - 因子表达式：单股票时间序列表达式中的 `rank/cs_rank/cs_zscore` 不允许使用全样本未来数据；需要横截面排序时由评估/选股流程在同一交易日股票池内完成。
 - 因子看板：Alpha191 分组收益使用信号日后一交易日开盘建仓、下一调仓执行日开盘调仓，并扣除交易成本。
-- 因子挖掘：新版本采用 `Institutional Factor Lab v4`，候选因子必须通过真实行情、embargo walk-forward 样本外验证、下一交易日开盘执行、统计显著性、DSR/PBO 过拟合控制、多重检验惩罚、基准超额收益、容量评分、稳健性评分和 A 股交易约束检查；历史挖掘结果若生成于旧版本，必须重新严格验证后再使用。
+- 因子挖掘：新版本采用 `Institutional Factor Lab v4`，所有完成真实评估的候选都会展示并分为 `institutional_pass`、`research_candidate`、`evaluated_weak`；系统不会为了曲线好看隐藏弱因子，也不会把弱因子伪装成有效因子。严格通过因子仍需通过真实行情、embargo walk-forward、下一交易日开盘执行、统计显著性、DSR/PBO、基准超额、容量评分、稳健性评分和 A 股交易约束检查。
 - 自动检查：发布前建议运行 `.\.venv\Scripts\python.exe scripts/health_check.py`，或单独运行 `scripts/validate_factor_no_lookahead.py` 与 `scripts/security_check.py`。
 
 ### 第一步：完成基础配置

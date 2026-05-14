@@ -104,7 +104,16 @@ def calculate_factor_from_daily_frame(df, daily_basic=None):
         info = BUILTIN_FACTORS.get(factor_key)
         if not info:
             raise ValueError(f"unknown builtin factor: {{factor_key}}")
-        return info["func"](closes, highs, lows, volumes)
+        basic_data = _daily_basic_to_dict(daily_basic, data.index)
+        return info["func"](
+            closes,
+            highs,
+            lows,
+            volumes,
+            opens=opens,
+            amounts=amounts,
+            basic_data=basic_data,
+        )
 
     basic_data = _daily_basic_to_dict(daily_basic, data.index)
     engine = FactorEngine(cache=None)
@@ -142,6 +151,9 @@ def build_joinquant_backtest_code(
     exclude_star_market: bool | None = None,
     exclude_st: bool = True,
     slippage: float = 0.002,
+    commission_rate: float = 0.0003,
+    stamp_tax_rate: float = 0.001,
+    min_commission: float = 5.0,
 ) -> str:
     """生成可直接复制到聚宽的因子截面选股回测代码。"""
     expression = str(factor.expression or "")
@@ -159,6 +171,9 @@ def build_joinquant_backtest_code(
     include_star_market = bool(include_star_market)
     exclude_st = bool(exclude_st)
     slippage = max(0.0, min(float(slippage or 0.0), 0.05))
+    commission_rate = max(0.0, min(float(commission_rate or 0.0), 0.05))
+    stamp_tax_rate = max(0.0, min(float(stamp_tax_rate or 0.0), 0.05))
+    min_commission = max(0.0, min(float(min_commission or 0.0), 100.0))
     index_symbol = str(index_symbol or "000300.XSHG").strip()
     benchmark = str(benchmark or index_symbol or "000300.XSHG").strip()
     start_date = str(start_date or "").strip()
@@ -201,11 +216,11 @@ def initialize(context):
 
     set_order_cost(OrderCost(
         open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
+        close_tax=__STAMP_TAX_RATE__,
+        open_commission=__COMMISSION_RATE__,
+        close_commission=__COMMISSION_RATE__,
         close_today_commission=0,
-        min_commission=5
+        min_commission=__MIN_COMMISSION__
     ), type='stock')
 
     g.index_symbol = __INDEX_SYMBOL_REPR__  # 000300.XSHG 沪深300；000016.XSHG 上证50；000905.XSHG 中证500
@@ -656,6 +671,9 @@ def eval_expression(expr, close, high, low, open_, volume, amount, valuation_dat
         .replace("__TAKE_PROFIT_PCT__", repr(round(take_profit_pct, 6)))
         .replace("__INCLUDE_STAR_MARKET__", "True" if include_star_market else "False")
         .replace("__SLIPPAGE__", repr(round(slippage, 6)))
+        .replace("__COMMISSION_RATE__", repr(round(commission_rate, 6)))
+        .replace("__STAMP_TAX_RATE__", repr(round(stamp_tax_rate, 6)))
+        .replace("__MIN_COMMISSION__", repr(round(min_commission, 4)))
         .replace("__START_DATE_REPR__", repr(start_date))
         .replace("__END_DATE_REPR__", repr(end_date))
         .replace("__EXCLUDE_ST__", "True" if exclude_st else "False")
@@ -769,15 +787,33 @@ def _lookback_start(end_date: str, days: int = 420) -> str:
     return (dt - timedelta(days=days)).strftime("%Y%m%d")
 
 
-def build_factor_strategy_code(factor_id: int, factor_name: str, direction: str = "top") -> str:
+def build_factor_strategy_code(
+    factor_id: int,
+    factor_name: str,
+    direction: str = "top",
+    *,
+    select_pct: float = 0.1,
+    max_positions: int = 0,
+    rebalance_days: int = 5,
+    target_exposure: float = 0.95,
+    max_position_pct: float = 0.12,
+) -> str:
     safe_name = str(factor_name or f"Factor {factor_id}").replace('"""', "")
     reverse = "True" if direction != "bottom" else "False"
+    select_pct = max(0.001, min(float(select_pct or 0.1), 1.0))
+    max_positions = max(0, int(max_positions or 0))
+    rebalance_days = max(1, min(int(rebalance_days or 5), 60))
+    target_exposure = max(0.0, min(float(target_exposure or 0.95), 1.0))
+    max_position_pct = max(0.0, min(float(max_position_pct or 0.12), 1.0))
     return f'''def initialize(context):
     """基于因子库因子自动生成的选股策略：{safe_name}"""
     context.factor_ref = "id:{factor_id}"
-    context.max_positions = 10
-    context.rebalance_days = 5
+    context.max_positions = {max_positions}
+    context.select_pct = {select_pct!r}
+    context.rebalance_days = {rebalance_days}
     context.factor_direction_high_is_better = {reverse}
+    context.target_exposure = {target_exposure!r}
+    context.max_position_pct = {max_position_pct!r}
     context.day_count = 0
 
 def handle_data(context):
@@ -801,8 +837,12 @@ def handle_data(context):
         return
 
     scores.sort(key=lambda item: item[1], reverse=context.factor_direction_high_is_better)
-    selected = [code for code, _ in scores[:max(1, int(context.max_positions))]]
-    target_weight = 1.0 / max(len(selected), 1)
+    if context.max_positions and context.max_positions > 0:
+        select_count = max(1, int(context.max_positions))
+    else:
+        select_count = max(1, int(len(scores) * float(context.select_pct)))
+    selected = [code for code, _ in scores[:select_count]]
+    target_weight = min(float(context.target_exposure) / max(len(selected), 1), float(context.max_position_pct))
 
     for ts_code in list(context.positions.keys()):
         if ts_code not in selected:
@@ -824,9 +864,29 @@ async def create_strategy_from_factor_workflow(
     if not factor:
         raise LookupError("因子不存在")
 
+    mining_meta = {}
+    if isinstance(factor.graph_json, dict):
+        mining_meta = factor.graph_json.get("mining") or {}
+    effective_direction = direction or mining_meta.get("direction") or "top"
+    select_pct = float(mining_meta.get("select_pct") or 0.1)
+    rebalance_days = int(mining_meta.get("rebalance_days") or 5)
+    target_exposure = float(mining_meta.get("target_exposure") or 0.95)
+    max_position_pct = float(mining_meta.get("max_position_pct") or 0.12)
     name = f"因子策略_{factor.id}_{factor.name}"[:100]
-    code = build_factor_strategy_code(factor.id, factor.name, direction=direction)
-    description = f"由因子库自动生成，使用因子 {factor.name} ({factor.expression}) 进行截面排序选股。"
+    code = build_factor_strategy_code(
+        factor.id,
+        factor.name,
+        direction=effective_direction,
+        select_pct=select_pct,
+        rebalance_days=rebalance_days,
+        target_exposure=target_exposure,
+        max_position_pct=max_position_pct,
+    )
+    direction_text = "低值组占优" if effective_direction == "bottom" else "高值组占优"
+    description = (
+        f"由因子库自动生成，使用因子 {factor.name} ({factor.expression}) 进行截面排序选股。"
+        f"方向：{direction_text}；选股比例：{select_pct:.4f}；调仓周期：{rebalance_days}日。"
+    )
     existing_result = await db.execute(select(Strategy).where(Strategy.name == name))
     strategy = existing_result.scalar_one_or_none()
     if strategy:
@@ -847,6 +907,11 @@ async def create_strategy_from_factor_workflow(
         "name": strategy.name,
         "factor_id": factor.id,
         "factor_name": factor.name,
+        "direction": effective_direction,
+        "select_pct": select_pct,
+        "rebalance_days": rebalance_days,
+        "target_exposure": target_exposure,
+        "max_position_pct": max_position_pct,
     }
 
 

@@ -1,7 +1,7 @@
 """数据库连接与 schema 初始化。"""
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import text
+from sqlalchemy import event, text
 from config import DATABASE_URL
 from database.secret_crypto import encrypt_secret, is_encrypted_secret
 from logging_config import get_logger
@@ -20,7 +20,21 @@ def _create_engine(database_url: str):
     kwargs = {"echo": False}
     if database_url.startswith("mysql+"):
         kwargs["pool_pre_ping"] = True
-    return create_async_engine(database_url, **kwargs)
+    if database_url.startswith("sqlite+"):
+        kwargs["connect_args"] = {"timeout": 30}
+    engine = create_async_engine(database_url, **kwargs)
+    if database_url.startswith("sqlite+"):
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_sqlite_pragmas(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.execute("PRAGMA foreign_keys=ON")
+            finally:
+                cursor.close()
+    return engine
 
 
 def get_engine():
@@ -137,6 +151,36 @@ async def _init_schema(engine):
 
 async def init_db():
     await _init_schema(get_engine())
+    await _seed_builtin_factors()
+
+
+async def _seed_builtin_factors():
+    """确保系统预置因子在启动后可直接使用。"""
+    from sqlalchemy import select
+    from database.models import Factor
+    from factor.builtin_factors import BUILTIN_FACTORS, normalize_category
+
+    async with get_session_factory()() as session:
+        changed = False
+        for name, info in BUILTIN_FACTORS.items():
+            result = await session.execute(select(Factor).where(Factor.name == name))
+            existing = result.scalar_one_or_none()
+            next_values = {
+                "description": info["description"],
+                "expression": info["expression"],
+                "category": normalize_category(info["category"]),
+                "source": "builtin",
+            }
+            if existing:
+                for field, value in next_values.items():
+                    if getattr(existing, field) != value:
+                        setattr(existing, field, value)
+                        changed = True
+                continue
+            session.add(Factor(name=name, **next_values))
+            changed = True
+        if changed:
+            await session.commit()
 
 
 async def init_external_db(database_url: str):

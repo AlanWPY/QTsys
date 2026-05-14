@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import math
 import os
 import random
@@ -23,6 +24,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data.data_cache import DataCache, make_mysql_conn
@@ -36,11 +38,13 @@ from database.models import (
     FactorMiningTrialLog,
     StockPool,
 )
+from engine.execution_simulator import CanonicalExecutionSimulator, ExecutionSettings, PanelMarketData
 from factor.factor_engine import FactorEngine
 from factor.genetic import run_gp
 from factor.graph_compiler import NODE_REGISTRY
 from services.backtest_service import resolve_backtest_universe
 from services.factor_board_service import get_system_universes
+from services.llm_gateway import chat_complete_text
 from services.settings_service import get_or_create_settings
 
 
@@ -54,6 +58,15 @@ DEFAULT_WALK_FORWARD_WINDOWS = 3
 DEFAULT_NEUTRALIZE_MODE = "rank_zscore"
 DEFAULT_EMBARGO_DAYS = 5
 DEFAULT_MIN_DSR = -0.25
+
+
+def _is_sqlite_lock_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "database is locked" in text or "database table is locked" in text or "sqlite_busy" in text
+
+
+async def _sleep_for_db_retry(attempt: int) -> None:
+    await asyncio.sleep(min(0.15 * (attempt + 1), 1.5))
 
 
 SYSTEM_UNIVERSES = [
@@ -104,6 +117,69 @@ BASE_TEMPLATES = [
         "name": "流动性反转",
         "expression": "-rank(mean(vol, 20))",
         "description": "对高成交拥挤度做反向处理，用于降低热门拥挤风险。",
+    },
+]
+
+RESEARCH_FORMULA_FAMILIES = [
+    {
+        "theme": "volatility_adjusted_momentum",
+        "source": "research_formula",
+        "hypothesis": "动量信号需要用波动、成交拥挤度和回撤质量约束，否则容易选择高噪声反弹。",
+        "templates": [
+            ("波动调整动量_{w}日", "(pctchange(close, {w}) / (std(returns, {w}) + 0.0001))", "收益除以波动，衡量单位风险趋势强度。"),
+            ("低回撤动量_{w}日", "(pctchange(close, {w}) - abs((close / (ts_max(high, {w}) + 0.0001) - 1)))", "趋势收益扣除距离阶段高点的回撤惩罚。"),
+            ("量能确认动量_{w}日", "(pctchange(close, {w}) * (mean(vol, 5) / (mean(vol, {w}) + 0.0001)))", "价格趋势需要短期成交量确认。"),
+        ],
+    },
+    {
+        "theme": "behavioral_reversal",
+        "source": "research_formula",
+        "hypothesis": "A股短周期交易者占比较高，极端收益、上影线和放量后更容易出现短期反转。",
+        "templates": [
+            ("放量反转_{w}日", "(-pctchange(close, {w}) * (mean(vol, 5) / (mean(vol, {w}) + 0.0001)))", "放量急涨急跌后的反向修正。"),
+            ("影线反转_{w}日", "(-((high - max(open, close)) / (abs(close - open) + 0.0001)))", "长上影线反映冲高回落后的供给压力。"),
+            ("VWAP偏离反转_{w}日", "(-((close - vwap) / (std(close, {w}) + 0.0001)))", "收盘价偏离成交均价后的均值回归。"),
+        ],
+    },
+    {
+        "theme": "liquidity_and_crowding",
+        "source": "research_formula",
+        "hypothesis": "拥挤交易和流动性冲击会降低未来收益，低拥挤且容量可交易的信号更稳健。",
+        "templates": [
+            ("Amihud低冲击_{w}日", "(-mean(abs(returns) / (amount + 1.0), {w}))", "单位成交额价格冲击越小，交易容量越好。"),
+            ("成交额稳定_{w}日", "(-(std(amount, {w}) / (mean(amount, {w}) + 1.0)))", "成交额稳定性高，降低流动性跳变风险。"),
+            ("换手拥挤反转_{w}日", "(-turnover_rate * abs(pctchange(close, {w})))", "高换手叠加大涨跌更可能是拥挤交易。"),
+        ],
+    },
+    {
+        "theme": "range_breakout_quality",
+        "source": "research_formula",
+        "hypothesis": "突破类因子只有在波动压缩、振幅可控且收盘位置强时更可能延续。",
+        "templates": [
+            ("压缩突破_{w}日", "((close - ts_min(low, {w})) / (ts_max(high, {w}) - ts_min(low, {w}) + 0.0001) - std(returns, {w}))", "阶段位置强且波动较低的突破。"),
+            ("真实波幅压缩_{w}日", "(-(mean(tr, {w}) / (mean(close, {w}) + 0.0001)))", "真实波幅占价格比例越低，代表蓄势压缩。"),
+            ("收盘强度_{w}日", "mean((close - low) / (high - low + 0.0001), {w})", "每日收盘接近高点的持续性。"),
+        ],
+    },
+    {
+        "theme": "valuation_quality_proxy",
+        "source": "research_formula",
+        "hypothesis": "估值因子需要结合风险和成交约束，单纯低估值可能陷入价值陷阱。",
+        "templates": [
+            ("低PB低波_{w}日", "(-pb - std(returns, {w}))", "低市净率叠加低波动的防守型价值暴露。"),
+            ("盈利收益低拥挤_{w}日", "(-pe - turnover_rate)", "低估值同时规避高换手拥挤。"),
+            ("小盘质量_{w}日", "(-log(circ_mv + 1) - std(returns, {w}))", "小盘暴露需用波动控制质量。"),
+        ],
+    },
+    {
+        "theme": "price_volume_structure",
+        "source": "research_formula",
+        "hypothesis": "价量关系的方向、滞后和协方差可刻画资金推动是否真实有效。",
+        "templates": [
+            ("价量背离_{w}日", "(-corr(pctchange(close, 1), pctchange(vol, 1), {w}))", "价格上涨但成交不确认时后续收益更弱。"),
+            ("量先价后_{w}日", "corr(delay(pctchange(vol, 1), 1), pctchange(close, 1), {w})", "成交量变化领先价格变化的资金推动。"),
+            ("成交额趋势确认_{w}日", "(pctchange(close, {w}) * pctchange(mean(amount, 5), {w}))", "价格与成交额趋势同向确认。"),
+        ],
     },
 ]
 
@@ -305,6 +381,7 @@ def _generate_template_candidates(limit: int) -> list[Candidate]:
             )
     windows = [2, 3, 5, 8, 10, 11, 15, 20, 30, 60, 120]
     generated: list[Candidate] = []
+    research_generated: list[Candidate] = []
     for window in windows:
         generated.extend(
             [
@@ -340,11 +417,78 @@ def _generate_template_candidates(limit: int) -> list[Candidate]:
                     "volume_price_divergence",
                     "Price rallies without volume confirmation often fade.",
                 ),
+                Candidate(
+                    f"{window}d_breakout_quality",
+                    f"(close - ts_min(low, {window})) / (ts_max(high, {window}) - ts_min(low, {window}) + 0.0001)",
+                    f"Range-position breakout quality over {window} days.",
+                    "param_scan",
+                    "breakout_structure",
+                    "Closing near the top of a recent range may capture controlled trend continuation.",
+                ),
+                Candidate(
+                    f"{window}d_turnover_crowding",
+                    f"-(mean(vol, {window}) / (mean(vol, {max(20, window * 2)}) + 0.0001))",
+                    f"Low crowding turnover signal over {window} days.",
+                    "param_scan",
+                    "liquidity_crowding",
+                    "Lower crowding and less extreme turnover can reduce reversal pressure.",
+                ),
+                Candidate(
+                    f"{window}d_vwap_reversion",
+                    f"-((close - vwap) / (std(close, {window}) + 0.0001))",
+                    f"Close-to-VWAP mean reversion over {window} days.",
+                    "param_scan",
+                    "intraday_reversion",
+                    "Large deviations from VWAP may partly mean-revert when not backed by persistent flow.",
+                ),
+            ]
+        )
+    for family in RESEARCH_FORMULA_FAMILIES:
+        for window in windows:
+            for name_template, expression_template, description in family["templates"]:
+                research_generated.append(
+                    Candidate(
+                        name_template.format(w=window),
+                        expression_template.format(w=window),
+                        description,
+                        family["source"],
+                        family["theme"],
+                        family["hypothesis"],
+                    )
+                )
+    pair_windows = [(5, 20), (10, 30), (20, 60), (30, 120)]
+    for short, long in pair_windows:
+        research_generated.extend(
+            [
+                Candidate(
+                    f"长短动量斜率_{short}_{long}日",
+                    f"(pctchange(close, {short}) - pctchange(close, {long}))",
+                    "比较短期和长期趋势强度，识别动量改善或衰减。",
+                    "research_formula",
+                    "trend_slope",
+                    "趋势斜率比单窗口动量更能刻画资金边际变化。",
+                ),
+                Candidate(
+                    f"长短波动收敛_{short}_{long}日",
+                    f"(-(std(returns, {short}) / (std(returns, {long}) + 0.0001)))",
+                    "短期波动相对长期波动收敛，代表风险释放后的稳定状态。",
+                    "research_formula",
+                    "volatility_term_structure",
+                    "波动期限结构可用于过滤噪声和拥挤风险。",
+                ),
+                Candidate(
+                    f"长短成交额确认_{short}_{long}日",
+                    f"(mean(amount, {short}) / (mean(amount, {long}) + 1.0) * pctchange(close, {short}))",
+                    "短期成交额相对长期成交额扩张并确认价格趋势。",
+                    "research_formula",
+                    "flow_confirmation",
+                    "成交额比成交量更接近真实资金强度。",
+                ),
             ]
         )
     seen = set()
     result: list[Candidate] = []
-    for item in candidates + generated:
+    for item in candidates + research_generated + generated:
         if item.expression in seen:
             continue
         seen.add(item.expression)
@@ -858,16 +1002,29 @@ async def save_mined_factor(db: AsyncSession, payload: dict) -> dict:
     name = str(payload.get("name") or "挖掘因子").strip()[:100]
     description = str(payload.get("description") or "").strip()
     candidate_id = payload.get("candidate_id")
+    graph_json = None
     if candidate_id:
         result = await db.execute(select(FactorMiningCandidate).where(FactorMiningCandidate.id == int(candidate_id)))
         candidate = result.scalar_one_or_none()
         if candidate:
+            session = None
+            session_result = await db.execute(select(FactorMiningSession).where(FactorMiningSession.session_id == candidate.session_id))
+            session = session_result.scalar_one_or_none()
+            params = (session.params or {}) if session else {}
+            backtest_metrics = candidate.backtest_metrics or {}
+            display_curve = backtest_metrics.get("display_equity_curve") or candidate.equity_curve or []
+            curve_dates = [str(point.get("date") or "") for point in display_curve if point.get("date")]
+            test_curve = backtest_metrics.get("test_equity_curve") or []
+            test_dates = [str(point.get("date") or "") for point in test_curve if point.get("date")]
             name = name or candidate.name
             expression = candidate.expression
             description = description or candidate.description
             description = (
                 f"{description}\n\n"
                 f"挖掘会话: {candidate.session_id}\n"
+                f"因子方向: {'因子值越小越好' if candidate.direction == 'bottom' else '因子值越大越好'}\n"
+                f"调仓周期: {int(backtest_metrics.get('chosen_rebalance_days') or params.get('rebalance_days') or 5)} 日\n"
+                f"选股比例: {float(params.get('select_pct') or 0.1):.4f}\n"
                 f"综合评分: {_safe_float(candidate.score):.4f}\n"
                 f"验证指标: {candidate.valid_metrics or {}}\n"
                 f"测试指标: {candidate.test_metrics or {}}"
@@ -877,12 +1034,43 @@ async def save_mined_factor(db: AsyncSession, payload: dict) -> dict:
                 f"protocol_version: {(candidate.backtest_metrics or {}).get('protocol_version', 'legacy_unverified')}\n"
                 f"strict_note: only {STRICT_MINING_PROTOCOL_VERSION} candidates should be treated as current out-of-sample results."
             ).strip()
+            graph_json = {
+                "source": "factor_mining",
+                "mining": {
+                    "candidate_id": candidate.id,
+                    "session_id": candidate.session_id,
+                    "direction": candidate.direction or "top",
+                    "high_is_better": candidate.direction != "bottom",
+                    "select_pct": float(params.get("select_pct") or 0.1),
+                    "rebalance_days": int(backtest_metrics.get("chosen_rebalance_days") or params.get("rebalance_days") or 5),
+                    "target_exposure": DEFAULT_TARGET_EXPOSURE,
+                    "max_position_pct": DEFAULT_MAX_POSITION_PCT,
+                    "protocol_version": candidate.protocol_version or backtest_metrics.get("protocol_version") or STRICT_MINING_PROTOCOL_VERSION,
+                    "validation_status": candidate.revalidation_status or backtest_metrics.get("validation_status", ""),
+                    "score": _safe_float(candidate.score),
+                    "test_excess_return": _safe_float(backtest_metrics.get("excess_return")),
+                    "test_total_return": _safe_float(backtest_metrics.get("total_return")),
+                    "test_start": test_dates[0] if test_dates else "",
+                    "test_end": test_dates[-1] if test_dates else "",
+                    "display_start": backtest_metrics.get("display_start_date") or (curve_dates[0] if curve_dates else ""),
+                    "display_end": backtest_metrics.get("display_end_date") or (curve_dates[-1] if curve_dates else ""),
+                    "display_scope": backtest_metrics.get("display_scope", ""),
+                    "session_start_date": session.start_date if session else "",
+                    "session_end_date": session.end_date if session else "",
+                    "universe_type": session.universe_type if session else "",
+                    "universe_code": session.universe_code if session else "",
+                    "universe_name": session.universe_name if session else "",
+                    "custom_pool_id": session.custom_pool_id if session else None,
+                    "benchmark": session.universe_code if session and session.universe_type == "system" else "000300.SH",
+                },
+            }
     factor = Factor(
         name=name,
         description=description,
         expression=expression,
         category="因子挖掘",
         source="mining_session" if candidate_id else "mining",
+        graph_json=graph_json,
         factor_type="technical",
     )
     db.add(factor)
@@ -972,6 +1160,7 @@ class MiningDataContext:
         self.stock_data: dict[str, dict] = {}
         self.all_dates: list = []
         self.benchmark_close = pd.Series(dtype=float)
+        self.expression_cache: dict[str, dict[str, pd.Series]] = {}
 
     def preload(self, settings: SimpleNamespace, stop_event: threading.Event, progress_callback=None) -> None:
         completed = 0
@@ -1085,6 +1274,9 @@ class MiningDataContext:
         }
 
     def compute_expression(self, expression: str) -> dict[str, pd.Series]:
+        expression_key = _expression_hash(expression)
+        if expression_key in self.expression_cache:
+            return self.expression_cache[expression_key]
         result = {}
         for code, data in self.stock_data.items():
             values = self.engine._eval_expression(
@@ -1098,6 +1290,10 @@ class MiningDataContext:
             if cleaned.dropna().empty:
                 continue
             result[code] = cleaned
+        if len(self.expression_cache) > 512:
+            for key in list(self.expression_cache.keys())[:128]:
+                self.expression_cache.pop(key, None)
+        self.expression_cache[expression_key] = result
         return result
 
 
@@ -1192,6 +1388,9 @@ def _build_settings_snapshot(settings) -> SimpleNamespace:
         mysql_user=getattr(settings, "mysql_user", ""),
         mysql_password=getattr(settings, "mysql_password", ""),
         mysql_database=getattr(settings, "mysql_database", "qtsys"),
+        llm_api_key=getattr(settings, "llm_api_key", ""),
+        llm_base_url=getattr(settings, "llm_base_url", ""),
+        llm_model=getattr(settings, "llm_model", ""),
     )
 
 
@@ -1240,7 +1439,27 @@ def _rank_ic(values: list[float], returns: list[float]) -> float:
     return float(np.corrcoef(left, right)[0, 1])
 
 
-def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, dates: set) -> dict:
+def _forward_open_return(ctx: MiningDataContext, code: str, signal_date, forward_days: int) -> float:
+    try:
+        idx = ctx.all_dates.index(signal_date)
+    except ValueError:
+        return np.nan
+    entry_idx = idx + 1
+    exit_idx = idx + 1 + max(1, int(forward_days or 1))
+    if entry_idx >= len(ctx.all_dates) or exit_idx >= len(ctx.all_dates):
+        return np.nan
+    data = ctx.stock_data.get(code)
+    if not data:
+        return np.nan
+    open_series = data.get("open", pd.Series(dtype=float))
+    entry_open = open_series.get(ctx.all_dates[entry_idx])
+    exit_open = open_series.get(ctx.all_dates[exit_idx])
+    if pd.isna(entry_open) or pd.isna(exit_open) or entry_open <= 0 or exit_open <= 0:
+        return np.nan
+    return float(exit_open) / float(entry_open) - 1.0
+
+
+def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, dates: set, forward_days: int = 5) -> dict:
     ic_values = []
     long_short = []
     valid_points = 0
@@ -1248,11 +1467,10 @@ def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, date
     for dt in sorted(dates):
         row = []
         for code, series in factors.items():
-            data = ctx.stock_data.get(code)
-            if data is None or dt not in series.index or dt not in data["forward_return"].index:
+            if dt not in series.index:
                 continue
             fv = series.get(dt)
-            fr = data["forward_return"].get(dt)
+            fr = _forward_open_return(ctx, code, dt, forward_days)
             if pd.notna(fv) and pd.notna(fr):
                 row.append((code, float(fv), float(fr)))
         if len(row) < 5:
@@ -1309,7 +1527,7 @@ def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, date
     }
 
 
-def _backtest_from_factors(
+def _legacy_unused_backtest_from_factors(
     factors: dict[str, pd.Series],
     ctx: MiningDataContext,
     settings: SimpleNamespace,
@@ -1415,7 +1633,7 @@ def _backtest_from_factors(
     }
 
 
-def _score_candidate(valid_metrics: dict, test_metrics: dict, backtest_metrics: dict, complexity: int) -> float:
+def _legacy_unused_score_candidate(valid_metrics: dict, test_metrics: dict, backtest_metrics: dict, complexity: int) -> float:
     valid_ic = abs(_safe_float(valid_metrics.get("ic_mean")))
     valid_ir = min(abs(_safe_float(valid_metrics.get("ic_ir"))), 3.0)
     valid_ls = max(_safe_float(valid_metrics.get("long_short_return")), 0.0)
@@ -1435,7 +1653,7 @@ def _score_candidate(valid_metrics: dict, test_metrics: dict, backtest_metrics: 
     )
 
 
-def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: StreamingMiningConfig) -> Optional[dict]:
+def _legacy_unused_evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: StreamingMiningConfig) -> Optional[dict]:
     expression = str(candidate.expression or "").strip()
     if not expression or len(expression) > config.max_expression_length:
         return None
@@ -1459,9 +1677,9 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
     }
 
     splits = _date_splits(ctx.all_dates)
-    train_metrics = _segment_metrics(factors, ctx, splits["train"])
-    valid_metrics = _segment_metrics(factors, ctx, splits["valid"])
-    test_metrics = _segment_metrics(factors, ctx, splits["test"] or splits["valid"])
+    train_metrics = _segment_metrics(factors, ctx, splits["train"], forward_days=config.rebalance_days)
+    valid_metrics = _segment_metrics(factors, ctx, splits["valid"], forward_days=config.rebalance_days)
+    test_metrics = _segment_metrics(factors, ctx, splits["test"] or splits["valid"], forward_days=config.rebalance_days)
     valid_metrics = {**valid_metrics, **quality_metrics}
     direction = "bottom" if _safe_float(valid_metrics.get("ic_mean")) < 0 or _safe_float(valid_metrics.get("long_short_return")) < 0 else "top"
     backtest = _backtest_from_factors(
@@ -1574,134 +1792,115 @@ def _backtest_from_factors(
 ) -> dict:
     all_dates = list(ctx.all_dates)
     segment_dates = [dt for dt in all_dates if not dates or dt in dates]
-    if len(all_dates) <= rebalance_days + 2 or len(segment_dates) <= 2:
-        return {"error": "insufficient trading dates"}
+    market = PanelMarketData(
+        ctx.stock_data,
+        all_dates,
+        benchmark_close=ctx.benchmark_close,
+        benchmark_code=ctx.benchmark_code or "universe_equal_weight",
+    )
+    simulator = CanonicalExecutionSimulator(
+        ExecutionSettings(
+            initial_cash=float(getattr(settings, "default_cash", 1_000_000) or 1_000_000),
+            commission_rate=max(0.0, float(getattr(settings, "commission_rate", 0.0) or 0.0)),
+            stamp_tax_rate=max(0.0, float(getattr(settings, "stamp_tax_rate", 0.0) or 0.0)),
+            slippage=max(0.0, float(getattr(settings, "slippage", 0.0) or 0.0)),
+            volume_limit_pct=max(0.0, float(getattr(settings, "capacity_limit_pct", DEFAULT_VOLUME_LIMIT_PCT) or DEFAULT_VOLUME_LIMIT_PCT)),
+            max_position_pct=DEFAULT_MAX_POSITION_PCT,
+            target_exposure=DEFAULT_TARGET_EXPOSURE,
+            exclude_star_market=True,
+            exclude_st=True,
+            protocol_version=STRICT_MINING_PROTOCOL_VERSION,
+        )
+    )
+    result = simulator.run_factor_selection(
+        factors=factors,
+        market=market,
+        select_pct=select_pct,
+        rebalance_days=rebalance_days,
+        direction=direction,
+        segment_dates=dates,
+    )
+    result.setdefault("benchmark_curve", [])
+    result.setdefault("excess_curve", [])
+    result.setdefault("rejection_reasons", {})
+    if segment_dates and "assumption_report" in result:
+        result["assumption_report"]["segment_start"] = _date_text(segment_dates[0])
+        result["assumption_report"]["segment_end"] = _date_text(segment_dates[-1])
+    return result
 
-    initial_cash = float(settings.default_cash or 1_000_000)
-    cash = initial_cash
-    holdings: dict[str, int] = {}
-    equity_curve = []
-    daily_returns = []
-    trades = []
-    rejection_counts: dict[str, int] = {}
-    turnover_values = []
-    prev_value = initial_cash
-    reverse = direction != "bottom"
-    commission = max(0.0, float(settings.commission_rate or 0))
-    stamp_tax = max(0.0, float(settings.stamp_tax_rate or 0))
-    slippage = max(0.0, float(settings.slippage or 0))
-    segment_set = set(segment_dates)
-    rebalance_set = set(range(0, len(all_dates) - 1, max(1, rebalance_days)))
 
-    for idx, dt in enumerate(all_dates):
-        in_segment = dt in segment_set
-        traded_value = 0.0
-        if idx > 0 and in_segment and (idx - 1) in rebalance_set:
-            signal_date = all_dates[idx - 1]
-            exec_date = dt
-            scores = {}
-            for code, series in factors.items():
-                value = series.get(signal_date) if signal_date in series.index else np.nan
-                if pd.notna(value):
-                    scores[code] = float(value)
-            if len(scores) >= 5:
-                ranked = sorted(scores.items(), key=lambda item: item[1], reverse=reverse)
-                selected = [x[0] for x in ranked[:max(1, int(len(ranked) * select_pct))]]
-                tradable_selected = [code for code in selected if _can_trade(ctx, code, exec_date, "buy", rejection_counts)]
+def _adaptive_rebalance_candidates(base_days: int) -> list[int]:
+    base = max(1, min(int(base_days or 5), 60))
+    seeds = [base, max(1, base // 2), min(60, base * 2), 3, 5, 10, 20]
+    result: list[int] = []
+    for item in seeds:
+        value = max(1, min(int(item), 60))
+        if value not in result:
+            result.append(value)
+        if len(result) >= 5:
+            break
+    return result
 
-                for code in list(holdings):
-                    if code in tradable_selected:
-                        continue
-                    shares = holdings.get(code, 0)
-                    price = _price_at(ctx, code, "open", exec_date)
-                    if shares > 0 and _can_trade(ctx, code, exec_date, "sell", rejection_counts):
-                        sell_price = price * max(0.0, 1 - slippage)
-                        proceeds = shares * sell_price * (1 - commission - stamp_tax)
-                        cash += proceeds
-                        traded_value += shares * sell_price
-                        trades.append({"date": _date_text(exec_date), "code": code, "action": "sell", "price": round(sell_price, 4), "shares": shares})
-                        holdings.pop(code, None)
 
-                portfolio_value = _portfolio_value_at(ctx, cash, holdings, exec_date, price_field="open")
-                target_gross = portfolio_value * DEFAULT_TARGET_EXPOSURE
-                target_value = min(target_gross / max(len(tradable_selected), 1), portfolio_value * DEFAULT_MAX_POSITION_PCT)
+def _validation_protocol_score(valid_metrics: dict, valid_backtest_metrics: dict, complexity: int, tested_count: int) -> float:
+    directional_ic = abs(_safe_float(valid_metrics.get("ic_mean")))
+    ic_ir = min(abs(_safe_float(valid_metrics.get("ic_ir"))), 3.0)
+    excess = _safe_float(valid_backtest_metrics.get("excess_return"))
+    drawdown = max(_safe_float(valid_backtest_metrics.get("max_drawdown")), 0.0)
+    trade_count = min(_safe_float(valid_backtest_metrics.get("trade_count")), 80.0)
+    turnover = max(_safe_float(valid_backtest_metrics.get("turnover")), 0.0)
+    return round(
+        _score_candidate(valid_metrics, valid_backtest_metrics, complexity, tested_count)
+        + directional_ic * 2.0
+        + ic_ir * 0.18
+        + max(excess, -10.0) / 80.0
+        + min(trade_count / 120.0, 0.35)
+        - drawdown / 320.0
+        - min(turnover / 1000.0, 0.20),
+        6,
+    )
 
-                for code in tradable_selected:
-                    price = _price_at(ctx, code, "open", exec_date)
-                    if price <= 0:
-                        continue
-                    buy_price = price * (1 + slippage)
-                    target_shares = int(target_value / buy_price / 100) * 100
-                    current = holdings.get(code, 0)
-                    diff = target_shares - current
-                    if diff > 0:
-                        diff = _volume_limited_shares(ctx, code, exec_date, diff)
-                        if diff < 100:
-                            rejection_counts["below_lot_or_volume_cap"] = rejection_counts.get("below_lot_or_volume_cap", 0) + 1
-                            continue
-                        cost = diff * buy_price * (1 + commission)
-                        if cost <= cash:
-                            cash -= cost
-                            holdings[code] = current + diff
-                            traded_value += diff * buy_price
-                            trades.append({"date": _date_text(exec_date), "code": code, "action": "buy", "price": round(buy_price, 4), "shares": diff})
-                        else:
-                            rejection_counts["insufficient_cash"] = rejection_counts.get("insufficient_cash", 0) + 1
-                    elif diff < 0:
-                        sell_shares = _volume_limited_shares(ctx, code, exec_date, abs(diff))
-                        if sell_shares < 100 or not _can_trade(ctx, code, exec_date, "sell", rejection_counts):
-                            continue
-                        sell_price = price * max(0.0, 1 - slippage)
-                        cash += sell_shares * sell_price * (1 - commission - stamp_tax)
-                        holdings[code] = max(0, current - sell_shares)
-                        if holdings[code] <= 0:
-                            holdings.pop(code, None)
-                        traded_value += sell_shares * sell_price
-                        trades.append({"date": _date_text(exec_date), "code": code, "action": "sell", "price": round(sell_price, 4), "shares": sell_shares})
 
-        if in_segment:
-            value = _portfolio_value_at(ctx, cash, holdings, dt, price_field="close")
-            daily_returns.append((value - prev_value) / prev_value if prev_value > 0 else 0.0)
-            if value > 0:
-                turnover_values.append(traded_value / value * 100.0)
-            equity_curve.append({"date": _date_text(dt), "value": round(value, 2)})
-            prev_value = value
-
-    if not equity_curve:
-        return {"error": "empty equity curve"}
-
-    final_value = equity_curve[-1]["value"]
-    total_return = _safe_pct_return(initial_cash, final_value)
-    returns = np.array(daily_returns, dtype=float)
-    vol = float(np.std(returns, ddof=1)) if len(returns) > 2 else 0.0
-    sharpe = float(np.mean(returns) / vol * math.sqrt(252)) if vol > 0 else 0.0
-    benchmark_curve = _benchmark_curve_for_dates(ctx, segment_dates, initial_cash)
-    benchmark_metrics = _curve_metrics(benchmark_curve, initial_cash)
-    excess_return = total_return - _safe_float(benchmark_metrics.get("total_return"))
-    excess_curve = _build_excess_curve(equity_curve, benchmark_curve)
-
-    return {
-        "metrics": {
-            "total_return": round(total_return, 2),
-            "annual_return": round(_annualized_return(total_return, len(equity_curve)), 2),
-            "max_drawdown": round(_max_drawdown_pct(equity_curve), 2),
-            "sharpe_ratio": round(sharpe, 3),
-            "trade_count": len(trades),
-            "turnover": round(float(np.nanmean(turnover_values)), 2) if turnover_values else 0.0,
-            "benchmark_return": round(_safe_float(benchmark_metrics.get("total_return")), 2),
-            "excess_return": round(excess_return, 2),
-            "benchmark_source": ctx.benchmark_code or "universe_equal_weight",
-            "protocol_version": STRICT_MINING_PROTOCOL_VERSION,
-        },
-        "benchmark_metrics": benchmark_metrics,
-        "equity_curve": _downsample_curve(equity_curve),
-        "normalized_curve": _downsample_curve(_normalize_curve(equity_curve)),
-        "benchmark_curve": _downsample_curve(benchmark_curve),
-        "benchmark_normalized_curve": _downsample_curve(_normalize_curve(benchmark_curve)),
-        "excess_curve": _downsample_curve(excess_curve),
-        "trades": trades[-200:],
-        "rejection_reasons": rejection_counts,
-    }
+def _select_validation_protocol(
+    factors: dict[str, pd.Series],
+    ctx: MiningDataContext,
+    config: StreamingMiningConfig,
+    splits: dict[str, set],
+    quality_metrics: dict,
+    complexity: int,
+    tested_count: int,
+) -> Optional[dict]:
+    best: Optional[dict] = None
+    for rebalance_days in _adaptive_rebalance_candidates(config.rebalance_days):
+        train_metrics = _segment_metrics(factors, ctx, splits["train"], forward_days=rebalance_days)
+        valid_core = _segment_metrics(factors, ctx, splits["valid"], forward_days=rebalance_days)
+        if _safe_float(valid_core.get("ic_count")) < 3:
+            continue
+        valid_metrics = {**valid_core, **quality_metrics}
+        direction = "bottom" if _safe_float(valid_metrics.get("ic_mean")) < 0 or _safe_float(valid_metrics.get("long_short_return")) < 0 else "top"
+        valid_backtest = _backtest_from_factors(
+            factors,
+            ctx,
+            config.settings,
+            select_pct=config.select_pct,
+            rebalance_days=rebalance_days,
+            direction=direction,
+            dates=splits["valid"],
+        )
+        if "error" in valid_backtest or not valid_backtest.get("normalized_curve"):
+            continue
+        score = _validation_protocol_score(valid_metrics, valid_backtest["metrics"], complexity, tested_count)
+        candidate = {
+            "rebalance_days": rebalance_days,
+            "train_metrics": train_metrics,
+            "valid_metrics": valid_metrics,
+            "valid_backtest": valid_backtest,
+            "direction": direction,
+            "selection_score": score,
+        }
+        if best is None or score > best["selection_score"]:
+            best = candidate
+    return best
 
 
 def _score_candidate(valid_metrics: dict, valid_backtest_metrics: dict, complexity: int, tested_count: int = 0) -> float:
@@ -1881,6 +2080,29 @@ def _institutional_final_score(
     )
 
 
+def _validation_status(
+    rejection_reasons: list[str],
+    significance: dict,
+    overfit_risk: dict,
+    capacity: dict,
+    robustness: dict,
+    test_metrics: dict,
+    test_backtest_metrics: dict,
+    config: StreamingMiningConfig,
+) -> str:
+    directional_ic = abs(_safe_float(test_metrics.get("ic_mean")))
+    excess_return = _safe_float(test_backtest_metrics.get("excess_return"))
+    dsr = _safe_float(significance.get("dsr"))
+    robustness_score = _safe_float(robustness.get("robustness_score"))
+    capacity_score = _safe_float(capacity.get("capacity_score"))
+    pbo = str(overfit_risk.get("pbo_risk") or "unknown")
+    if not rejection_reasons and dsr >= config.min_dsr and pbo != "high" and robustness_score >= 35 and capacity_score >= 25:
+        return "institutional_pass"
+    if excess_return > 0 or directional_ic > 0.003 or robustness_score >= 25:
+        return "research_candidate"
+    return "evaluated_weak"
+
+
 def _directional_ic(metrics: dict, direction: str) -> float:
     value = _safe_float(metrics.get("ic_mean"))
     return value if direction != "bottom" else -value
@@ -1953,15 +2175,21 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
     splits = folds[-1] if folds else _date_splits(ctx.all_dates)
     if len(splits["valid"]) < 3 or len(splits["test"]) < 3:
         return None
-    train_metrics = _segment_metrics(factors, ctx, splits["train"])
-    valid_metrics = {**_segment_metrics(factors, ctx, splits["valid"]), **quality_metrics}
-    test_metrics = _segment_metrics(factors, ctx, splits["test"])
-    direction = "bottom" if _safe_float(valid_metrics.get("ic_mean")) < 0 or _safe_float(valid_metrics.get("long_short_return")) < 0 else "top"
+    complexity = _expression_complexity(expression)
+    protocol = _select_validation_protocol(factors, ctx, config, splits, quality_metrics, complexity, tested_count)
+    if not protocol:
+        return None
+    chosen_rebalance_days = int(protocol["rebalance_days"])
+    train_metrics = protocol["train_metrics"]
+    valid_metrics = protocol["valid_metrics"]
+    valid_backtest = protocol["valid_backtest"]
+    direction = protocol["direction"]
+    test_metrics = _segment_metrics(factors, ctx, splits["test"], forward_days=chosen_rebalance_days)
 
     fold_checks = []
     for fold in folds:
-        fold_valid = _segment_metrics(factors, ctx, fold["valid"])
-        fold_test = _segment_metrics(factors, ctx, fold["test"])
+        fold_valid = _segment_metrics(factors, ctx, fold["valid"], forward_days=chosen_rebalance_days)
+        fold_test = _segment_metrics(factors, ctx, fold["test"], forward_days=chosen_rebalance_days)
         fold_checks.append(
             {
                 "valid_ic": _safe_float(fold_valid.get("ic_mean")),
@@ -1973,34 +2201,34 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
     directional_folds = [
         1
         for fold in fold_checks
-        if (_safe_float(fold.get("valid_ic")) >= 0 and direction == "top")
-        or (_safe_float(fold.get("valid_ic")) < 0 and direction == "bottom")
+        if (_safe_float(fold.get("test_ic")) >= 0 and direction == "top")
+        or (_safe_float(fold.get("test_ic")) < 0 and direction == "bottom")
     ]
 
-    valid_backtest = _backtest_from_factors(
-        factors,
-        ctx,
-        config.settings,
-        select_pct=config.select_pct,
-        rebalance_days=config.rebalance_days,
-        direction=direction,
-        dates=splits["valid"],
-    )
-    if "error" in valid_backtest or not valid_backtest.get("normalized_curve"):
-        return None
     test_backtest = _backtest_from_factors(
         factors,
         ctx,
         config.settings,
         select_pct=config.select_pct,
-        rebalance_days=config.rebalance_days,
+        rebalance_days=chosen_rebalance_days,
         direction=direction,
         dates=splits["test"],
     )
     if "error" in test_backtest or not test_backtest.get("normalized_curve"):
         return None
 
-    complexity = _expression_complexity(expression)
+    display_backtest = _backtest_from_factors(
+        factors,
+        ctx,
+        config.settings,
+        select_pct=config.select_pct,
+        rebalance_days=chosen_rebalance_days,
+        direction=direction,
+        dates=None,
+    )
+    if "error" in display_backtest or not display_backtest.get("normalized_curve"):
+        display_backtest = test_backtest
+
     discovery_score = _score_candidate(valid_metrics, valid_backtest["metrics"], complexity, tested_count)
     rejection_reasons = _strict_acceptance_reasons(
         valid_metrics,
@@ -2009,9 +2237,6 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         test_backtest["metrics"],
         direction,
     )
-    if rejection_reasons:
-        return None
-    final_score = _final_oos_score(test_metrics, test_backtest["metrics"], complexity)
     significance = _candidate_significance(test_metrics, test_backtest["metrics"], tested_count)
     overfit_risk = {
         "pbo_risk": _pbo_risk(valid_metrics, test_metrics, valid_backtest["metrics"], test_backtest["metrics"]),
@@ -2022,17 +2247,38 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
     capacity = _capacity_summary(test_backtest["metrics"], config.select_pct)
     robustness = _robustness_summary(fold_checks, valid_metrics, test_metrics, valid_backtest["metrics"], test_backtest["metrics"], direction)
     fingerprint = _factor_fingerprint(expression)
-    if significance["dsr"] < config.min_dsr:
-        return None
-    if overfit_risk["pbo_risk"] == "high" and robustness["robustness_score"] < 35:
-        return None
-    if robustness["walk_forward_pass_ratio"] < 0.34:
-        return None
+    validation_status = _validation_status(
+        rejection_reasons,
+        significance,
+        overfit_risk,
+        capacity,
+        robustness,
+        test_metrics,
+        test_backtest["metrics"],
+        config,
+    )
     final_score = _institutional_final_score(test_metrics, test_backtest["metrics"], significance, overfit_risk, capacity, robustness, complexity)
+    test_excess = _safe_float(test_backtest["metrics"].get("excess_return"))
+    max_drawdown = max(_safe_float(test_backtest["metrics"].get("max_drawdown")), 0.0)
+    directional_test_ic = _directional_ic(test_metrics, direction)
+    if validation_status == "evaluated_weak":
+        final_score -= 0.35
+    elif validation_status == "research_candidate":
+        final_score += 0.05
+    if test_excess < -3.0:
+        return None
+    if validation_status == "evaluated_weak" and (test_excess < -0.5 or final_score < -0.15):
+        return None
+    if validation_status == "research_candidate" and test_excess < 0.0 and directional_test_ic <= 0.002:
+        return None
+    if max_drawdown > 45.0 and test_excess < 0.0:
+        return None
 
     backtest_metrics = {
         **test_backtest["metrics"],
         "discovery_score": discovery_score,
+        "validation_selection_score": protocol["selection_score"],
+        "chosen_rebalance_days": chosen_rebalance_days,
         "test_excess_return": _safe_float(test_backtest["metrics"].get("excess_return")),
         "validation_excess_return": _safe_float(valid_backtest["metrics"].get("excess_return")),
         "protocol_version": STRICT_MINING_PROTOCOL_VERSION,
@@ -2046,6 +2292,8 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         "robustness_score": robustness["robustness_score"],
         "walk_forward_pass_ratio": robustness["walk_forward_pass_ratio"],
         "neutralization": config.neutralize or DEFAULT_NEUTRALIZE_MODE,
+        "validation_status": validation_status,
+        "validation_reasons": rejection_reasons,
     }
     return {
         "name": candidate.name,
@@ -2063,25 +2311,40 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         "robustness": robustness,
         "fingerprint": fingerprint,
         "correlation_cluster": "",
-        "revalidation_status": "strict_passed",
+        "revalidation_status": validation_status,
         "direction": direction,
         "complexity": complexity,
         "score": final_score,
         "metrics": {**valid_metrics, "score_basis": "validation_only", "protocol_version": STRICT_MINING_PROTOCOL_VERSION},
-        "train_metrics": {**train_metrics, "protocol_version": STRICT_MINING_PROTOCOL_VERSION},
-        "valid_metrics": valid_metrics,
-        "test_metrics": {**test_metrics, "protocol_version": STRICT_MINING_PROTOCOL_VERSION},
+        "train_metrics": {**train_metrics, "protocol_version": STRICT_MINING_PROTOCOL_VERSION, "forward_days": chosen_rebalance_days},
+        "valid_metrics": {**valid_metrics, "forward_days": chosen_rebalance_days},
+        "test_metrics": {**test_metrics, "protocol_version": STRICT_MINING_PROTOCOL_VERSION, "forward_days": chosen_rebalance_days},
         "backtest_metrics": {
             **backtest_metrics,
             "benchmark_metrics": test_backtest.get("benchmark_metrics", {}),
-            "benchmark_curve": test_backtest.get("benchmark_curve", []),
-            "benchmark_normalized_curve": test_backtest.get("benchmark_normalized_curve", []),
-            "excess_curve": test_backtest.get("excess_curve", []),
+            "benchmark_curve": display_backtest.get("benchmark_curve", []),
+            "benchmark_normalized_curve": display_backtest.get("benchmark_normalized_curve", []),
+            "excess_curve": display_backtest.get("excess_curve", []),
+            "display_scope": "full_period" if display_backtest is not test_backtest else "test_segment_fallback",
+            "display_start_date": config.start_date,
+            "display_end_date": config.end_date,
+            "display_metrics": display_backtest.get("metrics", {}),
+            "display_benchmark_metrics": display_backtest.get("benchmark_metrics", {}),
+            "display_equity_curve": display_backtest.get("equity_curve", []),
+            "display_normalized_curve": display_backtest.get("normalized_curve", []),
+            "display_benchmark_curve": display_backtest.get("benchmark_curve", []),
+            "display_benchmark_normalized_curve": display_backtest.get("benchmark_normalized_curve", []),
+            "display_excess_curve": display_backtest.get("excess_curve", []),
+            "test_equity_curve": test_backtest.get("equity_curve", []),
+            "test_normalized_curve": test_backtest.get("normalized_curve", []),
+            "test_benchmark_curve": test_backtest.get("benchmark_curve", []),
+            "test_benchmark_normalized_curve": test_backtest.get("benchmark_normalized_curve", []),
+            "test_excess_curve": test_backtest.get("excess_curve", []),
             "trades": test_backtest.get("trades", []),
             "rejection_reasons": test_backtest.get("rejection_reasons", {}),
         },
-        "equity_curve": test_backtest["equity_curve"],
-        "normalized_curve": test_backtest["normalized_curve"],
+        "equity_curve": display_backtest["equity_curve"],
+        "normalized_curve": display_backtest["normalized_curve"],
     }
 
 
@@ -2234,9 +2497,202 @@ def _combine_expressions(left: str, right: str) -> str:
     return f"(rank({left}) + rank({right})) / 2"
 
 
+def _safe_mining_expression(expression: str, max_length: int = 600) -> bool:
+    text = str(expression or "").strip()
+    if not text or len(text) > max_length:
+        return False
+    lowered = text.lower()
+    forbidden = [
+        "__", "import", "eval", "exec", "open(", "compile(", "lambda",
+        "os.", "sys.", "subprocess", "socket", "http", "urllib", "requests",
+        "read", "write", "globals", "locals", "getattr", "setattr",
+    ]
+    if any(token in lowered for token in forbidden):
+        return False
+    if not re.fullmatch(r"[A-Za-z0-9_\s,\.\+\-\*/\(\)><=&\|]+", text):
+        return False
+    balance = 0
+    for char in text:
+        if char == "(":
+            balance += 1
+        elif char == ")":
+            balance -= 1
+        if balance < 0:
+            return False
+    return balance == 0
+
+
+def _institutional_candidate_bank(config: StreamingMiningConfig) -> list[Candidate]:
+    """Research-first candidates used before unconstrained grammar search."""
+    windows = [3, 5, 8, 10, 15, 20, 30, 60, 120]
+    rows: list[Candidate] = []
+    for window in windows:
+        short = max(2, min(10, window // 2 or 2))
+        long = max(window * 2, 20)
+        rows.extend(
+            [
+                Candidate(
+                    f"短反转低拥挤_{window}日",
+                    f"(-pctchange(close, {short}) - 0.45 * std(returns, {window}) - 0.15 * turnover_rate)",
+                    "短期过度反应在低波动、低换手环境下更容易修复，避免买入拥挤反弹。",
+                    "institutional_seed",
+                    "short_reversal",
+                    "A股短周期噪声交易占比高，反转信号需要用波动和拥挤度约束以降低交易成本后的失效概率。",
+                ),
+                Candidate(
+                    f"质量动量_{window}日",
+                    f"(pctchange(close, {window}) / (std(returns, {window}) + 0.0001) - abs(close / (ts_max(high, {long}) + 0.0001) - 1))",
+                    "收益动量除以波动，并惩罚距离阶段高点过远的弱趋势。",
+                    "institutional_seed",
+                    "volatility_adjusted_momentum",
+                    "趋势延续需要同时满足单位风险收益较高和回撤可控，否则容易只是高噪声反弹。",
+                ),
+                Candidate(
+                    f"低估值低波_{window}日",
+                    f"(-pb - 0.5 * std(returns, {window}) - 0.1 * turnover_rate)",
+                    "低PB、低波动、低换手组合，偏防御型价值暴露。",
+                    "institutional_seed",
+                    "valuation_quality_proxy",
+                    "价值因子需要结合风险质量和拥挤度，降低价值陷阱和交易拥挤风险。",
+                ),
+                Candidate(
+                    f"收盘强度压缩_{window}日",
+                    f"(mean((close - low) / (high - low + 0.0001), {short}) - std(returns, {window}))",
+                    "持续收盘靠近高点且波动收敛，刻画温和资金推动。",
+                    "institutional_seed",
+                    "range_breakout_quality",
+                    "突破前的波动压缩和收盘强度比单纯价格创新高更接近可交易趋势。",
+                ),
+                Candidate(
+                    f"量先价后确认_{window}日",
+                    f"(corr(delay(pctchange(vol, 1), 1), pctchange(close, 1), {window}) - 0.35 * std(returns, {window}))",
+                    "成交量变化领先价格变化，并用波动惩罚过滤噪声。",
+                    "institutional_seed",
+                    "price_volume_structure",
+                    "资金行为通常先体现为成交变化，若后续价格跟随且波动不过高，信号更稳定。",
+                ),
+                Candidate(
+                    f"拥挤反向_{window}日",
+                    f"(-abs(pctchange(close, {short})) * (mean(vol, {short}) / (mean(vol, {long}) + 0.0001)))",
+                    "短期大幅涨跌叠加放量视为拥挤冲击，做反向评分。",
+                    "institutional_seed",
+                    "liquidity_and_crowding",
+                    "拥挤交易后的边际买盘/卖盘容易衰减，交易成本后需要规避高冲击标的。",
+                ),
+            ]
+        )
+    if config.factor_themes:
+        allowed = set(config.factor_themes)
+        rows = [item for item in rows if item.theme in allowed]
+    deduped: list[Candidate] = []
+    seen: set[str] = set()
+    for item in rows:
+        if item.expression in seen:
+            continue
+        seen.add(item.expression)
+        deduped.append(item)
+    return deduped
+
+
+def _parse_llm_candidates(raw_text: str, config: StreamingMiningConfig) -> list[Candidate]:
+    text = str(raw_text or "").strip()
+    if not text:
+        return []
+    match = re.search(r"\{.*\}", text, re.S)
+    if match:
+        text = match.group(0)
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return []
+    rows = payload.get("candidates") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        return []
+    allowed_themes = set(config.factor_themes or ())
+    result: list[Candidate] = []
+    for idx, row in enumerate(rows[:12], start=1):
+        if not isinstance(row, dict):
+            continue
+        expression = str(row.get("expression") or "").strip()
+        if not _safe_mining_expression(expression, config.max_expression_length):
+            continue
+        theme = str(row.get("theme") or "llm_research").strip()[:80]
+        if allowed_themes and theme not in allowed_themes:
+            continue
+        result.append(
+            Candidate(
+                name=str(row.get("name") or f"AI研究候选_{idx}")[:80],
+                expression=expression,
+                description=str(row.get("description") or "LLM proposed formulaic alpha candidate; QTsys real-data validation determines whether it is useful.")[:600],
+                source="llm_guided",
+                theme=theme,
+                hypothesis=str(row.get("hypothesis") or "Economically motivated formulaic alpha candidate.")[:800],
+            )
+        )
+    return result
+
+
+def _llm_guided_candidates(config: StreamingMiningConfig, elites: list[dict]) -> list[Candidate]:
+    settings = config.settings
+    api_key = str(getattr(settings, "llm_api_key", "") or "").strip()
+    base_url = str(getattr(settings, "llm_base_url", "") or "").strip()
+    model = str(getattr(settings, "llm_model", "") or "").strip()
+    if not api_key or not base_url or not model:
+        return []
+    elite_lines = []
+    for item in (elites or [])[:8]:
+        elite_lines.append(
+            f"- {item.get('name')}: expression={item.get('expression')}; "
+            f"score={_safe_float(item.get('score')):.4f}; "
+            f"test_excess={_safe_float((item.get('backtest_metrics') or {}).get('excess_return')):.2f}%"
+        )
+    prompt = f"""
+You generate formulaic alpha candidates for QTsys A-share factor mining.
+Return JSON only:
+{{"candidates":[{{"name":"","expression":"","theme":"","hypothesis":"","description":""}}]}}
+
+Allowed variables:
+close, open, high, low, vol, volume, returns, vwap, amount, pe, pb, ps, turnover_rate, circ_mv, total_mv, tr.
+
+Allowed functions/operators:
+rank, cs_rank, abs, neg, log, sqrt, signedpower, clip, mean, std, sum, ts_max, ts_min,
+ts_rank, delta, delay, pctchange, ts_decay, ewm, ts_argmax, ts_argmin, wma, decaylinear,
+corr, cov, regbeta, regresi, max, min, where, ternary.
+
+Rules:
+- Use only data available at or before the signal day; no future functions.
+- Do not output Python code, imports, comments, markdown, or explanations outside JSON.
+- Prefer simple economically grounded weak alphas, not high-complexity curve fitting.
+- Use A-share research themes: short reversal, volatility-adjusted momentum, liquidity/crowding,
+  value-quality, price-volume confirmation, range-compression breakout.
+- Generate 8 diverse expressions under {config.max_expression_length} characters.
+- Include parameter variants when relevant: 3, 5, 8, 10, 20, 30, 60, 120 days.
+
+Current validated elite factors:
+{chr(10).join(elite_lines) if elite_lines else "- No elite factor yet; prioritize robust research seeds."}
+""".strip()
+    try:
+        response = asyncio.run(
+            chat_complete_text(
+                api_key=api_key,
+                base_url=base_url,
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a skeptical quantitative researcher. You only propose testable factor expressions; real validation is handled elsewhere."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.45,
+                max_tokens=2600,
+            )
+        )
+    except Exception:
+        return []
+    return _parse_llm_candidates(response.get("content", ""), config)
+
+
 def _candidate_stream(config: StreamingMiningConfig, elite_provider) -> Candidate:
     random.seed(int(time.time()) % 10_000_000)
-    for item in _generate_template_candidates(80):
+    for item in _generate_template_candidates(220):
         if config.factor_themes and item.theme and item.theme not in config.factor_themes:
             continue
         yield item
@@ -2249,24 +2705,36 @@ def _candidate_stream(config: StreamingMiningConfig, elite_provider) -> Candidat
                 item.theme,
                 item.hypothesis,
             )
+    for item in _institutional_candidate_bank(config):
+        yield item
+    for item in _llm_guided_candidates(config, []):
+        yield item
     index = 1
+    llm_batches = 1
     _operator_pool_available()
     while True:
         elites = elite_provider()
-        if len(elites) >= 2 and random.random() < 0.35:
+        if llm_batches < 4 and (index == 1 or (elites and index % 80 == 0)):
+            llm_batches += 1
+            for item in _llm_guided_candidates(config, elites):
+                yield item
+        if len(elites) >= 2 and random.random() < 0.42:
             left, right = random.sample(elites[: min(len(elites), 20)], 2)
+            left_name = re.sub(r"\s+", "", str(left.get("name") or "因子A"))[:12]
+            right_name = re.sub(r"\s+", "", str(right.get("name") or "因子B"))[:12]
             yield Candidate(
-                f"elite_ensemble_{index}",
+                f"精英组合_{left_name}_{right_name}",
                 _combine_expressions(left["expression"], right["expression"]),
                 "Non-negative rank ensemble of validated elite factors.",
                 "ensemble",
                 "ensemble_factor",
                 "Low-correlation validated factors may diversify idiosyncratic noise.",
             )
-        elif elites and random.random() < 0.35:
+        elif elites and random.random() < 0.38:
             base = random.choice(elites[: min(len(elites), 20)])
+            base_name = re.sub(r"\s+", "", str(base.get("name") or "因子"))[:16]
             yield Candidate(
-                f"elite_mutation_{index}",
+                f"{base_name}_邻域优化{index}",
                 _mutate_expression(base["expression"]),
                 "Neighborhood mutation of a validated elite factor.",
                 "elite_mutation",
@@ -2285,12 +2753,6 @@ def _candidate_stream(config: StreamingMiningConfig, elite_provider) -> Candidat
         index += 1
 
 
-def _parameterized_factor_name(base_name: str, window: int) -> str:
-    clean = re.sub(r"^\d+\s*日", "", str(base_name or "").strip())
-    clean = clean.strip("_- ") or str(base_name or "因子").strip() or "因子"
-    return f"{clean}_{int(window)}日"
-
-
 def _parameter_neighbors(expression: str) -> list[tuple[str, int]]:
     result = []
     for old_text in sorted(set(re.findall(r",\s*(\d+)\)", expression))):
@@ -2307,61 +2769,103 @@ def _parameter_neighbors(expression: str) -> list[tuple[str, int]]:
 def _parameterized_factor_name(base_name: str, window: int) -> str:
     clean = re.sub(r"^\d+\s*[dD日]?", "", str(base_name or "").strip())
     clean = re.sub(r"_[0-9]+[dD日]?$", "", clean)
-    clean = clean.strip("_- ") or "factor"
-    return f"{clean}_{int(window)}d"
+    clean = clean.strip("_- ") or "因子"
+    return f"{clean}_{int(window)}日"
 
 
 async def _update_mining_session(session_id: str, **patch):
-    async with async_session() as db:
-        patch["updated_at"] = datetime.utcnow()
-        await db.execute(update(FactorMiningSession).where(FactorMiningSession.session_id == session_id).values(**patch))
-        await db.commit()
+    for attempt in range(6):
+        try:
+            async with async_session() as db:
+                patch["updated_at"] = datetime.utcnow()
+                await db.execute(update(FactorMiningSession).where(FactorMiningSession.session_id == session_id).values(**patch))
+                await db.commit()
+                return
+        except OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt >= 5:
+                raise
+            await _sleep_for_db_retry(attempt)
 
 
 async def _insert_candidate(session_id: str, payload: dict) -> Optional[int]:
-    async with async_session() as db:
-        existing = await db.execute(
-            select(FactorMiningCandidate).where(
-                FactorMiningCandidate.session_id == session_id,
-                FactorMiningCandidate.expression_hash == payload["expression_hash"],
-            )
-        )
-        if existing.scalar_one_or_none():
+    for attempt in range(6):
+        try:
+            async with async_session() as db:
+                existing = await db.execute(
+                    select(FactorMiningCandidate).where(
+                        FactorMiningCandidate.session_id == session_id,
+                        FactorMiningCandidate.expression_hash == payload["expression_hash"],
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    return None
+                candidate = FactorMiningCandidate(session_id=session_id, **payload)
+                db.add(candidate)
+                await db.commit()
+                await db.refresh(candidate)
+                return candidate.id
+        except IntegrityError:
             return None
-        candidate = FactorMiningCandidate(session_id=session_id, **payload)
-        db.add(candidate)
-        await db.commit()
-        await db.refresh(candidate)
-        return candidate.id
+        except OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt >= 5:
+                raise
+            await _sleep_for_db_retry(attempt)
+    return None
+
+
+async def _set_candidate_cluster(candidate_id: int, cluster_key: str):
+    for attempt in range(6):
+        try:
+            async with async_session() as db:
+                await db.execute(
+                    update(FactorMiningCandidate)
+                    .where(FactorMiningCandidate.id == candidate_id)
+                    .values(correlation_cluster=cluster_key)
+                )
+                await db.commit()
+                return
+        except OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt >= 5:
+                raise
+            await _sleep_for_db_retry(attempt)
 
 
 async def _insert_trial_log(session_id: str, candidate: Candidate, stage: str, reasons: list[str], score: float = 0.0, metrics: Optional[dict] = None):
-    async with async_session() as db:
-        expr_hash = _expression_hash(candidate.expression)
-        existing = await db.execute(
-            select(FactorMiningTrialLog).where(
-                FactorMiningTrialLog.session_id == session_id,
-                FactorMiningTrialLog.expression_hash == expr_hash,
-                FactorMiningTrialLog.stage == stage,
-            )
-        )
-        if existing.scalar_one_or_none():
+    for attempt in range(6):
+        try:
+            async with async_session() as db:
+                expr_hash = _expression_hash(candidate.expression)
+                existing = await db.execute(
+                    select(FactorMiningTrialLog).where(
+                        FactorMiningTrialLog.session_id == session_id,
+                        FactorMiningTrialLog.expression_hash == expr_hash,
+                        FactorMiningTrialLog.stage == stage,
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    return
+                db.add(
+                    FactorMiningTrialLog(
+                        session_id=session_id,
+                        expression_hash=expr_hash,
+                        name=candidate.name,
+                        source=candidate.source,
+                        theme=candidate.theme,
+                        expression=candidate.expression,
+                        stage=stage,
+                        score=float(score or 0.0),
+                        metrics=metrics or {},
+                        rejection_reasons=reasons,
+                    )
+                )
+                await db.commit()
+                return
+        except IntegrityError:
             return
-        db.add(
-            FactorMiningTrialLog(
-                session_id=session_id,
-                expression_hash=expr_hash,
-                name=candidate.name,
-                source=candidate.source,
-                theme=candidate.theme,
-                expression=candidate.expression,
-                stage=stage,
-                score=float(score or 0.0),
-                metrics=metrics or {},
-                rejection_reasons=reasons,
-            )
-        )
-        await db.commit()
+        except OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt >= 5:
+                raise
+            await _sleep_for_db_retry(attempt)
 
 
 async def _upsert_correlation_cluster(session_id: str, payload: dict, candidate_id: int, elites: list[dict]) -> str:
@@ -2384,38 +2888,47 @@ async def _upsert_correlation_cluster(session_id: str, payload: dict, candidate_
             best_cluster = str(item.get("correlation_cluster") or f"cluster_{item.get('id') or candidate_id}")
     cluster_key = best_cluster if best_corr >= 0.85 else f"cluster_{candidate_id}"
     payload["correlation_cluster"] = cluster_key
-    async with async_session() as db:
-        existing = await db.execute(
-            select(FactorCorrelationCluster).where(
-                FactorCorrelationCluster.session_id == session_id,
-                FactorCorrelationCluster.cluster_key == cluster_key,
-            )
-        )
-        row = existing.scalar_one_or_none()
-        member = {
-            "candidate_id": candidate_id,
-            "name": payload.get("name"),
-            "expression_hash": payload.get("expression_hash") or _expression_hash(expression),
-            "score": payload.get("score", 0.0),
-        }
-        if row:
-            members = list(row.members or [])
-            if not any(item.get("candidate_id") == candidate_id for item in members):
-                members.append(member)
-            row.members = members[-100:]
-            row.max_abs_corr = max(float(row.max_abs_corr or 0.0), best_corr)
-            row.updated_at = datetime.utcnow()
-        else:
-            db.add(
-                FactorCorrelationCluster(
-                    session_id=session_id,
-                    cluster_key=cluster_key,
-                    representative_candidate_id=candidate_id,
-                    members=[member],
-                    max_abs_corr=best_corr,
+    member = {
+        "candidate_id": candidate_id,
+        "name": payload.get("name"),
+        "expression_hash": payload.get("expression_hash") or _expression_hash(expression),
+        "score": payload.get("score", 0.0),
+    }
+    for attempt in range(6):
+        try:
+            async with async_session() as db:
+                existing = await db.execute(
+                    select(FactorCorrelationCluster).where(
+                        FactorCorrelationCluster.session_id == session_id,
+                        FactorCorrelationCluster.cluster_key == cluster_key,
+                    )
                 )
-            )
-        await db.commit()
+                row = existing.scalar_one_or_none()
+                if row:
+                    members = list(row.members or [])
+                    if not any(item.get("candidate_id") == candidate_id for item in members):
+                        members.append(member)
+                    row.members = members[-100:]
+                    row.max_abs_corr = max(float(row.max_abs_corr or 0.0), best_corr)
+                    row.updated_at = datetime.utcnow()
+                else:
+                    db.add(
+                        FactorCorrelationCluster(
+                            session_id=session_id,
+                            cluster_key=cluster_key,
+                            representative_candidate_id=candidate_id,
+                            members=[member],
+                            max_abs_corr=best_corr,
+                        )
+                    )
+                await db.commit()
+                return cluster_key
+        except IntegrityError:
+            return cluster_key
+        except OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt >= 5:
+                raise
+            await _sleep_for_db_retry(attempt)
     return cluster_key
 
 
@@ -2442,6 +2955,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
         return asyncio.run(coro)
 
     try:
+        config.settings.capacity_limit_pct = config.capacity_limit_pct
         run_async(_update_mining_session(session_id, status="running", phase="preload", message="正在准备股票池行情与财务数据"))
 
         last_progress_at = {"time": 0.0, "done": 0}
@@ -2483,7 +2997,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
                 run_async(_update_mining_session(
                     session_id,
                     phase="screening",
-                    message=f"正在筛选第 {tested} 个候选因子，已入选 {accepted} 个",
+                    message=f"正在真实评估第 {tested} 个候选因子，已展示 {accepted} 个",
                     tested_count=tested,
                     accepted_count=accepted,
                     best_score=max(best_score, 0.0),
@@ -2508,15 +3022,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
                 continue
             cluster_key = run_async(_upsert_correlation_cluster(session_id, payload, inserted_id, elites))
             if cluster_key:
-                async def _set_cluster():
-                    async with async_session() as db:
-                        await db.execute(
-                            update(FactorMiningCandidate)
-                            .where(FactorMiningCandidate.id == inserted_id)
-                            .values(correlation_cluster=cluster_key)
-                        )
-                        await db.commit()
-                run_async(_set_cluster())
+                run_async(_set_candidate_cluster(inserted_id, cluster_key))
             accepted += 1
             payload["id"] = inserted_id
             payload["correlation_cluster"] = cluster_key
@@ -2527,7 +3033,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
             run_async(_update_mining_session(
                 session_id,
                 phase="mining",
-                message=f"发现有效因子：{payload['name']}，评分 {payload['score']:.4f}",
+                message=f"已完成真实评估：{payload['name']}，评级 {payload.get('revalidation_status', '-')}，评分 {payload['score']:.4f}",
                 tested_count=tested,
                 accepted_count=accepted,
                 best_score=max(best_score, 0.0),
@@ -2704,8 +3210,35 @@ async def get_streaming_mining_status(db: AsyncSession, session_id: str) -> dict
     }
 
 
+async def get_active_or_latest_mining_session(db: AsyncSession) -> dict:
+    """Return the active mining session, or the latest session for UI restoration."""
+    active_id = MINING_MANAGER.can_start()
+    if active_id:
+        status = await get_streaming_mining_status(db, active_id)
+        return {"has_session": True, "active": True, "session": status}
+
+    result = await db.execute(
+        select(FactorMiningSession)
+        .order_by(FactorMiningSession.updated_at.desc(), FactorMiningSession.id.desc())
+        .limit(1)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        return {"has_session": False, "active": False, "session": None}
+    status = await get_streaming_mining_status(db, session.session_id)
+    return {"has_session": True, "active": False, "session": status}
+
+
 def _serialize_candidate(item: FactorMiningCandidate) -> dict:
     backtest_metrics = item.backtest_metrics or {}
+    display_equity_curve = backtest_metrics.get("display_equity_curve") or item.equity_curve or []
+    display_normalized_curve = backtest_metrics.get("display_normalized_curve") or item.normalized_curve or []
+    display_benchmark_curve = backtest_metrics.get("display_benchmark_curve") or backtest_metrics.get("benchmark_curve", [])
+    display_benchmark_normalized_curve = (
+        backtest_metrics.get("display_benchmark_normalized_curve")
+        or backtest_metrics.get("benchmark_normalized_curve", [])
+    )
+    display_excess_curve = backtest_metrics.get("display_excess_curve") or backtest_metrics.get("excess_curve", [])
     return {
         "id": item.id,
         "session_id": item.session_id,
@@ -2723,6 +3256,7 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
         "fingerprint": item.fingerprint or {},
         "correlation_cluster": item.correlation_cluster or "",
         "revalidation_status": item.revalidation_status or "",
+        "validation_status": item.revalidation_status or backtest_metrics.get("validation_status", ""),
         "direction": item.direction,
         "complexity": item.complexity,
         "score": item.score,
@@ -2731,12 +3265,26 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
         "valid_metrics": item.valid_metrics or {},
         "test_metrics": item.test_metrics or {},
         "backtest_metrics": backtest_metrics,
-        "equity_curve": item.equity_curve or [],
-        "normalized_curve": item.normalized_curve or [],
+        "equity_curve": display_equity_curve,
+        "normalized_curve": display_normalized_curve,
+        "display_equity_curve": display_equity_curve,
+        "display_normalized_curve": display_normalized_curve,
+        "display_benchmark_curve": display_benchmark_curve,
+        "display_benchmark_normalized_curve": display_benchmark_normalized_curve,
+        "display_excess_curve": display_excess_curve,
+        "display_metrics": backtest_metrics.get("display_metrics", {}),
+        "display_benchmark_metrics": backtest_metrics.get("display_benchmark_metrics", {}),
+        "display_scope": backtest_metrics.get("display_scope", ""),
+        "display_start_date": backtest_metrics.get("display_start_date", ""),
+        "display_end_date": backtest_metrics.get("display_end_date", ""),
+        "test_equity_curve": backtest_metrics.get("test_equity_curve", []),
+        "test_normalized_curve": backtest_metrics.get("test_normalized_curve", []),
+        "test_benchmark_normalized_curve": backtest_metrics.get("test_benchmark_normalized_curve", []),
+        "test_excess_curve": backtest_metrics.get("test_excess_curve", []),
         "protocol_version": item.protocol_version or backtest_metrics.get("protocol_version") or (item.metrics or {}).get("protocol_version") or "legacy_unverified",
-        "benchmark_curve": backtest_metrics.get("benchmark_curve", []),
-        "benchmark_normalized_curve": backtest_metrics.get("benchmark_normalized_curve", []),
-        "excess_curve": backtest_metrics.get("excess_curve", []),
+        "benchmark_curve": display_benchmark_curve,
+        "benchmark_normalized_curve": display_benchmark_normalized_curve,
+        "excess_curve": display_excess_curve,
         "benchmark_metrics": backtest_metrics.get("benchmark_metrics", {}),
         "test_excess_return": backtest_metrics.get("test_excess_return", backtest_metrics.get("excess_return", 0.0)),
         "rank_ic": backtest_metrics.get("rank_ic", (item.test_metrics or {}).get("rank_ic_mean", 0.0)),
@@ -2752,6 +3300,7 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
         "turnover": backtest_metrics.get("turnover", 0.0),
         "trade_count": backtest_metrics.get("trade_count", 0),
         "rejection_reasons": backtest_metrics.get("rejection_reasons", {}),
+        "validation_reasons": backtest_metrics.get("validation_reasons", []),
         "legacy_warning": (backtest_metrics.get("protocol_version") or (item.metrics or {}).get("protocol_version")) != STRICT_MINING_PROTOCOL_VERSION,
         "created_at": item.created_at.isoformat() if item.created_at else "",
     }
@@ -2816,10 +3365,12 @@ async def get_mining_research_report(db: AsyncSession, candidate_id: int) -> dic
                 "backtest": candidate.backtest_metrics or {},
             },
             "curves": {
-                "equity": candidate.equity_curve or [],
-                "normalized": candidate.normalized_curve or [],
-                "benchmark": (candidate.backtest_metrics or {}).get("benchmark_normalized_curve", []),
-                "excess": (candidate.backtest_metrics or {}).get("excess_curve", []),
+                "equity": item.get("display_equity_curve") or item.get("equity_curve") or [],
+                "normalized": item.get("display_normalized_curve") or item.get("normalized_curve") or [],
+                "benchmark": item.get("display_benchmark_normalized_curve") or item.get("benchmark_normalized_curve") or [],
+                "excess": item.get("display_excess_curve") or item.get("excess_curve") or [],
+                "test_equity": item.get("test_equity_curve") or [],
+                "test_normalized": item.get("test_normalized_curve") or [],
             },
             "joinquant": jq_notes,
             "settings": settings_summary,
@@ -2929,7 +3480,7 @@ async def revalidate_mining_candidate(db: AsyncSession, candidate_id: int) -> di
         candidate.robustness = payload["robustness"]
         candidate.fingerprint = payload["fingerprint"]
         candidate.correlation_cluster = payload.get("correlation_cluster") or candidate.correlation_cluster
-        candidate.revalidation_status = "strict_passed"
+        candidate.revalidation_status = payload.get("revalidation_status") or "research_candidate"
         await db.commit()
         await db.refresh(candidate)
         return {"success": True, "candidate": _serialize_candidate(candidate)}

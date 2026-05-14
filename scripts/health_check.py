@@ -110,7 +110,12 @@ with sync_playwright() as p:
     for path in pages:
         page = context.new_page()
         page.on('pageerror', lambda exc, path=path: errors.append(f'{path}: {exc}'))
-        page.on('console', lambda msg, path=path: errors.append(f'{path} console {msg.type}: {msg.text}') if msg.type == 'error' else None)
+        page.on(
+            'console',
+            lambda msg, path=path: errors.append(f'{path} console {msg.type}: {msg.text}')
+            if msg.type == 'error' and 'deoptimised the styling of /Inline Babel script' not in msg.text
+            else None,
+        )
         resp = page.goto('http://127.0.0.1:8000' + path, wait_until='domcontentloaded', timeout=30000)
         page.wait_for_timeout(1500)
         body = page.locator('body').inner_text(timeout=15000)
@@ -137,6 +142,7 @@ def main() -> int:
     checks = [
         ("Python compile", check_py_compile),
         ("No-lookahead invariants", lambda: check_script("validate_factor_no_lookahead.py")),
+        ("Canonical execution invariants", lambda: check_script("validate_execution_simulator.py")),
         ("Secret scan", lambda: check_script("security_check.py")),
         ("Backend smoke", check_backend),
     ]

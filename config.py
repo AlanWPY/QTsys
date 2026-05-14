@@ -1,9 +1,9 @@
-"""QTsys 配置模块。"""
+"""QTsys configuration module."""
 import os
 import shutil
 import sqlite3
 
-VERSION = "26.05.01"
+VERSION = "26.5.14"
 REPO_URL = "https://github.com/AlanWPY/QTsys.git"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -83,3 +83,4 @@ def build_mysql_url(host, port, user, password, database, async_mode=True):
 
 HOST = "0.0.0.0"
 PORT = 8000
+

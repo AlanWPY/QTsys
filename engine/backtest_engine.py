@@ -71,6 +71,7 @@ class BacktestEngine:
         self.positions: dict[str, Position] = {}
         self.pending_orders: list[Order] = []
         self.filled_orders: list[Order] = []
+        self.cancelled_orders: list[Order] = []
         self.equity_curve: list[dict] = []
         self.daily_returns: list[float] = []
         self.current_date: str = ""
@@ -93,6 +94,7 @@ class BacktestEngine:
         self.factor_series_cache: dict[tuple[str, str], pd.Series] = {}
         self.factor_run_start = ""
         self.factor_run_end = ""
+        self.exclude_star_market = True
 
     @property
     def portfolio_value(self) -> float:
@@ -197,6 +199,11 @@ class BacktestEngine:
                 order.reason = "无行情数据"
                 continue
 
+            if self.exclude_star_market and str(ts_code).upper().startswith("688"):
+                order.status = OrderStatus.CANCELLED
+                order.reason = "科创板默认过滤"
+                continue
+
             if self._risk_breached and order.side == OrderSide.BUY:
                 order.status = OrderStatus.CANCELLED
                 order.reason = "回撤熔断，禁止买入"
@@ -275,6 +282,7 @@ class BacktestEngine:
             self._fill_order(order, actual_amount, exec_price, commission, tax)
 
         self.filled_orders.extend([o for o in self.pending_orders if o.status == OrderStatus.FILLED])
+        self.cancelled_orders.extend([o for o in self.pending_orders if o.status == OrderStatus.CANCELLED])
         self.pending_orders.clear()
 
     def _fill_order(self, order: Order, amount: int, price: float, commission: float, tax: float):
@@ -502,10 +510,15 @@ class BacktestEngine:
             "execution_timing": "订单在下一交易日开盘撮合",
             "market_rules": "A股100股整数手、T+1可卖、涨跌停和成交量限制",
             "commission_rate": self.broker.commission_rate,
+            "min_commission": self.broker.min_commission,
             "stamp_tax_rate": self.broker.stamp_tax_rate,
             "slippage": self.broker.slippage,
+            "transfer_fee_rate": self.broker.transfer_fee_rate,
+            "volume_limit": self.broker.volume_limit,
             "max_position_pct": self.max_position_pct,
             "max_drawdown_limit": self.max_drawdown_limit,
+            "exclude_star_market": self.exclude_star_market,
+            "engine": "backtest_engine_next_open_a_share",
         }
 
     def run(
@@ -588,6 +601,10 @@ class BacktestEngine:
             self.initial_cash,
             self.portfolio_value,
         )
+        order_rejections = self._format_rejections()
+        if order_rejections:
+            metrics["order_reject_count"] = sum(item["count"] for item in order_rejections)
+            metrics["order_rejections"] = order_rejections
 
         return {
             "metrics": metrics,
@@ -596,6 +613,8 @@ class BacktestEngine:
             "daily_returns": [round(item, 6) for item in self.daily_returns],
             "benchmark_curve": self._build_benchmark_curve(),
             "logs": self.log_messages[-500:],
+            "order_rejections": order_rejections,
+            "order_trace": self._format_order_trace(),
             "final_value": round(self.portfolio_value, 2),
             "data_coverage": self._build_data_coverage_summary(universe, daily_basic_fields),
             "execution_model": self._build_execution_model_summary(),
@@ -650,3 +669,34 @@ class BacktestEngine:
                 }
             )
         return trades
+
+    def _format_rejections(self) -> list[dict]:
+        counts: dict[str, int] = {}
+        for order in self.cancelled_orders:
+            reason = order.reason or "未知原因"
+            counts[reason] = counts.get(reason, 0) + 1
+        return [
+            {"reason": reason, "count": count}
+            for reason, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        ]
+
+    def _format_order_trace(self) -> list[dict]:
+        rows = []
+        for order in [*self.filled_orders, *self.cancelled_orders]:
+            rows.append(
+                {
+                    "created_date": order.created_date,
+                    "filled_date": order.filled_date,
+                    "ts_code": order.ts_code,
+                    "side": order.side.value,
+                    "target_amount": order.amount,
+                    "filled_amount": order.filled_amount,
+                    "filled_price": round(order.filled_price, 4),
+                    "commission": round(order.commission, 2),
+                    "tax": round(order.tax, 2),
+                    "status": order.status.value,
+                    "reason": order.reason,
+                }
+            )
+        rows.sort(key=lambda item: (item.get("created_date") or "", item.get("filled_date") or "", item.get("ts_code") or ""))
+        return rows[-1000:]

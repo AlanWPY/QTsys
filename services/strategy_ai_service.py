@@ -38,7 +38,33 @@ STRATEGY_AI_SKILLS = [
         "name": "因子联动",
         "description": "可直接调用系统因子库，生成单因子或多因子量化策略。",
     },
+    {
+        "key": "institutional_quant_research",
+        "name": "机构级量化研究",
+        "description": "按 walk-forward、样本外检验、IC/IR、t-stat、p-value 和过拟合风险审查策略假设。",
+    },
+    {
+        "key": "market_data_validation",
+        "name": "市场数据校验",
+        "description": "强调所有信号必须基于真实行情、当前股票池和可交易数据，不允许模拟或占位数据。",
+    },
+    {
+        "key": "execution_cost_model",
+        "name": "执行成本建模",
+        "description": "要求策略考虑手续费、印花税、滑点、最小交易单位、仓位上限和成交失败场景。",
+    },
 ]
+
+QUANT_RESEARCH_GUARDRAILS = """
+机构级量化研究约束：
+- 不要承诺“稳定赚钱”或“必然有效”；策略只输出可验证假设和可执行代码。
+- 信号必须只使用当前交易日及以前可获得的数据；若使用收盘价信号，默认下一交易日执行。
+- 避免过拟合：参数数量要少，逻辑要能用行为金融、风险补偿、资金流或市场微结构解释。
+- 策略必须显式包含风控：单票仓位上限、调仓频率、止损/止盈或风险退出条件至少一种。
+- 策略说明必须提示后续验证：样本外收益、最大回撤、交易次数、换手率、手续费滑点后收益、基准超额收益。
+- 多因子策略优先使用 rank/标准化/等权或少量权重，不要生成复杂黑箱优化权重。
+- 禁止使用未来函数、全样本排序、全区间最大最小值、硬编码大段股票列表和外部联网请求。
+""".strip()
 
 ALLOWED_CONTEXT_APIS = [
     "context.universe",
@@ -454,8 +480,10 @@ def handle_data(context):
 - 信号、买卖规则、仓位规则、风控规则、调仓规则要完整。
 - 优先给出稳健、可解释、可维护的策略，不要只给空洞框架。
 - 如果用户要求优化当前策略，应基于当前策略改进，而不是脱离上下文重写。
+{QUANT_RESEARCH_GUARDRAILS}
 {market_block}
 你还可以调用系统因子库，因子目录摘要如下：
+{QUANT_RESEARCH_GUARDRAILS}
 {factor_catalog_text}
 
 {current_block}
@@ -487,6 +515,7 @@ strategy 中必须包含 name、description、code、logic_points、risk_points�
 优先复用因子库：context.get_factor / context.get_factor_history。
 禁止使用 hasattr/getattr/setattr；状态变量必须在 initialize(context) 中初始化。
 
+{QUANT_RESEARCH_GUARDRAILS}
 {factor_catalog_text}
 {current_block}
 """.strip()

@@ -64,6 +64,7 @@ async def selection_backtest(req: SelectionBacktestRequest, db: AsyncSession = D
         req.start_date, req.end_date,
         req.select_mode, req.select_pct,
         req.rebalance_days, req.initial_cash, req.benchmark,
+        settings.commission_rate, settings.stamp_tax_rate, settings.slippage,
     )
     return {"task_id": task_id}
 

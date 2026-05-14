@@ -1,0 +1,44 @@
+﻿{
+  "version": "26.5.14",
+  "enabled_skills": [
+    {
+      "name": "quantitative-research",
+      "source": "omer-metin/skills-for-antigravity@quantitative-research",
+      "role": "institutional research protocol",
+      "status": "installed",
+      "applies_to": ["strategy_ai", "factor_mining", "backtest_review"]
+    },
+    {
+      "name": "trading-quant",
+      "source": "lanyasheng/trading-quant@trading-quant",
+      "role": "multi-source market scan and trading diagnostics",
+      "status": "installed",
+      "applies_to": ["market_context", "strategy_ai", "news_analysis"]
+    },
+    {
+      "name": "market-data",
+      "source": "eng0ai/eng0-template-skills@market-data",
+      "role": "US market OHLCV, company details and news sentiment",
+      "status": "installed",
+      "applies_to": ["global_market_context", "strategy_ai", "portfolio_research"]
+    }
+  ],
+  "research_guardrails": {
+    "no_mock_market_data": true,
+    "signal_t_trade_next_open": true,
+    "require_transaction_costs": true,
+    "require_walk_forward_or_oos": true,
+    "require_trade_count": true,
+    "require_ic_ir_tstat_pvalue": true,
+    "flag_sharpe_above": 3.0,
+    "require_benchmark_excess": true,
+    "avoid_full_sample_ranking": true,
+    "avoid_survivorship_bias": true
+  },
+  "notes": [
+    "Installed skills become active after restarting Codex.",
+    "Runtime trading decisions still use QTsys local services and real configured data sources.",
+    "LLM output is treated as a hypothesis generator; validity must come from QTsys backtest and factor validation."
+  ]
+}
+

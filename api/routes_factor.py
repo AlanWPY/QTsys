@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from typing import Optional
 from database.connection import get_db
 from database.models import Settings, Factor, FactorResult
-from factor.builtin_factors import BUILTIN_FACTORS
+from factor.builtin_factors import BUILTIN_FACTORS, FACTOR_CATEGORIES, category_label, normalize_category
 from factor.alpha191_templates import get_alpha191_formula
 from factor.expression_to_graph import ExpressionToGraph
 from services.factor_catalog_service import load_factor_catalog
@@ -89,6 +89,9 @@ class JoinQuantCodeRequest(BaseModel):
     exclude_star_market: Optional[bool] = None
     exclude_st: bool = True
     slippage: float = 0.002
+    commission_rate: Optional[float] = None
+    stamp_tax_rate: Optional[float] = None
+    min_commission: float = 5.0
 
 
 # ===== 因子CRUD =====
@@ -97,14 +100,50 @@ class JoinQuantCodeRequest(BaseModel):
 async def list_factors(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Factor).order_by(Factor.created_at.desc()))
     factors = result.scalars().all()
+    payload = []
+    for f in factors:
+        category = normalize_category(f.category)
+        builtin_info = {}
+        expression = str(f.expression or "")
+        if expression.startswith("builtin:"):
+            builtin_info = BUILTIN_FACTORS.get(expression[8:], {})
+        payload.append({
+            "id": f.id,
+            "name": f.name,
+            "display_name": builtin_info.get("display_name") or f.name,
+            "description": f.description,
+            "expression": f.expression,
+            "category": category,
+            "category_label": category_label(category),
+            "source": f.source,
+            "graph_json": f.graph_json or None,
+            "mining_metadata": (f.graph_json or {}).get("mining", {}) if isinstance(f.graph_json, dict) else {},
+            "created_at": f.created_at.isoformat() if f.created_at else "",
+        })
+    return payload
+
+
+@router.get("/categories")
+async def list_factor_categories(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Factor))
+    counts = {key: 0 for key in FACTOR_CATEGORIES}
+    for factor in result.scalars().all():
+        counts[normalize_category(factor.category)] = counts.get(normalize_category(factor.category), 0) + 1
+    builtin_counts = {key: 0 for key in FACTOR_CATEGORIES}
+    for info in BUILTIN_FACTORS.values():
+        key = normalize_category(info.get("category"))
+        builtin_counts[key] = builtin_counts.get(key, 0) + 1
     return [
         {
-            "id": f.id, "name": f.name, "description": f.description,
-            "expression": f.expression, "category": f.category,
-            "source": f.source,
-            "created_at": f.created_at.isoformat() if f.created_at else "",
+            "key": key,
+            "label": meta["label"],
+            "jq_key": meta.get("jq_key", key),
+            "description": meta.get("description", ""),
+            "accent": meta.get("accent", "#94a3b8"),
+            "count": counts.get(key, 0),
+            "builtin_count": builtin_counts.get(key, 0),
         }
-        for f in factors
+        for key, meta in FACTOR_CATEGORIES.items()
     ]
 
 
@@ -117,7 +156,7 @@ async def get_factor_catalog(db: AsyncSession = Depends(get_db)):
 async def create_factor(data: FactorCreate, db: AsyncSession = Depends(get_db)):
     f = Factor(
         name=data.name, description=data.description,
-        expression=data.expression, category=data.category, source="user",
+        expression=data.expression, category=normalize_category(data.category), source="user",
     )
     db.add(f)
     await db.commit()
@@ -158,13 +197,20 @@ async def get_factor_joinquant_code(factor_id: int, db: AsyncSession = Depends(g
     factor = result.scalar_one_or_none()
     if not factor:
         raise HTTPException(status_code=404, detail="因子不存在")
+    settings_result = await db.execute(select(Settings).where(Settings.id == 1))
+    settings = settings_result.scalar_one_or_none()
     return {
         "id": factor.id,
         "name": factor.name,
         "expression": factor.expression,
         "category": factor.category,
         "source": factor.source,
-        "code": build_joinquant_backtest_code(factor),
+        "code": build_joinquant_backtest_code(
+            factor,
+            commission_rate=getattr(settings, "commission_rate", 0.0003) if settings else 0.0003,
+            stamp_tax_rate=getattr(settings, "stamp_tax_rate", 0.001) if settings else 0.001,
+            slippage=getattr(settings, "slippage", 0.002) if settings else 0.002,
+        ),
     }
 
 
@@ -178,6 +224,11 @@ async def create_factor_joinquant_code(
     factor = result.scalar_one_or_none()
     if not factor:
         raise HTTPException(status_code=404, detail="因子不存在")
+    settings_result = await db.execute(select(Settings).where(Settings.id == 1))
+    settings = settings_result.scalar_one_or_none()
+    commission_rate = req.commission_rate if req.commission_rate is not None else (getattr(settings, "commission_rate", 0.0003) if settings else 0.0003)
+    stamp_tax_rate = req.stamp_tax_rate if req.stamp_tax_rate is not None else (getattr(settings, "stamp_tax_rate", 0.001) if settings else 0.001)
+    slippage = req.slippage if req.slippage is not None else (getattr(settings, "slippage", 0.002) if settings else 0.002)
     return {
         "id": factor.id,
         "name": factor.name,
@@ -202,7 +253,10 @@ async def create_factor_joinquant_code(
             include_star_market=req.include_star_market,
             exclude_star_market=req.exclude_star_market,
             exclude_st=req.exclude_st,
-            slippage=req.slippage,
+            slippage=slippage,
+            commission_rate=commission_rate,
+            stamp_tax_rate=stamp_tax_rate,
+            min_commission=req.min_commission,
         ),
     }
 
@@ -211,19 +265,34 @@ async def create_factor_joinquant_code(
 async def init_builtin_factors(db: AsyncSession = Depends(get_db)):
     """初始化内置因子"""
     created = 0
+    updated = 0
     for name, info in BUILTIN_FACTORS.items():
         result = await db.execute(select(Factor).where(Factor.name == name))
-        if result.scalar_one_or_none():
+        existing = result.scalar_one_or_none()
+        if existing:
+            changed = False
+            next_values = {
+                "description": info["description"],
+                "expression": info["expression"],
+                "category": normalize_category(info["category"]),
+                "source": "builtin",
+            }
+            for field, value in next_values.items():
+                if getattr(existing, field) != value:
+                    setattr(existing, field, value)
+                    changed = True
+            if changed:
+                updated += 1
             continue
         f = Factor(
             name=name, description=info["description"],
             expression=info["expression"],
-            category=info["category"], source="builtin",
+            category=normalize_category(info["category"]), source="builtin",
         )
         db.add(f)
         created += 1
     await db.commit()
-    return {"message": f"已创建{created}个内置因子", "created": created}
+    return {"message": f"已创建{created}个、更新{updated}个内置因子", "created": created, "updated": updated}
 
 
 # ===== 因子评价 =====

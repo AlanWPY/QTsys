@@ -146,9 +146,111 @@ async def get_result(result_id: int, db: AsyncSession = Depends(get_db)):
         "validation_note": (r.metrics or {}).get("validation_note", ""),
         "equity_curve": r.equity_curve,
         "trades": r.trades,
+        "order_rejections": (r.metrics or {}).get("order_rejections", []),
+        "order_trace": (r.metrics or {}).get("order_trace", []),
         "daily_returns": r.daily_returns,
         "benchmark_curve": r.benchmark_curve or [],
     })
+
+
+@router.get("/parity_package/{result_id}")
+async def get_parity_package(result_id: int, db: AsyncSession = Depends(get_db)):
+    """Return a JoinQuant parity package for a stored local backtest result.
+
+    The package is intentionally read-only: it exposes assumptions, curves,
+    trades and rejection summaries so users can compare local behavior with
+    an external platform day by day.
+    """
+    result = await db.execute(select(BacktestResult).where(BacktestResult.id == result_id))
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="结果不存在")
+    metrics = r.metrics or {}
+    execution_model = metrics.get("execution_model", {})
+    data_coverage = metrics.get("data_coverage", {})
+    trades = r.trades or []
+    by_date: dict[str, list[dict]] = {}
+    for trade in trades:
+        date_key = str(trade.get("date") or "")
+        by_date.setdefault(date_key, []).append(trade)
+    package = {
+        "result_id": r.id,
+        "strategy_name": repair_text(r.strategy_name),
+        "period": {"start_date": r.start_date, "end_date": r.end_date},
+        "universe": normalize_universe_label(r.universe),
+        "initial_cash": r.initial_cash,
+        "final_value": r.final_value,
+        "metrics": metrics,
+        "assumptions": {
+            "validation_note": metrics.get("validation_note", ""),
+            "execution_model": execution_model,
+            "data_coverage": data_coverage,
+            "joinquant_alignment": [
+                "保持相同股票池、起止日期、调仓周期、TopN/仓位参数。",
+                "保持相同手续费、最低佣金、印花税、滑点和科创板/ST过滤设置。",
+                "逐日比较本地 trades_by_date 与 JoinQuant 成交/拒单日志。",
+            ],
+        },
+        "curves": {
+            "equity_curve": r.equity_curve or [],
+            "benchmark_curve": r.benchmark_curve or [],
+            "daily_returns": r.daily_returns or [],
+        },
+        "trades": trades,
+        "trades_by_date": by_date,
+        "order_rejections": metrics.get("order_rejections", []),
+        "order_trace": metrics.get("order_trace", []),
+    }
+    return normalize_text_payload(package)
+
+
+@router.get("/parity_export/{result_id}")
+async def export_parity_package(result_id: int, db: AsyncSession = Depends(get_db)):
+    """Export local backtest parity data as CSV for external-platform checking."""
+    result = await db.execute(select(BacktestResult).where(BacktestResult.id == result_id))
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="结果不存在")
+
+    output = io.StringIO()
+    output.write("\ufeff")
+    metrics = r.metrics or {}
+    output.write("# assumptions\n")
+    output.write(f"strategy_name,{repair_text(r.strategy_name)}\n")
+    output.write(f"period,{r.start_date}-{r.end_date}\n")
+    output.write(f"universe,{normalize_universe_label(r.universe)}\n")
+    output.write(f"validation_note,{metrics.get('validation_note', '')}\n\n")
+
+    output.write("# equity_curve\n")
+    writer = csv.DictWriter(output, fieldnames=["date", "value", "cash"])
+    writer.writeheader()
+    for row in (r.equity_curve or []):
+        writer.writerow({k: row.get(k, "") for k in ["date", "value", "cash"]})
+    output.write("\n# trades\n")
+    trade_fields = ["date", "ts_code", "side", "amount", "price", "commission", "tax"]
+    writer2 = csv.DictWriter(output, fieldnames=trade_fields)
+    writer2.writeheader()
+    for trade in (r.trades or []):
+        writer2.writerow({k: trade.get(k, "") for k in trade_fields})
+    output.write("\n# order_rejections\n")
+    writer3 = csv.DictWriter(output, fieldnames=["reason", "count"])
+    writer3.writeheader()
+    for row in metrics.get("order_rejections", []):
+        writer3.writerow({"reason": row.get("reason", ""), "count": row.get("count", "")})
+    output.write("\n# order_trace\n")
+    trace_fields = ["created_date", "filled_date", "ts_code", "side", "target_amount", "filled_amount", "filled_price", "status", "reason"]
+    writer4 = csv.DictWriter(output, fieldnames=trace_fields)
+    writer4.writeheader()
+    for row in metrics.get("order_trace", []):
+        writer4.writerow({k: row.get(k, "") for k in trace_fields})
+
+    output.seek(0)
+    filename = f"backtest_parity_{result_id}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # ===== 参数优化 =====
@@ -354,6 +456,7 @@ async def export_result(result_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="结果不存在")
 
     output = io.StringIO()
+    output.write("\ufeff")
     # 写入绩效指标
     output.write("# 绩效指标\n")
     metrics = r.metrics or {}

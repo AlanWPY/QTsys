@@ -16,7 +16,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Optional
 from uuid import uuid4
@@ -58,6 +58,13 @@ DEFAULT_WALK_FORWARD_WINDOWS = 3
 DEFAULT_NEUTRALIZE_MODE = "rank_zscore"
 DEFAULT_EMBARGO_DAYS = 5
 DEFAULT_MIN_DSR = -0.25
+
+
+def _warmup_start_date(start_date: str, days: int = 540) -> str:
+    try:
+        return (datetime.strptime(str(start_date), "%Y%m%d") - timedelta(days=days)).strftime("%Y%m%d")
+    except Exception:
+        return start_date
 
 
 def _is_sqlite_lock_error(exc: Exception) -> bool:
@@ -247,7 +254,7 @@ def _build_excess_curve(strategy_curve: list[dict], benchmark_curve: list[dict])
     benchmark = _curve_value_map(_normalize_curve(benchmark_curve))
     result = []
     for date in sorted(set(strategy) & set(benchmark)):
-        result.append({"date": date, "value": round(1.0 + strategy[date] - benchmark[date], 6)})
+        result.append({"date": date, "value": round((strategy[date] - benchmark[date]) * 100.0, 4)})
     return result
 
 
@@ -1158,7 +1165,9 @@ class MiningDataContext:
         self.end_date = end_date
         self.benchmark_code = str(benchmark_code or "").upper()
         self.stock_data: dict[str, dict] = {}
+        self.stock_names: dict[str, str] = {}
         self.all_dates: list = []
+        self.analysis_dates: list = []
         self.benchmark_close = pd.Series(dtype=float)
         self.expression_cache: dict[str, dict[str, pd.Series]] = {}
 
@@ -1167,14 +1176,18 @@ class MiningDataContext:
         failed = 0
         total = len(self.universe)
         max_workers = min(max((os.cpu_count() or 4) // 2, 2), 4)
+        warmup_start = _warmup_start_date(self.start_date)
+        display_start = pd.to_datetime(self.start_date)
+        display_end = pd.to_datetime(self.end_date)
 
         def load_one(code: str):
             client = TushareClient(settings.tushare_token)
             worker_cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
             try:
-                daily = worker_cache.get_daily(code, self.start_date, self.end_date, adj="qfq")
-                basic = worker_cache.get_daily_basic(code, self.start_date, self.end_date)
-                return code, daily, basic
+                daily = worker_cache.get_daily(code, warmup_start, self.end_date, adj="qfq")
+                exec_daily = worker_cache.get_daily(code, warmup_start, self.end_date, adj=None)
+                basic = worker_cache.get_daily_basic(code, warmup_start, self.end_date)
+                return code, daily, exec_daily, basic
             finally:
                 if worker_cache.mysql:
                     try:
@@ -1191,8 +1204,8 @@ class MiningDataContext:
                     break
                 code = futures[future]
                 try:
-                    _, daily, basic = future.result()
-                    item = self._prepare_stock_data(daily, basic)
+                    _, daily, exec_daily, basic = future.result()
+                    item = self._prepare_stock_data(daily, basic, exec_daily=exec_daily)
                     if item and len(item["close"]) >= 45:
                         self.stock_data[code] = item
                     else:
@@ -1205,8 +1218,18 @@ class MiningDataContext:
 
         all_dates = set()
         for item in self.stock_data.values():
-            all_dates.update(item["close"].dropna().index.tolist())
+            all_dates.update([dt for dt in item["close"].dropna().index.tolist() if pd.to_datetime(dt) <= display_end])
         self.all_dates = sorted(all_dates)
+        self.analysis_dates = [dt for dt in self.all_dates if display_start <= pd.to_datetime(dt) <= display_end]
+        try:
+            basics = self.cache.client.get_stock_basic()
+            if basics is not None and not basics.empty:
+                self.stock_names = {
+                    str(row.get("ts_code") or "").upper(): str(row.get("name") or "")
+                    for row in basics.to_dict("records")
+                }
+        except Exception:
+            self.stock_names = {}
         self._prepare_benchmark()
 
     def _prepare_benchmark(self) -> None:
@@ -1242,7 +1265,7 @@ class MiningDataContext:
         if values:
             self.benchmark_close = pd.Series([x[1] for x in values], index=[x[0] for x in values], dtype=float)
 
-    def _prepare_stock_data(self, daily: pd.DataFrame, basic: pd.DataFrame) -> Optional[dict]:
+    def _prepare_stock_data(self, daily: pd.DataFrame, basic: pd.DataFrame, exec_daily: Optional[pd.DataFrame] = None) -> Optional[dict]:
         if daily is None or daily.empty:
             return None
         df = daily.copy()
@@ -1257,6 +1280,17 @@ class MiningDataContext:
         volumes = indexed["vol"].astype(float)
         opens = indexed["open"].astype(float) if "open" in indexed.columns else closes.shift(1)
         amounts = indexed["amount"].astype(float) if "amount" in indexed.columns else volumes * closes
+        exec_indexed = indexed
+        if exec_daily is not None and not exec_daily.empty:
+            edf = exec_daily.copy()
+            edf["trade_date"] = pd.to_datetime(edf["trade_date"], errors="coerce")
+            edf = edf.dropna(subset=["trade_date"]).sort_values("trade_date")
+            if not edf.empty:
+                exec_indexed = edf.set_index("trade_date").reindex(indexed.index)
+        exec_closes = pd.to_numeric(exec_indexed.get("close", closes), errors="coerce").astype(float).reindex(indexed.index).ffill()
+        exec_highs = pd.to_numeric(exec_indexed.get("high", highs), errors="coerce").astype(float).reindex(indexed.index).ffill()
+        exec_lows = pd.to_numeric(exec_indexed.get("low", lows), errors="coerce").astype(float).reindex(indexed.index).ffill()
+        exec_opens = pd.to_numeric(exec_indexed.get("open", opens), errors="coerce").astype(float).reindex(indexed.index).ffill()
         basic_data = {}
         if basic is not None and not basic.empty:
             bdf = basic.copy()
@@ -1267,9 +1301,11 @@ class MiningDataContext:
                 if col in aligned.columns:
                     basic_data[col] = aligned[col].astype(float)
         return {
-            "close": closes, "high": highs, "low": lows, "vol": volumes,
-            "open": opens, "amount": amounts, "basic": basic_data,
-            "prev_close": closes.shift(1),
+            "close": exec_closes, "high": exec_highs, "low": exec_lows, "vol": volumes,
+            "open": exec_opens,
+            "factor_close": closes, "factor_open": opens, "factor_high": highs, "factor_low": lows,
+            "amount": amounts, "basic": basic_data,
+            "prev_close": exec_closes.shift(1),
             "forward_return": closes.pct_change(5).shift(-5),
         }
 
@@ -1281,8 +1317,8 @@ class MiningDataContext:
         for code, data in self.stock_data.items():
             values = self.engine._eval_expression(
                 expression,
-                data["close"], data["high"], data["low"], data["vol"],
-                data["open"], data["basic"], data["amount"],
+                data["factor_close"], data["factor_high"], data["factor_low"], data["vol"],
+                data["factor_open"], data["basic"], data["amount"],
             )
             if values is None or not isinstance(values, pd.Series):
                 continue
@@ -1361,6 +1397,60 @@ def _expression_hash(expression: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def _strip_outer_parentheses(text: str) -> str:
+    text = str(text or "").strip()
+    while text.startswith("(") and text.endswith(")"):
+        depth = 0
+        balanced = True
+        for idx, char in enumerate(text):
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0 and idx != len(text) - 1:
+                    balanced = False
+                    break
+            if depth < 0:
+                balanced = False
+                break
+        if not balanced or depth != 0:
+            break
+        text = text[1:-1].strip()
+    return text
+
+
+def _split_expression_sign(expression: str) -> tuple[int, str]:
+    text = re.sub(r"\s+", "", str(expression or ""))
+    sign = 1
+    changed = True
+    while changed:
+        changed = False
+        text = _strip_outer_parentheses(text)
+        if text.startswith("neg(") and text.endswith(")"):
+            sign *= -1
+            text = text[4:-1]
+            changed = True
+            continue
+        if text.startswith("-"):
+            sign *= -1
+            text = text[1:]
+            changed = True
+    return sign, _strip_outer_parentheses(text)
+
+
+def _opposite_direction(direction: str) -> str:
+    return "top" if direction == "bottom" else "bottom"
+
+
+def _trading_equivalence_key(expression: str, direction: str) -> str:
+    sign, core = _split_expression_sign(expression)
+    effective_direction = str(direction or "top").lower()
+    if sign < 0:
+        effective_direction = _opposite_direction(effective_direction)
+    normalized = f"{core}|{effective_direction}"
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def _expression_complexity(expression: str) -> int:
     return len(re.findall(r"[A-Za-z_]+\(", expression or "")) + len(re.findall(r"[+\-*/><=]", expression or ""))
 
@@ -1379,9 +1469,9 @@ def _build_settings_snapshot(settings) -> SimpleNamespace:
     return SimpleNamespace(
         tushare_token=settings.tushare_token,
         default_cash=float(settings.default_cash or 1_000_000),
-        commission_rate=float(settings.commission_rate or 0.0),
-        stamp_tax_rate=float(settings.stamp_tax_rate or 0.0),
-        slippage=float(settings.slippage or 0.0),
+        commission_rate=float(settings.commission_rate if settings.commission_rate is not None else 0.0003),
+        stamp_tax_rate=float(settings.stamp_tax_rate if settings.stamp_tax_rate is not None else 0.001),
+        slippage=float(settings.slippage if settings.slippage is not None else 0.002),
         use_mysql=getattr(settings, "use_mysql", 0),
         mysql_host=getattr(settings, "mysql_host", ""),
         mysql_port=getattr(settings, "mysql_port", 3306),
@@ -1676,7 +1766,7 @@ def _legacy_unused_evaluate_candidate(candidate: Candidate, ctx: MiningDataConte
         "value_mean": round(float(flat.mean()), 6),
     }
 
-    splits = _date_splits(ctx.all_dates)
+    splits = _date_splits(getattr(ctx, "analysis_dates", None) or ctx.all_dates)
     train_metrics = _segment_metrics(factors, ctx, splits["train"], forward_days=config.rebalance_days)
     valid_metrics = _segment_metrics(factors, ctx, splits["valid"], forward_days=config.rebalance_days)
     test_metrics = _segment_metrics(factors, ctx, splits["test"] or splits["valid"], forward_days=config.rebalance_days)
@@ -1790,6 +1880,15 @@ def _backtest_from_factors(
     direction: str,
     dates: Optional[set] = None,
 ) -> dict:
+    def _setting_float(name: str, default: float) -> float:
+        value = getattr(settings, name, None)
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except Exception:
+            return default
+
     all_dates = list(ctx.all_dates)
     segment_dates = [dt for dt in all_dates if not dates or dt in dates]
     market = PanelMarketData(
@@ -1797,14 +1896,16 @@ def _backtest_from_factors(
         all_dates,
         benchmark_close=ctx.benchmark_close,
         benchmark_code=ctx.benchmark_code or "universe_equal_weight",
+        stock_names=getattr(ctx, "stock_names", {}) or {},
     )
     simulator = CanonicalExecutionSimulator(
         ExecutionSettings(
-            initial_cash=float(getattr(settings, "default_cash", 1_000_000) or 1_000_000),
-            commission_rate=max(0.0, float(getattr(settings, "commission_rate", 0.0) or 0.0)),
-            stamp_tax_rate=max(0.0, float(getattr(settings, "stamp_tax_rate", 0.0) or 0.0)),
-            slippage=max(0.0, float(getattr(settings, "slippage", 0.0) or 0.0)),
-            volume_limit_pct=max(0.0, float(getattr(settings, "capacity_limit_pct", DEFAULT_VOLUME_LIMIT_PCT) or DEFAULT_VOLUME_LIMIT_PCT)),
+            initial_cash=max(1.0, _setting_float("default_cash", 1_000_000)),
+            commission_rate=max(0.0, _setting_float("commission_rate", 0.0003)),
+            stamp_tax_rate=max(0.0, _setting_float("stamp_tax_rate", 0.001)),
+            slippage=max(0.0, _setting_float("slippage", 0.002)),
+            transfer_fee_rate=0.0,
+            volume_limit_pct=max(0.0, _setting_float("capacity_limit_pct", DEFAULT_VOLUME_LIMIT_PCT)),
             max_position_pct=DEFAULT_MAX_POSITION_PCT,
             target_exposure=DEFAULT_TARGET_EXPOSURE,
             exclude_star_market=True,
@@ -1837,7 +1938,7 @@ def _adaptive_rebalance_candidates(base_days: int) -> list[int]:
         value = max(1, min(int(item), 60))
         if value not in result:
             result.append(value)
-        if len(result) >= 5:
+        if len(result) >= 3:
             break
     return result
 
@@ -1861,6 +1962,30 @@ def _validation_protocol_score(valid_metrics: dict, valid_backtest_metrics: dict
     )
 
 
+def _direction_candidate_score(valid_metrics: dict, valid_backtest_metrics: dict, direction: str, complexity: int, tested_count: int) -> float:
+    directional_ic = _directional_ic(valid_metrics, direction)
+    ic_ir = min(abs(_safe_float(valid_metrics.get("ic_ir"))), 3.0)
+    excess = _safe_float(valid_backtest_metrics.get("excess_return"))
+    total_return = _safe_float(valid_backtest_metrics.get("total_return"))
+    drawdown = max(_safe_float(valid_backtest_metrics.get("max_drawdown")), 0.0)
+    trade_count = min(_safe_float(valid_backtest_metrics.get("trade_count")), 120.0)
+    turnover = max(_safe_float(valid_backtest_metrics.get("turnover")), 0.0)
+    complexity_penalty = min(max(complexity, 0) / 120.0, 0.35)
+    multiple_test_penalty = min(math.log1p(max(tested_count, 0)) / 18.0, 0.45)
+    return round(
+        max(directional_ic, -0.05) * 5.0
+        + ic_ir * 0.12
+        + max(excess, -15.0) / 55.0
+        + max(total_return, -20.0) / 180.0
+        + min(trade_count / 200.0, 0.30)
+        - drawdown / 240.0
+        - min(turnover / 1000.0, 0.20)
+        - complexity_penalty
+        - multiple_test_penalty,
+        6,
+    )
+
+
 def _select_validation_protocol(
     factors: dict[str, pd.Series],
     ctx: MiningDataContext,
@@ -1877,30 +2002,62 @@ def _select_validation_protocol(
         if _safe_float(valid_core.get("ic_count")) < 3:
             continue
         valid_metrics = {**valid_core, **quality_metrics}
-        direction = "bottom" if _safe_float(valid_metrics.get("ic_mean")) < 0 or _safe_float(valid_metrics.get("long_short_return")) < 0 else "top"
-        valid_backtest = _backtest_from_factors(
-            factors,
-            ctx,
-            config.settings,
-            select_pct=config.select_pct,
-            rebalance_days=rebalance_days,
-            direction=direction,
-            dates=splits["valid"],
-        )
-        if "error" in valid_backtest or not valid_backtest.get("normalized_curve"):
-            continue
-        score = _validation_protocol_score(valid_metrics, valid_backtest["metrics"], complexity, tested_count)
-        candidate = {
-            "rebalance_days": rebalance_days,
-            "train_metrics": train_metrics,
-            "valid_metrics": valid_metrics,
-            "valid_backtest": valid_backtest,
-            "direction": direction,
-            "selection_score": score,
-        }
-        if best is None or score > best["selection_score"]:
-            best = candidate
+        ic_hint = _safe_float(valid_core.get("ic_mean"))
+        ls_hint = _safe_float(valid_core.get("long_short_return"))
+        primary_direction = "bottom" if (ic_hint < 0 or ls_hint < 0) else "top"
+        directions = [primary_direction]
+        if abs(ic_hint) < 0.006 or abs(ls_hint) < 0.16:
+            directions.append(_opposite_direction(primary_direction))
+        for direction in directions:
+            valid_backtest = _backtest_from_factors(
+                factors,
+                ctx,
+                config.settings,
+                select_pct=config.select_pct,
+                rebalance_days=rebalance_days,
+                direction=direction,
+                dates=splits["valid"],
+            )
+            if "error" in valid_backtest or not valid_backtest.get("normalized_curve"):
+                continue
+            score = _direction_candidate_score(valid_metrics, valid_backtest["metrics"], direction, complexity, tested_count)
+            candidate = {
+                "rebalance_days": rebalance_days,
+                "train_metrics": train_metrics,
+                "valid_metrics": valid_metrics,
+                "valid_backtest": valid_backtest,
+                "direction": direction,
+                "selection_score": score,
+            }
+            if best is None or score > best["selection_score"]:
+                best = candidate
     return best
+
+
+def _fast_screen_candidate(
+    factors: dict[str, pd.Series],
+    ctx: MiningDataContext,
+    splits: dict[str, set],
+    quality_metrics: dict,
+    rebalance_days: int,
+) -> tuple[bool, dict]:
+    """Cheap IC/coverage screen before expensive execution simulation.
+
+    This does not decide validity; it only avoids running full A-share execution
+    simulation for expressions with no measurable validation signal or coverage.
+    Final displayed results still come from `_backtest_from_factors`.
+    """
+    metrics = _segment_metrics(factors, ctx, splits.get("valid", set()), forward_days=rebalance_days)
+    valid_count = int(metrics.get("ic_count") or 0)
+    directional_ic = abs(_safe_float(metrics.get("ic_mean")))
+    coverage = _safe_float(quality_metrics.get("coverage_ratio"))
+    if valid_count < 3:
+        return False, {**metrics, "fast_reject_reason": "valid_ic_count_below_3"}
+    if coverage < 45.0:
+        return False, {**metrics, "fast_reject_reason": "coverage_below_45pct"}
+    if directional_ic < 0.0002 and abs(_safe_float(metrics.get("long_short_return"))) < 0.02:
+        return False, {**metrics, "fast_reject_reason": "validation_signal_near_zero"}
+    return True, metrics
 
 
 def _score_candidate(valid_metrics: dict, valid_backtest_metrics: dict, complexity: int, tested_count: int = 0) -> float:
@@ -2171,11 +2328,21 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         "neutralization": config.neutralize or DEFAULT_NEUTRALIZE_MODE,
     }
 
-    folds = _walk_forward_splits(ctx.all_dates, config.walk_forward_windows, config.embargo_days)
-    splits = folds[-1] if folds else _date_splits(ctx.all_dates)
+    analysis_dates = getattr(ctx, "analysis_dates", None) or ctx.all_dates
+    folds = _walk_forward_splits(analysis_dates, config.walk_forward_windows, config.embargo_days)
+    splits = folds[-1] if folds else _date_splits(analysis_dates)
     if len(splits["valid"]) < 3 or len(splits["test"]) < 3:
         return None
     complexity = _expression_complexity(expression)
+    passed_fast_screen, fast_metrics = _fast_screen_candidate(
+        factors,
+        ctx,
+        splits,
+        quality_metrics,
+        max(1, int(config.rebalance_days or 5)),
+    )
+    if not passed_fast_screen:
+        return None
     protocol = _select_validation_protocol(factors, ctx, config, splits, quality_metrics, complexity, tested_count)
     if not protocol:
         return None
@@ -2224,7 +2391,7 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         select_pct=config.select_pct,
         rebalance_days=chosen_rebalance_days,
         direction=direction,
-        dates=None,
+        dates=set(analysis_dates),
     )
     if "error" in display_backtest or not display_backtest.get("normalized_curve"):
         display_backtest = test_backtest
@@ -2247,6 +2414,8 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
     capacity = _capacity_summary(test_backtest["metrics"], config.select_pct)
     robustness = _robustness_summary(fold_checks, valid_metrics, test_metrics, valid_backtest["metrics"], test_backtest["metrics"], direction)
     fingerprint = _factor_fingerprint(expression)
+    trading_equivalence_key = _trading_equivalence_key(expression, direction)
+    fingerprint["trading_equivalence_key"] = trading_equivalence_key
     validation_status = _validation_status(
         rejection_reasons,
         significance,
@@ -2265,13 +2434,7 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         final_score -= 0.35
     elif validation_status == "research_candidate":
         final_score += 0.05
-    if test_excess < -3.0:
-        return None
-    if validation_status == "evaluated_weak" and (test_excess < -0.5 or final_score < -0.15):
-        return None
-    if validation_status == "research_candidate" and test_excess < 0.0 and directional_test_ic <= 0.002:
-        return None
-    if max_drawdown > 45.0 and test_excess < 0.0:
+    if _safe_float(test_backtest["metrics"].get("trade_count")) <= 0:
         return None
 
     backtest_metrics = {
@@ -2310,6 +2473,7 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         "capacity": capacity,
         "robustness": robustness,
         "fingerprint": fingerprint,
+        "trading_equivalence_key": trading_equivalence_key,
         "correlation_cluster": "",
         "revalidation_status": validation_status,
         "direction": direction,
@@ -2380,6 +2544,9 @@ def _mine_sync(
     for item in ctx.stock_data.values():
         all_dates.update(item["close"].dropna().index.tolist())
     ctx.all_dates = sorted(all_dates)
+    display_start = pd.to_datetime(start_date)
+    display_end = pd.to_datetime(end_date)
+    ctx.analysis_dates = [dt for dt in ctx.all_dates if display_start <= pd.to_datetime(dt) <= display_end]
     ctx._prepare_benchmark()
     if len(ctx.stock_data) < 5:
         raise ValueError("available prepared data is insufficient for mining")
@@ -2791,6 +2958,9 @@ async def _insert_candidate(session_id: str, payload: dict) -> Optional[int]:
     for attempt in range(6):
         try:
             async with async_session() as db:
+                trading_key = payload.get("trading_equivalence_key") or ""
+                model_payload = dict(payload)
+                model_payload.pop("trading_equivalence_key", None)
                 existing = await db.execute(
                     select(FactorMiningCandidate).where(
                         FactorMiningCandidate.session_id == session_id,
@@ -2799,7 +2969,15 @@ async def _insert_candidate(session_id: str, payload: dict) -> Optional[int]:
                 )
                 if existing.scalar_one_or_none():
                     return None
-                candidate = FactorMiningCandidate(session_id=session_id, **payload)
+                if trading_key:
+                    rows = await db.execute(
+                        select(FactorMiningCandidate).where(FactorMiningCandidate.session_id == session_id)
+                    )
+                    for row in rows.scalars().all():
+                        fingerprint = row.fingerprint or {}
+                        if fingerprint.get("trading_equivalence_key") == trading_key:
+                            return None
+                candidate = FactorMiningCandidate(session_id=session_id, **model_payload)
                 db.add(candidate)
                 await db.commit()
                 await db.refresh(candidate)
@@ -2989,9 +3167,10 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
             if stop_event.is_set():
                 break
             expression_hash = _expression_hash(candidate.expression)
-            if expression_hash in seen_hashes:
+            expression_seen_key = f"expr:{expression_hash}"
+            if expression_seen_key in seen_hashes:
                 continue
-            seen_hashes.add(expression_hash)
+            seen_hashes.add(expression_seen_key)
             tested += 1
             if tested % 5 == 1:
                 run_async(_update_mining_session(
@@ -3017,6 +3196,22 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
                 if config.max_trials and tested >= config.max_trials:
                     break
                 continue
+            equivalence_key = str(payload.get("trading_equivalence_key") or "")
+            equivalence_seen_key = f"trade:{equivalence_key}"
+            if equivalence_key and equivalence_seen_key in seen_hashes:
+                run_async(_insert_trial_log(
+                    session_id,
+                    candidate,
+                    "trading_equivalent_duplicate",
+                    ["same_factor_values_after_direction_normalization"],
+                    score=_safe_float(payload.get("score")),
+                    metrics={"equivalence_key": equivalence_key, "direction": payload.get("direction")},
+                ))
+                if config.max_trials and tested >= config.max_trials:
+                    break
+                continue
+            if equivalence_key:
+                seen_hashes.add(equivalence_seen_key)
             inserted_id = run_async(_insert_candidate(session_id, payload))
             if inserted_id is None:
                 continue
@@ -3254,6 +3449,7 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
         "capacity": item.capacity or {},
         "robustness": item.robustness or {},
         "fingerprint": item.fingerprint or {},
+        "trading_equivalence_key": (item.fingerprint or {}).get("trading_equivalence_key", ""),
         "correlation_cluster": item.correlation_cluster or "",
         "revalidation_status": item.revalidation_status or "",
         "validation_status": item.revalidation_status or backtest_metrics.get("validation_status", ""),

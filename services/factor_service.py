@@ -1,6 +1,7 @@
 """因子服务。"""
 import asyncio
 import inspect
+import re
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -154,6 +155,8 @@ def build_joinquant_backtest_code(
     commission_rate: float = 0.0003,
     stamp_tax_rate: float = 0.001,
     min_commission: float = 5.0,
+    universe_codes: list[str] | None = None,
+    universe_as_of_date: str = "",
 ) -> str:
     """生成可直接复制到聚宽的因子截面选股回测代码。"""
     expression = str(factor.expression or "")
@@ -178,6 +181,21 @@ def build_joinquant_backtest_code(
     benchmark = str(benchmark or index_symbol or "000300.XSHG").strip()
     start_date = str(start_date or "").strip()
     end_date = str(end_date or "").strip()
+    universe_as_of_date = str(universe_as_of_date or start_date or "").strip()
+
+    def _to_jq_code(code: str) -> str:
+        text = str(code or "").strip().upper()
+        if text.endswith(".SH"):
+            return text[:6] + ".XSHG"
+        if text.endswith(".SZ"):
+            return text[:6] + ".XSHE"
+        return text
+
+    fixed_universe = []
+    for code in universe_codes or []:
+        jq_code = _to_jq_code(code)
+        if re.match(r"^\d{6}\.XS(HG|HE)$", jq_code) and jq_code not in fixed_universe:
+            fixed_universe.append(jq_code)
     template = r'''
 # -*- coding: utf-8 -*-
 """
@@ -234,6 +252,8 @@ def initialize(context):
     g.stop_loss_pct = __STOP_LOSS_PCT__        # 0 表示关闭止损；如 0.08 表示亏损8%止损
     g.take_profit_pct = __TAKE_PROFIT_PCT__    # 0 表示关闭止盈；如 0.20 表示盈利20%止盈
     g.include_star_market = __INCLUDE_STAR_MARKET__  # 默认过滤科创板，避免市价单保护限价问题
+    g.fixed_universe = __FIXED_UNIVERSE_REPR__
+    g.universe_as_of_date = __UNIVERSE_AS_OF_DATE_REPR__
     g.day_count = 0
 
     run_daily(rebalance, time='open')
@@ -246,9 +266,9 @@ def rebalance(context):
     if g.day_count % g.rebalance_days != 1:
         return
 
-    stocks = get_index_stocks(g.index_symbol)
+    stocks = get_strategy_universe()
     stocks = filter_tradable_stocks(stocks)
-    scores = score_universe(stocks)
+    scores = score_universe(stocks, context)
     if len(scores) == 0:
         log.info('本次调仓无有效因子值')
         return
@@ -267,6 +287,17 @@ def rebalance(context):
         safe_order_target_value(context, stock, target_value)
 
     log.info('调仓完成：%s' % ','.join(selected))
+
+
+def get_strategy_universe():
+    if getattr(g, 'fixed_universe', None):
+        return list(g.fixed_universe)
+    try:
+        if getattr(g, 'universe_as_of_date', ''):
+            return get_index_stocks(g.index_symbol, date=g.universe_as_of_date)
+    except Exception:
+        pass
+    return get_index_stocks(g.index_symbol)
 
 
 def apply_risk_controls(context):
@@ -352,10 +383,10 @@ def is_star_market(stock):
     return str(stock).startswith('688')
 
 
-def score_universe(stocks):
+def score_universe(stocks, context):
     rows = []
     for stock in stocks:
-        value = calculate_latest_factor_value(stock)
+        value = calculate_latest_factor_value(stock, context)
         if value is None:
             continue
         try:
@@ -367,16 +398,32 @@ def score_universe(stocks):
     return rows
 
 
-def calculate_latest_factor_value(stock):
-    df = attribute_history(
-        stock,
-        count=int(g.lookback),
-        unit='1d',
-        fields=['open', 'high', 'low', 'close', 'volume', 'money'],
-        skip_paused=True,
-        df=True,
-        fq='pre'
-    )
+def calculate_latest_factor_value(stock, context):
+    end_date = getattr(context, 'previous_date', None)
+    df = None
+    try:
+        df = get_price(
+            stock,
+            end_date=end_date,
+            count=int(g.lookback),
+            frequency='daily',
+            fields=['open', 'high', 'low', 'close', 'volume', 'money'],
+            skip_paused=True,
+            fq='pre',
+            panel=False,
+        )
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        df = attribute_history(
+            stock,
+            count=int(g.lookback),
+            unit='1d',
+            fields=['open', 'high', 'low', 'close', 'volume', 'money'],
+            skip_paused=True,
+            df=True,
+            fq='pre'
+        )
     if df is None or df.empty or len(df) < 30:
         return None
 
@@ -677,6 +724,8 @@ def eval_expression(expr, close, high, low, open_, volume, amount, valuation_dat
         .replace("__START_DATE_REPR__", repr(start_date))
         .replace("__END_DATE_REPR__", repr(end_date))
         .replace("__EXCLUDE_ST__", "True" if exclude_st else "False")
+        .replace("__FIXED_UNIVERSE_REPR__", repr(fixed_universe))
+        .replace("__UNIVERSE_AS_OF_DATE_REPR__", repr(universe_as_of_date))
     )
 
 
@@ -867,11 +916,25 @@ async def create_strategy_from_factor_workflow(
     mining_meta = {}
     if isinstance(factor.graph_json, dict):
         mining_meta = factor.graph_json.get("mining") or {}
-    effective_direction = direction or mining_meta.get("direction") or "top"
+    mined_direction = str(mining_meta.get("direction") or "").strip().lower()
+    requested_direction = str(direction or "").strip().lower()
+    if mined_direction in {"top", "bottom"}:
+        effective_direction = mined_direction
+    elif requested_direction in {"top", "bottom"}:
+        effective_direction = requested_direction
+    else:
+        effective_direction = "top"
     select_pct = float(mining_meta.get("select_pct") or 0.1)
     rebalance_days = int(mining_meta.get("rebalance_days") or 5)
     target_exposure = float(mining_meta.get("target_exposure") or 0.95)
     max_position_pct = float(mining_meta.get("max_position_pct") or 0.12)
+    benchmark = str(mining_meta.get("benchmark") or mining_meta.get("benchmark_code") or "000300.SH")
+    start_date = str(mining_meta.get("session_start_date") or mining_meta.get("display_start") or mining_meta.get("test_start") or "")
+    end_date = str(mining_meta.get("session_end_date") or mining_meta.get("display_end") or mining_meta.get("test_end") or "")
+    universe_type = str(mining_meta.get("universe_type") or "")
+    universe_code = str(mining_meta.get("universe_code") or "")
+    universe_name = str(mining_meta.get("universe_name") or "")
+    custom_pool_id = mining_meta.get("custom_pool_id")
     name = f"因子策略_{factor.id}_{factor.name}"[:100]
     code = build_factor_strategy_code(
         factor.id,
@@ -912,6 +975,25 @@ async def create_strategy_from_factor_workflow(
         "rebalance_days": rebalance_days,
         "target_exposure": target_exposure,
         "max_position_pct": max_position_pct,
+        "backtest_context": {
+            "source": "mined_factor_strategy",
+            "source_label": "因子挖掘策略",
+            "factor_id": factor.id,
+            "factor_name": factor.name,
+            "direction": effective_direction,
+            "select_pct": select_pct,
+            "rebalance_days": rebalance_days,
+            "target_exposure": target_exposure,
+            "max_position_pct": max_position_pct,
+            "benchmark": benchmark,
+            "universe_type": universe_type,
+            "universe_code": universe_code,
+            "universe_name": universe_name,
+            "custom_pool_id": custom_pool_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "stock_items": [],
+        },
     }
 
 

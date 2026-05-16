@@ -1,19 +1,61 @@
 """回测服务。"""
 import asyncio
+import re
 from typing import Optional
 
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import BacktestResult, StockPool, Strategy
+from database.models import BacktestResult, Factor, StockPool, Strategy
 from data.data_cache import DataCache, make_mysql_conn
 from data.tushare_client import TushareClient
 from engine.backtest_engine import BacktestEngine
+from factor.factor_backtest import run_selection_backtest
+from factor.factor_engine import FactorEngine
 from services.factor_board_service import get_system_universes
 from services.factor_catalog_service import load_factor_catalog
 from services.settings_service import get_or_create_settings
 from strategy.strategy_loader import load_strategy
+
+
+def _extract_generated_factor_strategy_config(strategy_code: str) -> Optional[dict]:
+    code = strategy_code or ""
+    factor_match = re.search(r"context\.factor_ref\s*=\s*[\"']id:(\d+)[\"']", code)
+    if not factor_match or "context.get_factor(context.factor_ref" not in code:
+        return None
+
+    def _float(name: str, default: float) -> float:
+        match = re.search(rf"context\.{name}\s*=\s*([0-9.]+)", code)
+        if not match:
+            return default
+        try:
+            return float(match.group(1))
+        except Exception:
+            return default
+
+    def _int(name: str, default: int) -> int:
+        match = re.search(rf"context\.{name}\s*=\s*(\d+)", code)
+        if not match:
+            return default
+        try:
+            return int(match.group(1))
+        except Exception:
+            return default
+
+    direction = "top"
+    direction_match = re.search(r"context\.factor_direction_high_is_better\s*=\s*(True|False)", code)
+    if direction_match and direction_match.group(1) == "False":
+        direction = "bottom"
+
+    return {
+        "factor_id": int(factor_match.group(1)),
+        "direction": direction,
+        "select_pct": max(0.001, min(_float("select_pct", 0.1), 1.0)),
+        "rebalance_days": max(1, min(_int("rebalance_days", 5), 60)),
+        "target_exposure": max(0.0, min(_float("target_exposure", 0.95), 1.0)),
+        "max_position_pct": max(0.0, min(_float("max_position_pct", 0.12), 1.0)),
+    }
 
 
 def _detect_required_history_fields(strategy_code: str) -> set[str]:
@@ -242,28 +284,82 @@ async def run_backtest_workflow(
     client = TushareClient(settings.tushare_token)
     cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
     factor_catalog = await load_factor_catalog(db)
-    engine = BacktestEngine(
-        cache=cache,
-        initial_cash=initial_cash,
-        commission_rate=settings.commission_rate,
-        stamp_tax_rate=settings.stamp_tax_rate,
-        slippage=settings.slippage,
-        max_position_pct=max_position_pct,
-        max_drawdown_limit=max_drawdown_limit,
-    )
-    engine.universe = resolved_codes
+    factor_strategy_config = _extract_generated_factor_strategy_config(strategy.code)
+    if factor_strategy_config:
+        factor_result = await db.execute(select(Factor).where(Factor.id == factor_strategy_config["factor_id"]))
+        factor = factor_result.scalar_one_or_none()
+        if not factor:
+            raise ValueError("因子策略引用的因子不存在")
+        factor_engine = FactorEngine(cache)
+        result_data = await asyncio.to_thread(
+            run_selection_backtest,
+            cache,
+            factor_engine,
+            factor.expression,
+            resolved_codes,
+            start_date,
+            end_date,
+            factor_strategy_config["direction"],
+            factor_strategy_config["select_pct"],
+            factor_strategy_config["rebalance_days"],
+            initial_cash,
+            benchmark,
+            settings.commission_rate,
+            settings.stamp_tax_rate,
+            settings.slippage,
+            factor_strategy_config["max_position_pct"],
+            factor_strategy_config["target_exposure"],
+        )
+        if "error" not in result_data:
+            result_data["final_value"] = round(float((result_data.get("equity_curve") or [{"value": initial_cash}])[-1].get("value", initial_cash)), 2)
+            result_data["logs"] = [
+                f"因子策略使用 canonical 因子选股回测: factor_id={factor.id}, direction={factor_strategy_config['direction']}, "
+                f"select_pct={factor_strategy_config['select_pct']}, rebalance_days={factor_strategy_config['rebalance_days']}"
+            ]
+            result_data["order_rejections"] = [
+                {"reason": reason, "count": count}
+                for reason, count in sorted((result_data.get("rejection_reasons") or {}).items(), key=lambda item: (-item[1], item[0]))
+            ]
+            result_data["order_trace"] = result_data.get("trades", [])[-1000:]
+            result_data["data_coverage"] = {
+                "requested_stock_count": len(resolved_codes),
+                "loaded_stock_count": len(resolved_codes),
+                "missing_stock_count": 0,
+                "missing_stocks": [],
+                "trade_date_count": len(result_data.get("equity_curve") or []),
+                "start_date": start_date,
+                "end_date": end_date,
+                "factor_id": factor.id,
+                "factor_name": factor.name,
+            }
+            result_data["execution_model"] = {
+                **(result_data.get("assumption_report") or {}),
+                "engine": "canonical_factor_selection_from_generated_strategy",
+                "factor_strategy_config": factor_strategy_config,
+            }
+    else:
+        engine = BacktestEngine(
+            cache=cache,
+            initial_cash=initial_cash,
+            commission_rate=settings.commission_rate,
+            stamp_tax_rate=settings.stamp_tax_rate,
+            slippage=settings.slippage,
+            max_position_pct=max_position_pct,
+            max_drawdown_limit=max_drawdown_limit,
+        )
+        engine.universe = resolved_codes
 
-    result_data = await asyncio.to_thread(
-        engine.run,
-        universe=resolved_codes,
-        start_date=start_date,
-        end_date=end_date,
-        initialize_func=init_func,
-        handle_data_func=handle_func,
-        benchmark=benchmark,
-        required_fields=required_fields,
-        factor_catalog=factor_catalog,
-    )
+        result_data = await asyncio.to_thread(
+            engine.run,
+            universe=resolved_codes,
+            start_date=start_date,
+            end_date=end_date,
+            initialize_func=init_func,
+            handle_data_func=handle_func,
+            benchmark=benchmark,
+            required_fields=required_fields,
+            factor_catalog=factor_catalog,
+        )
     if "error" in result_data:
         raise ValueError(result_data["error"])
 

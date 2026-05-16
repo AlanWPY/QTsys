@@ -22,6 +22,8 @@ from services.factor_service import (
     mine_gp_workflow,
     rank_factor_cross_section_workflow,
 )
+from services.settings_service import get_or_create_settings
+from services.backtest_service import resolve_backtest_universe
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
 
@@ -92,6 +94,32 @@ class JoinQuantCodeRequest(BaseModel):
     commission_rate: Optional[float] = None
     stamp_tax_rate: Optional[float] = None
     min_commission: float = 5.0
+
+
+async def _resolve_factor_joinquant_universe(
+    db: AsyncSession,
+    factor: Factor,
+    settings: Settings | None,
+    start_date: str = "",
+) -> tuple[list[str], str]:
+    factor_meta = (factor.graph_json or {}).get("mining", {}) if isinstance(factor.graph_json, dict) else {}
+    universe_code = str(factor_meta.get("universe_code") or "").strip().upper()
+    if not universe_code:
+        return [], str(start_date or "")
+    try:
+        settings_for_universe = settings or await get_or_create_settings(db)
+        resolved = await resolve_backtest_universe(
+            db,
+            settings_for_universe,
+            universe_type=str(factor_meta.get("universe_type") or "system"),
+            universe_code=universe_code,
+            universe_name=str(factor_meta.get("universe_name") or ""),
+            custom_pool_id=factor_meta.get("custom_pool_id"),
+            as_of_date=str(factor_meta.get("session_start_date") or start_date or ""),
+        )
+        return resolved.get("codes") or [], resolved.get("universe_as_of_date") or str(factor_meta.get("session_start_date") or start_date or "")
+    except Exception:
+        return [], str(start_date or "")
 
 
 # ===== 因子CRUD =====
@@ -199,17 +227,22 @@ async def get_factor_joinquant_code(factor_id: int, db: AsyncSession = Depends(g
         raise HTTPException(status_code=404, detail="因子不存在")
     settings_result = await db.execute(select(Settings).where(Settings.id == 1))
     settings = settings_result.scalar_one_or_none()
+    universe_codes, universe_as_of_date = await _resolve_factor_joinquant_universe(db, factor, settings)
     return {
         "id": factor.id,
         "name": factor.name,
         "expression": factor.expression,
         "category": factor.category,
         "source": factor.source,
+        "universe_count": len(universe_codes),
+        "universe_as_of_date": universe_as_of_date,
         "code": build_joinquant_backtest_code(
             factor,
             commission_rate=getattr(settings, "commission_rate", 0.0003) if settings else 0.0003,
             stamp_tax_rate=getattr(settings, "stamp_tax_rate", 0.001) if settings else 0.001,
             slippage=getattr(settings, "slippage", 0.002) if settings else 0.002,
+            universe_codes=universe_codes,
+            universe_as_of_date=universe_as_of_date,
         ),
     }
 
@@ -229,12 +262,15 @@ async def create_factor_joinquant_code(
     commission_rate = req.commission_rate if req.commission_rate is not None else (getattr(settings, "commission_rate", 0.0003) if settings else 0.0003)
     stamp_tax_rate = req.stamp_tax_rate if req.stamp_tax_rate is not None else (getattr(settings, "stamp_tax_rate", 0.001) if settings else 0.001)
     slippage = req.slippage if req.slippage is not None else (getattr(settings, "slippage", 0.002) if settings else 0.002)
+    universe_codes, universe_as_of_date = await _resolve_factor_joinquant_universe(db, factor, settings, req.start_date)
     return {
         "id": factor.id,
         "name": factor.name,
         "expression": factor.expression,
         "category": factor.category,
         "source": factor.source,
+        "universe_count": len(universe_codes),
+        "universe_as_of_date": universe_as_of_date,
         "code": build_joinquant_backtest_code(
             factor,
             index_symbol=req.index_symbol,
@@ -257,6 +293,8 @@ async def create_factor_joinquant_code(
             commission_rate=commission_rate,
             stamp_tax_rate=stamp_tax_rate,
             min_commission=req.min_commission,
+            universe_codes=universe_codes,
+            universe_as_of_date=universe_as_of_date,
         ),
     }
 

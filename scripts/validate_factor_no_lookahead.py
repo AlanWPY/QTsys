@@ -82,7 +82,7 @@ def validate_factor_mining_strict_protocol():
     missing = [token for token in institutional_tokens if token not in evaluate_source]
     if missing:
         raise AssertionError(f"Factor mining institutional protocol checks are incomplete; missing {missing}")
-    display_tokens = ["display_backtest", "dates=None", "display_normalized_curve", "test_normalized_curve"]
+    display_tokens = ["display_backtest", "analysis_dates", "display_normalized_curve", "test_normalized_curve"]
     missing = [token for token in display_tokens if token not in evaluate_source]
     if missing:
         raise AssertionError(f"Factor mining must store full-period display curves separately from strict test curves; missing {missing}")

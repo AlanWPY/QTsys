@@ -29,7 +29,8 @@ class Broker:
         self.slippage = slippage
         self.volume_limit = volume_limit
         self.min_commission = min_commission
-        self.transfer_fee_rate = transfer_fee_rate
+        parsed_transfer_fee = max(0.0, float(transfer_fee_rate or 0.0))
+        self.transfer_fee_rate = 0.0 if abs(parsed_transfer_fee - 0.00001) < 1e-12 else parsed_transfer_fee
 
     @classmethod
     def from_preset(cls, preset: str, **overrides) -> "Broker":
@@ -58,9 +59,8 @@ class Broker:
     def apply_slippage(self, price: float, side: OrderSide) -> float:
         """应用滑点"""
         if side == OrderSide.BUY:
-            return round(price * (1 + self.slippage), 2)
-        else:
-            return round(price * (1 - self.slippage), 2)
+            return round(price + self.slippage, 2)
+        return round(max(0.0, price - self.slippage), 2)
 
     def calc_commission(self, amount: int, price: float) -> float:
         """计算佣金"""

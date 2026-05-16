@@ -1,10 +1,35 @@
 """因子回测引擎 - 选股因子回测 + 技术因子回测"""
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
 from engine.execution_simulator import CanonicalExecutionSimulator, ExecutionSettings, PanelMarketData
 from logging_config import get_logger
 
 logger = get_logger("qtsys.factor.backtest")
+
+
+def _warmup_start_date(start_date: str, days: int = 540) -> str:
+    try:
+        return (datetime.strptime(str(start_date), "%Y%m%d") - timedelta(days=days)).strftime("%Y%m%d")
+    except Exception:
+        return start_date
+
+
+def _stock_name_map(cache) -> dict[str, str]:
+    try:
+        client = getattr(cache, "client", None)
+        if client is None:
+            return {}
+        frame = client.get_stock_basic()
+        if frame is None or frame.empty:
+            return {}
+        return {
+            str(row.get("ts_code") or "").upper(): str(row.get("name") or "")
+            for row in frame.to_dict("records")
+        }
+    except Exception:
+        return {}
 
 
 def run_selection_backtest(
@@ -16,6 +41,8 @@ def run_selection_backtest(
     commission_rate: float = 0.0003,
     stamp_tax_rate: float = 0.001,
     slippage: float = 0.001,
+    max_position_pct: float = 0.12,
+    target_exposure: float = 0.95,
 ) -> dict:
     """选股因子回测
     每个调仓日: 计算全股票池因子值 → 排序 → 选取top/bottom N% → 等权买入
@@ -24,15 +51,19 @@ def run_selection_backtest(
 
     stock_factors = {}
     stock_data = {}
+    stock_names = _stock_name_map(cache)
+    warmup_start = _warmup_start_date(start_date)
+    start_ts = pd.to_datetime(start_date)
+    end_ts = pd.to_datetime(end_date)
 
     for ts_code in universe:
-        fv = factor_engine.compute_factor_values(expression, ts_code, start_date, end_date)
+        fv = factor_engine.compute_factor_values(expression, ts_code, warmup_start, end_date)
         if fv is None:
             continue
-        df = cache.get_daily(ts_code, start_date, end_date)
-        if df.empty:
+        exec_df = cache.get_daily(ts_code, warmup_start, end_date, adj=None)
+        if exec_df.empty:
             continue
-        frame = df.copy()
+        frame = exec_df.copy()
         frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
         frame = frame.dropna(subset=["trade_date"]).sort_values("trade_date")
         if frame.empty or "close" not in frame.columns:
@@ -41,7 +72,11 @@ def run_selection_backtest(
         factor_series = pd.Series(fv).copy()
         factor_series.index = pd.to_datetime(factor_series.index, errors="coerce")
         factor_series = pd.to_numeric(factor_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        factor_series = factor_series[factor_series.index <= end_ts]
         if factor_series.empty:
+            continue
+        indexed = indexed[indexed.index <= end_ts]
+        if indexed.empty:
             continue
         closes = pd.to_numeric(indexed["close"], errors="coerce")
         opens = pd.to_numeric(indexed["open"], errors="coerce") if "open" in indexed.columns else closes.shift(1)
@@ -64,8 +99,11 @@ def run_selection_backtest(
         return {"error": f"有效股票不足(仅{len(stock_factors)}只)"}
 
     all_dates = sorted(set().union(*[data["close"].dropna().index for data in stock_data.values()]))
+    segment_dates = {dt for dt in all_dates if start_ts <= pd.to_datetime(dt) <= end_ts}
     if len(all_dates) < rebalance_days * 2:
         return {"error": "交易日不足"}
+    if len(segment_dates) < 2:
+        return {"error": "回测正式区间交易日不足"}
 
     benchmark_close = pd.Series(dtype=float)
     try:
@@ -84,21 +122,23 @@ def run_selection_backtest(
             commission_rate=max(0.0, float(commission_rate or 0.0)),
             stamp_tax_rate=max(0.0, float(stamp_tax_rate or 0.0)),
             slippage=max(0.0, float(slippage or 0.0)),
+            transfer_fee_rate=0.0,
             volume_limit_pct=0.10,
-            max_position_pct=0.12,
-            target_exposure=0.95,
+            max_position_pct=max(0.0, float(max_position_pct or 0.12)),
+            target_exposure=max(0.0, min(float(target_exposure or 0.95), 1.0)),
             exclude_star_market=True,
             exclude_st=True,
             protocol_version="factor_selection_canonical_v1",
         )
     )
-    market = PanelMarketData(stock_data, all_dates, benchmark_close=benchmark_close, benchmark_code=benchmark)
+    market = PanelMarketData(stock_data, all_dates, benchmark_close=benchmark_close, benchmark_code=benchmark, stock_names=stock_names)
     result = simulator.run_factor_selection(
         factors=stock_factors,
         market=market,
         select_pct=select_pct,
         rebalance_days=rebalance_days,
         direction="top" if select_mode == "top" else "bottom",
+        segment_dates=segment_dates,
     )
     if "error" in result:
         return result

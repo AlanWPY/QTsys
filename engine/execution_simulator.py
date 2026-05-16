@@ -46,7 +46,7 @@ class ExecutionSettings:
     stamp_tax_rate: float = 0.001
     slippage: float = 0.001
     min_commission: float = 5.0
-    transfer_fee_rate: float = 0.00001
+    transfer_fee_rate: float = 0.0
     volume_limit_pct: float = 0.10
     max_position_pct: float = 0.12
     target_exposure: float = 0.95
@@ -107,12 +107,43 @@ class PanelMarketData:
         self.benchmark_close = benchmark_close if benchmark_close is not None else pd.Series(dtype=float)
         self.benchmark_code = str(benchmark_code or "")
         self.stock_names = stock_names or {}
+        self._valuation_cache: dict[tuple[str, str, pd.Timestamp], float] = {}
 
     def price(self, code: str, field: str, dt) -> float:
-        series = self.stock_data.get(code, {}).get(field)
+        data = self.stock_data.get(code, {})
+        series = data.get(field)
+        if series is None and field == "high":
+            series = data.get("high_exec")
+        if series is None and field == "low":
+            series = data.get("low_exec")
+        if series is None and field == "close":
+            series = data.get("close_exec")
         if series is None:
             return 0.0
         return _safe_float(series.get(pd.to_datetime(dt)), 0.0)
+
+    def valuation_price(self, code: str, field: str, dt) -> float:
+        dt = pd.to_datetime(dt)
+        cache_key = (str(code), str(field), dt)
+        if cache_key in self._valuation_cache:
+            return self._valuation_cache[cache_key]
+        direct = self.price(code, field, dt)
+        if direct > 0:
+            self._valuation_cache[cache_key] = direct
+            return direct
+        series = self.stock_data.get(code, {}).get(field)
+        if series is None or getattr(series, "empty", True):
+            self._valuation_cache[cache_key] = 0.0
+            return 0.0
+        try:
+            normalized = pd.to_numeric(series.copy(), errors="coerce")
+            normalized.index = pd.to_datetime(normalized.index)
+            history = normalized.loc[normalized.index <= dt].dropna()
+            value = _safe_float(history.iloc[-1], 0.0) if not history.empty else 0.0
+        except Exception:
+            value = 0.0
+        self._valuation_cache[cache_key] = value
+        return value
 
     def name(self, code: str) -> str:
         return str(self.stock_names.get(code) or "")
@@ -150,25 +181,23 @@ class CanonicalExecutionSimulator:
         turnover_values: list[float] = []
         reverse = direction != "bottom"
         rebalance_step = max(1, int(rebalance_days or 1))
-        global_rebalance_indexes = set(range(0, len(all_dates) - 1, rebalance_step))
-        first_segment_idx = all_dates.index(segment_ordered[0])
+        execution_dates = set(segment_ordered[::rebalance_step])
 
         for idx, current_dt in enumerate(all_dates):
             in_segment = current_dt in selected_segment
             traded_value = 0.0
-            should_rebalance = idx > 0 and in_segment and (
-                (idx - 1) in global_rebalance_indexes or idx == first_segment_idx
-            )
+            should_rebalance = idx > 0 and in_segment and current_dt in execution_dates
             if should_rebalance:
                 signal_date = all_dates[idx - 1]
                 scores = self._collect_scores(factors, signal_date)
                 if len(scores) >= 5:
-                    target_codes = self._target_codes(scores, select_pct, reverse)
-                    tradable_targets = [
-                        code
-                        for code in target_codes
+                    tradable_scores = {
+                        code: value
+                        for code, value in scores.items()
                         if self._can_trade(market, code, current_dt, "buy", rejection_counts)
-                    ]
+                    }
+                    target_count = max(1, int(len(scores) * max(0.001, min(float(select_pct or 0.1), 1.0))))
+                    tradable_targets = self._target_codes(tradable_scores, select_pct, reverse, target_count=target_count)
                     traded_value += self._liquidate_unselected(
                         market, current_dt, holdings, tradable_targets, trades, rejection_counts, cash_ref := {"cash": cash}
                     )
@@ -246,9 +275,10 @@ class CanonicalExecutionSimulator:
                 scores[code] = float(value)
         return scores
 
-    def _target_codes(self, scores: dict[str, float], select_pct: float, reverse: bool) -> list[str]:
+    def _target_codes(self, scores: dict[str, float], select_pct: float, reverse: bool, target_count: Optional[int] = None) -> list[str]:
         ranked = sorted(scores.items(), key=lambda item: item[1], reverse=reverse)
-        count = max(1, int(len(ranked) * max(0.001, min(float(select_pct or 0.1), 1.0))))
+        count = int(target_count) if target_count is not None else max(1, int(len(ranked) * max(0.001, min(float(select_pct or 0.1), 1.0))))
+        count = max(1, min(count, len(ranked)))
         return [code for code, _ in ranked[:count]]
 
     def _liquidate_unselected(
@@ -343,7 +373,9 @@ class CanonicalExecutionSimulator:
 
         cash_ref["cash"] -= total_cost
         holdings[code] = int(holdings.get(code, 0) or 0) + desired
-        trades.append(self._trade_record(dt, code, "buy", desired, exec_price))
+        commission = self._commission(desired, exec_price)
+        transfer_fee = self._transfer_fee(code, desired, exec_price)
+        trades.append(self._trade_record(dt, code, "buy", desired, exec_price, commission, 0.0, transfer_fee))
         return desired, desired * exec_price
 
     def _sell(self, market, dt, code, shares, holdings, trades, rejection_counts, cash_ref) -> tuple[int, float]:
@@ -361,14 +393,17 @@ class CanonicalExecutionSimulator:
         if desired <= 0:
             self._reject(rejection_counts, "below_lot_or_volume_cap")
             return 0, 0.0
-        proceeds = desired * exec_price - self._commission(desired, exec_price) - self._stamp_tax(desired, exec_price) - self._transfer_fee(code, desired, exec_price)
+        commission = self._commission(desired, exec_price)
+        stamp_tax = self._stamp_tax(desired, exec_price)
+        transfer_fee = self._transfer_fee(code, desired, exec_price)
+        proceeds = desired * exec_price - commission - stamp_tax - transfer_fee
         cash_ref["cash"] += proceeds
         remaining = max(0, current - desired)
         if remaining > 0:
             holdings[code] = remaining
         else:
             holdings.pop(code, None)
-        trades.append(self._trade_record(dt, code, "sell", desired, exec_price))
+        trades.append(self._trade_record(dt, code, "sell", desired, exec_price, commission, stamp_tax, transfer_fee))
         return desired, desired * exec_price
 
     def _can_trade(self, market: PanelMarketData, code: str, dt, side: str, rejection_counts: dict[str, int]) -> bool:
@@ -414,14 +449,17 @@ class CanonicalExecutionSimulator:
     def _portfolio_value(self, market: PanelMarketData, cash: float, holdings: dict[str, int], dt, price_field: str) -> float:
         value = float(cash)
         for code, shares in holdings.items():
-            price = market.price(code, price_field, dt)
+            price = market.valuation_price(code, price_field, dt)
+            if price <= 0 and price_field != "close":
+                price = market.valuation_price(code, "close", dt)
             if price > 0:
                 value += int(shares) * price
         return value
 
     def _slipped_price(self, price: float, side: str) -> float:
         slip = max(0.0, float(self.settings.slippage or 0.0))
-        return float(price) * (1 + slip if side == "buy" else 1 - slip)
+        adjusted = float(price) + slip if side == "buy" else float(price) - slip
+        return round(max(0.0, adjusted), 2)
 
     def _clamped_exec_price(self, market: PanelMarketData, code: str, dt, price: float) -> float:
         high = market.price(code, "high", dt)
@@ -454,8 +492,29 @@ class CanonicalExecutionSimulator:
         rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
 
     @staticmethod
-    def _trade_record(dt, code: str, action: str, shares: int, price: float) -> dict:
-        return {"date": _date_text(dt), "code": code, "action": action, "price": round(float(price), 4), "shares": int(shares)}
+    def _trade_record(
+        dt,
+        code: str,
+        action: str,
+        shares: int,
+        price: float,
+        commission: float = 0.0,
+        stamp_tax: float = 0.0,
+        transfer_fee: float = 0.0,
+    ) -> dict:
+        trade_value = max(0, int(shares)) * max(0.0, float(price))
+        return {
+            "date": _date_text(dt),
+            "code": code,
+            "action": action,
+            "price": round(float(price), 4),
+            "shares": int(shares),
+            "trade_value": round(trade_value, 2),
+            "commission": round(float(commission or 0.0), 2),
+            "stamp_tax": round(float(stamp_tax or 0.0), 2),
+            "transfer_fee": round(float(transfer_fee or 0.0), 2),
+            "fee": round(float(commission or 0.0) + float(stamp_tax or 0.0) + float(transfer_fee or 0.0), 2),
+        }
 
     def _benchmark_curve(self, market: PanelMarketData, dates: list, initial_cash: float) -> list[dict]:
         if not dates:

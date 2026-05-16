@@ -65,20 +65,12 @@ async def options(db: AsyncSession = Depends(get_db)):
 @router.post("/run")
 async def run_mining(req: FactorMiningRequest, db: AsyncSession = Depends(get_db)):
     try:
-        return await run_factor_mining_workflow(
-            db,
-            universe_type=req.universe_type,
-            universe_code=req.universe_code,
-            custom_pool_id=req.custom_pool_id,
-            start_date=req.start_date,
-            end_date=req.end_date,
-            max_stocks=req.max_stocks,
-            candidate_count=req.candidate_count,
-            gp_generations=req.gp_generations,
-            gp_population=req.gp_population,
-            select_pct=req.select_pct,
-            rebalance_days=req.rebalance_days,
-        )
+        data = await start_streaming_mining_session(db, req.model_dump())
+        return {
+            **data,
+            "streaming": True,
+            "message": "旧版一次性挖掘入口已统一切换为会话式挖掘，请通过 sessions/status/results 获取真实样本外曲线。",
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

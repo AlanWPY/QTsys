@@ -77,6 +77,7 @@ class BacktestEngine:
         self.current_date: str = ""
         self.current_dt: Optional[pd.Timestamp] = None
         self.trade_dates: list[str] = []
+        self.history_dates: list[str] = []
         self._date_to_idx: dict[str, int] = {}
         self.all_data: dict[str, pd.DataFrame] = {}
         self.date_index: dict[str, dict[str, dict]] = {}
@@ -95,6 +96,8 @@ class BacktestEngine:
         self.factor_run_start = ""
         self.factor_run_end = ""
         self.exclude_star_market = True
+        self.exclude_st = True
+        self.stock_names: dict[str, str] = {}
 
     @property
     def portfolio_value(self) -> float:
@@ -132,7 +135,7 @@ class BacktestEngine:
         self.pending_orders.append(order)
 
     def order_target_percent(self, ts_code: str, percent: float):
-        target_value = self.portfolio_value * float(percent)
+        target_value = self.portfolio_value * max(0.0, float(percent))
         pos = self.positions.get(ts_code)
         current_value = pos.market_value if pos and pos.amount > 0 else 0.0
         diff = target_value - current_value
@@ -145,7 +148,7 @@ class BacktestEngine:
     def order_value(self, ts_code: str, value: float):
         price = self._get_reference_price(ts_code)
         if price and price > 0:
-            amount = int(float(value) / price)
+            amount = int(max(0.0, float(value)) / price)
             if amount != 0:
                 self.order(ts_code, amount)
 
@@ -162,7 +165,7 @@ class BacktestEngine:
         if current_pos <= 0:
             row = idx.get(self.current_date)
             return float(row["pre_close"]) if row and row.get("pre_close") else None
-        prev_date = self.trade_dates[current_pos - 1]
+        prev_date = self.history_dates[current_pos - 1] if self.history_dates else self.trade_dates[current_pos - 1]
         row = idx.get(prev_date)
         return float(row["close"]) if row and row.get("close") is not None else None
 
@@ -183,7 +186,8 @@ class BacktestEngine:
             return HistoryWindow(name=field)
 
         normalized_field = HISTORY_FIELD_ALIASES.get(field, field)
-        relevant_dates = self.trade_dates[max(0, current_pos - count + 1): current_pos + 1]
+        date_source = self.history_dates or self.trade_dates
+        relevant_dates = date_source[max(0, current_pos - count + 1): current_pos + 1]
         values = []
         for date_value in relevant_dates:
             row = idx.get(date_value)
@@ -201,7 +205,13 @@ class BacktestEngine:
 
             if self.exclude_star_market and str(ts_code).upper().startswith("688"):
                 order.status = OrderStatus.CANCELLED
-                order.reason = "科创板默认过滤"
+                order.reason = "star_market_filtered"
+                continue
+
+            stock_name = self.stock_names.get(str(ts_code).upper(), "")
+            if self.exclude_st and "ST" in stock_name.upper():
+                order.status = OrderStatus.CANCELLED
+                order.reason = "st_filtered"
                 continue
 
             if self._risk_breached and order.side == OrderSide.BUY:
@@ -221,7 +231,7 @@ class BacktestEngine:
             pre_close = row["pre_close"]
             volume = float(row.get("vol", 0) or 0) * 100
 
-            limit_up, limit_down = self.broker.check_limit(pre_close, ts_code=ts_code)
+            limit_up, limit_down = self.broker.check_limit(pre_close, ts_code=ts_code, name=stock_name)
             if order.side == OrderSide.BUY and open_price >= limit_up:
                 order.status = OrderStatus.CANCELLED
                 order.reason = "涨停无法买入"
@@ -233,6 +243,7 @@ class BacktestEngine:
 
             max_vol = int(volume * self.broker.volume_limit)
             actual_amount = min(order.amount, max_vol) if max_vol > 0 else order.amount
+            actual_amount = (int(actual_amount) // 100) * 100
 
             if order.side == OrderSide.SELL:
                 pos = self.positions.get(ts_code)
@@ -240,7 +251,7 @@ class BacktestEngine:
                     order.status = OrderStatus.CANCELLED
                     order.reason = "无可卖持仓"
                     continue
-                actual_amount = min(actual_amount, pos.available)
+                actual_amount = min(actual_amount, (int(pos.available) // 100) * 100)
 
             if actual_amount <= 0:
                 order.status = OrderStatus.CANCELLED
@@ -270,20 +281,41 @@ class BacktestEngine:
             total_cost = actual_amount * exec_price + commission + tax
 
             if order.side == OrderSide.BUY and total_cost > self.cash:
-                actual_amount = int(self.cash / (exec_price * (1 + self.broker.commission_rate)))
-                actual_amount = (actual_amount // 100) * 100
+                actual_amount = self._max_affordable_lot(exec_price, ts_code, max_shares=actual_amount)
                 if actual_amount <= 0:
                     order.status = OrderStatus.CANCELLED
                     order.reason = "资金不足"
                     continue
                 commission = self.broker.calc_commission(actual_amount, exec_price)
                 tax = self.broker.calc_tax(actual_amount, exec_price, order.side, ts_code=ts_code)
+                total_cost = actual_amount * exec_price + commission + tax
+                if total_cost > self.cash:
+                    order.status = OrderStatus.CANCELLED
+                    order.reason = "资金不足"
+                    continue
 
             self._fill_order(order, actual_amount, exec_price, commission, tax)
 
         self.filled_orders.extend([o for o in self.pending_orders if o.status == OrderStatus.FILLED])
         self.cancelled_orders.extend([o for o in self.pending_orders if o.status == OrderStatus.CANCELLED])
         self.pending_orders.clear()
+
+    def _max_affordable_lot(self, exec_price: float, ts_code: str, max_shares: int) -> int:
+        max_lot = (max(0, int(max_shares)) // 100) * 100
+        low, high = 0, max_lot // 100
+        best = 0
+        while low <= high:
+            mid_lots = (low + high) // 2
+            shares = mid_lots * 100
+            commission = self.broker.calc_commission(shares, exec_price)
+            tax = self.broker.calc_tax(shares, exec_price, OrderSide.BUY, ts_code=ts_code)
+            total_cost = shares * exec_price + commission + tax
+            if total_cost <= self.cash + 1e-9:
+                best = shares
+                low = mid_lots + 1
+            else:
+                high = mid_lots - 1
+        return best
 
     def _fill_order(self, order: Order, amount: int, price: float, commission: float, tax: float):
         order.status = OrderStatus.FILLED
@@ -451,7 +483,8 @@ class BacktestEngine:
         current_pos = self._date_to_idx.get(self.current_date)
         if current_pos is None:
             return HistoryWindow(name=str(factor_ref))
-        relevant_dates = self.trade_dates[max(0, current_pos - count + 1): current_pos + 1]
+        date_source = self.history_dates or self.trade_dates
+        relevant_dates = date_source[max(0, current_pos - count + 1): current_pos + 1]
         values = []
         for date_value in relevant_dates:
             value = series.get(date_value)
@@ -486,6 +519,22 @@ class BacktestEngine:
         merged["pre_close"] = merged["pre_close"].fillna(merged["close"])
         return merged.sort_values("trade_date").reset_index(drop=True)
 
+    def _load_stock_names(self, universe: list[str]) -> dict[str, str]:
+        try:
+            stock_basic = self.cache.client.get_stock_basic()
+            if stock_basic is None or stock_basic.empty or "ts_code" not in stock_basic.columns:
+                return {}
+            frame = stock_basic.copy()
+            frame["ts_code"] = frame["ts_code"].astype(str).str.strip().str.upper()
+            frame["name"] = frame.get("name", "").astype(str)
+            wanted = {str(code).strip().upper() for code in universe or []}
+            if wanted:
+                frame = frame[frame["ts_code"].isin(wanted)]
+            return dict(zip(frame["ts_code"], frame["name"]))
+        except Exception as exc:
+            self.log(f"stock name lookup failed: {exc}")
+            return {}
+
     def _build_data_coverage_summary(self, requested_universe: list[str], daily_basic_fields: list[str]) -> dict:
         requested = list(requested_universe or [])
         loaded = sorted(self.all_data.keys())
@@ -508,6 +557,7 @@ class BacktestEngine:
         return {
             "signal_timing": "策略在交易日 T 使用截至 T 的历史数据形成信号",
             "execution_timing": "订单在下一交易日开盘撮合",
+            "history_warmup": "回测开始日前预加载约540个自然日历史数据，用于均线/因子窗口，与聚宽 attribute_history 口径对齐",
             "market_rules": "A股100股整数手、T+1可卖、涨跌停和成交量限制",
             "commission_rate": self.broker.commission_rate,
             "min_commission": self.broker.min_commission,
@@ -538,14 +588,19 @@ class BacktestEngine:
         self.factor_run_end = end_date
         self.set_factor_catalog(factor_catalog)
 
+        warmup_start = _warmup_start_date(start_date)
         self.trade_dates = self.cache.get_trade_cal(start_date, end_date)
         if not self.trade_dates:
             return {"error": "无法获取交易日历"}
-        self._date_to_idx = {date_value: idx for idx, date_value in enumerate(self.trade_dates)}
+        self.history_dates = self.cache.get_trade_cal(warmup_start, end_date) or list(self.trade_dates)
+        if self.trade_dates[0] not in set(self.history_dates):
+            self.history_dates = list(self.trade_dates)
+        self._date_to_idx = {date_value: idx for idx, date_value in enumerate(self.history_dates)}
 
         daily_basic_fields = self._required_daily_basic_fields(required_fields)
+        self.stock_names = self._load_stock_names(universe)
         for ts_code in universe:
-            df = self._load_symbol_data(ts_code, start_date, end_date, daily_basic_fields)
+            df = self._load_symbol_data(ts_code, warmup_start, end_date, daily_basic_fields)
             if df.empty:
                 continue
             self.all_data[ts_code] = df

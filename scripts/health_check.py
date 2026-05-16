@@ -141,6 +141,7 @@ def main() -> int:
     started_proc = _start_backend_if_needed()
     checks = [
         ("Python compile", check_py_compile),
+        ("Encoding guard", lambda: check_script("check_encoding.py")),
         ("No-lookahead invariants", lambda: check_script("validate_factor_no_lookahead.py")),
         ("Canonical execution invariants", lambda: check_script("validate_execution_simulator.py")),
         ("Secret scan", lambda: check_script("security_check.py")),

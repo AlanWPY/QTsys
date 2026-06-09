@@ -746,6 +746,10 @@ body::after {
     max-width: 1440px;
     padding: 30px 24px 44px;
 }
+.main.factor-mining-main {
+    max-width: min(1840px, calc(100vw - 36px));
+    padding: 24px 18px 48px;
+}
 .card,
 .metric-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78));
@@ -1119,18 +1123,18 @@ body::after {
 .factor-board-legend-name.subtle { color: #cbd5e1; }
 
 /* ===== Factor Mining ===== */
-.factor-mining-shell { display: flex; flex-direction: column; gap: 18px; }
-.factor-mining-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.85fr); gap: 18px; align-items: start; }
-.factor-mining-panel { border: 1px solid rgba(148, 163, 184, 0.12); background: linear-gradient(180deg, rgba(15,23,42,0.78), rgba(2,6,23,0.62)); box-shadow: 0 18px 42px rgba(0,0,0,0.20); }
+.factor-mining-shell { display: flex; flex-direction: column; gap: 22px; }
+.factor-mining-grid { display: grid; grid-template-columns: minmax(720px, 1.55fr) minmax(430px, 0.92fr); gap: 22px; align-items: start; }
+.factor-mining-panel { border: 1px solid rgba(148, 163, 184, 0.12); background: linear-gradient(180deg, rgba(15,23,42,0.82), rgba(2,6,23,0.66)); box-shadow: 0 22px 54px rgba(0,0,0,0.24); border-radius: 18px; }
 .factor-mining-title { font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 6px; }
-.factor-mining-copy { color: var(--text-400); font-size: 13px; line-height: 1.7; max-width: 860px; }
+.factor-mining-copy { color: var(--text-400); font-size: 13px; line-height: 1.7; max-width: 1040px; }
 .factor-mining-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .factor-mining-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.factor-mining-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
-.factor-mining-kpi { padding: 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.68); border: 1px solid rgba(148, 163, 184, 0.1); }
-.factor-mining-kpi-label { color: var(--text-500); font-size: 11px; margin-bottom: 6px; }
-.factor-mining-kpi-value { color: #f8fafc; font-size: 18px; font-weight: 800; }
-.factor-mining-chart { height: 300px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.1); background: rgba(2, 6, 23, 0.32); padding: 12px; }
+.factor-mining-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 8px; }
+.factor-mining-kpi { padding: 9px 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(148, 163, 184, 0.10); }
+.factor-mining-kpi-label { color: var(--text-500); font-size: 10px; margin-bottom: 4px; letter-spacing: 0.04em; }
+.factor-mining-kpi-value { color: #f8fafc; font-size: 14px; font-weight: 800; line-height: 1.15; }
+.factor-mining-chart { height: clamp(440px, 44vh, 620px); border-radius: 16px; border: 1px solid rgba(148, 163, 184, 0.13); background: radial-gradient(circle at 18% 12%, rgba(59,130,246,0.10), transparent 36%), rgba(2, 6, 23, 0.46); padding: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
 .factor-mining-list { display: flex; flex-direction: column; gap: 10px; max-height: 860px; overflow-y: auto; padding-right: 4px; }
 .factor-mining-item { border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.12); background: rgba(30, 41, 59, 0.54); padding: 12px; }
 .factor-mining-item-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
@@ -1139,8 +1143,17 @@ body::after {
 .factor-mining-expression { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(2, 6, 23, 0.5); color: #cbd5e1; font-size: 12px; font-family: Consolas, Monaco, monospace; overflow-x: auto; white-space: nowrap; }
 .factor-mining-mini-chart { height: 120px; margin-top: 10px; }
 .factor-mining-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 8px; font-size: 11px; background: rgba(99, 102, 241, 0.14); color: #c7d2fe; }
+.factor-mining-badge.pinned { background: rgba(250, 204, 21, 0.14); color: #fde68a; border: 1px solid rgba(250, 204, 21, 0.24); }
+.factor-mining-name-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.factor-mining-lock { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; color: #fde68a; background: rgba(250, 204, 21, 0.12); border: 1px solid rgba(250, 204, 21, 0.22); font-size: 11px; font-weight: 800; }
 .factor-mining-warning { margin-top: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.10); color: #fbbf24; font-size: 12px; line-height: 1.5; }
 .factor-mining-actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.factor-mining-pin-btn { background: rgba(34,197,94,0.14) !important; color: #bbf7d0 !important; border: 1px solid rgba(34,197,94,0.25) !important; }
+.factor-mining-pin-btn:hover { background: rgba(34,197,94,0.22) !important; text-decoration: none !important; }
+.factor-mining-delete-btn { background: rgba(239,68,68,0.13) !important; color: #fecaca !important; border: 1px solid rgba(239,68,68,0.28) !important; padding: 8px 14px !important; border-radius: 12px !important; font-size: 13px !important; }
+.factor-mining-delete-btn:hover { background: rgba(239,68,68,0.20) !important; text-decoration: none !important; }
+.factor-mining-table-actions { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+.factor-mining-table-actions .btn { min-height: 30px; padding: 6px 10px; border-radius: 10px; font-size: 12px; }
 .factor-mining-empty { padding: 36px 16px; text-align: center; color: var(--text-500); border: 1px dashed rgba(148, 163, 184, 0.18); border-radius: 8px; background: rgba(15, 23, 42, 0.38); }
 .factor-mining-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .factor-mining-metric { padding: 8px 9px; border-radius: 8px; background: rgba(15,23,42,0.54); border: 1px solid rgba(148,163,184,0.08); }
@@ -1148,7 +1161,7 @@ body::after {
 .factor-mining-metric b { color: #e2e8f0; font-size: 12px; font-weight: 800; }
 .factor-mining-metric b.text-profit { color: var(--profit); }
 .factor-mining-metric b.text-loss { color: var(--loss); }
-.factor-mining-statusbar { display: grid; grid-template-columns: 180px minmax(0, 1fr) 160px; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: rgba(15,23,42,0.62); border: 1px solid rgba(148,163,184,0.10); }
+.factor-mining-statusbar { display: grid; grid-template-columns: 170px minmax(0, 1fr) 145px; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(15,23,42,0.62); border: 1px solid rgba(148,163,184,0.10); }
 .factor-mining-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; box-shadow: 0 0 0 4px rgba(100,116,139,0.12); }
 .factor-mining-status-dot.running { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.12); }
 .factor-mining-status-dot.failed { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.12); }
@@ -1157,8 +1170,15 @@ body::after {
 .factor-mining-progress span { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.25s ease; }
 .factor-mining-log { max-height: 150px; overflow-y: auto; font-size: 12px; color: var(--text-400); line-height: 1.7; font-family: Consolas, Monaco, monospace; }
 .factor-mining-toggle { display: inline-flex; gap: 8px; align-items: center; color: var(--text-400); font-size: 12px; }
-.factor-mining-summary-table { max-height: 520px; overflow: auto; border: 1px solid rgba(148,163,184,0.10); border-radius: 10px; }
-.factor-mining-summary-table table { min-width: 980px; }
+.factor-mining-summary-table { max-height: 560px; overflow: auto; border: 1px solid rgba(148,163,184,0.10); border-radius: 14px; background: rgba(2,6,23,0.28); }
+.factor-mining-summary-table table { min-width: 1340px; border-collapse: separate; border-spacing: 0; }
+.factor-mining-summary-table th:first-child,
+.factor-mining-summary-table td:first-child { position: sticky; left: 0; z-index: 3; background: rgba(15,23,42,0.96); box-shadow: 10px 0 20px rgba(2,6,23,0.22); }
+.factor-mining-summary-table thead th:first-child { z-index: 4; }
+.factor-mining-summary-table th:first-child,
+.factor-mining-summary-table td:first-child { min-width: 178px; }
+.factor-mining-summary-table tbody tr { transition: background .18s ease, transform .18s ease; }
+.factor-mining-summary-table tbody tr:hover { background: rgba(30,41,59,0.38); }
 .factor-mining-summary-table td.formula-cell { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: Consolas, Monaco, monospace; color: #cbd5e1; }
 .factor-mining-stage { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px; border-radius: 12px; background: radial-gradient(circle at 20% 15%, rgba(56,189,248,0.12), transparent 34%), rgba(15,23,42,0.52); border: 1px solid rgba(148,163,184,0.10); overflow: hidden; }
 .factor-mining-miner { position: relative; height: 96px; }
@@ -1183,7 +1203,8 @@ body::after {
 @keyframes pickaxeSwing { 0%,100% { transform: rotate(-38deg); } 45% { transform: rotate(34deg) translate(4px, 9px); } }
 @keyframes minerBody { 0%,100% { transform: rotate(-3deg) translateY(0); } 45% { transform: rotate(5deg) translateY(4px); } }
 @keyframes minerSpark { 0%,45% { opacity: 0; transform: translate(0,0) scale(.8); } 58% { opacity: 1; } 100% { opacity: 0; transform: translate(12px,-18px) scale(.2); } }
-@media (max-width: 1100px) { .factor-mining-grid { grid-template-columns: 1fr; } .factor-mining-kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1300px) { .factor-mining-grid { grid-template-columns: 1fr; } .factor-mining-chart { height: 420px; } }
+@media (max-width: 1100px) { .factor-mining-grid { grid-template-columns: 1fr; } .factor-mining-kpis { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .factor-mining-statusbar, .factor-mining-stage { grid-template-columns: 1fr; } .factor-mining-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .factor-board-legend-swatch.spread { background: linear-gradient(90deg, #f8fafc, #94a3b8); }
 .factor-board-chart-baseline { fill: #94a3b8; font-size: 11px; }
@@ -9228,6 +9249,7 @@ function FactorMiningPage({ showToast }) {
     const [reportLoadingId, setReportLoadingId] = useState(null);
     const pollRef = useRef(null);
     const lastIdRef = useRef(0);
+    const resultsCountRef = useRef(0);
 
     useEffect(() => {
         api.get('/api/factor_mining/options').then(setOptions).catch(() => {});
@@ -9236,6 +9258,10 @@ function FactorMiningPage({ showToast }) {
     useEffect(() => {
         return () => { if (pollRef.current) clearInterval(pollRef.current); };
     }, []);
+
+    useEffect(() => {
+        resultsCountRef.current = results.length;
+    }, [results.length]);
 
     const best = results.length ? results[0] : null;
     const miningCurveSignature = (item) => {
@@ -9251,16 +9277,18 @@ function FactorMiningPage({ showToast }) {
     };
     const chartResults = useMemo(() => {
         const sorted = [...results].sort((a, b) => {
-            const ax = Number(a && (a.test_excess_return ?? (a.backtest_metrics && a.backtest_metrics.excess_return)));
-            const bx = Number(b && (b.test_excess_return ?? (b.backtest_metrics && b.backtest_metrics.excess_return)));
+            const aMetrics = (a && a.display_metrics && Object.keys(a.display_metrics).length) ? a.display_metrics : ((a && a.backtest_metrics) || {});
+            const bMetrics = (b && b.display_metrics && Object.keys(b.display_metrics).length) ? b.display_metrics : ((b && b.backtest_metrics) || {});
+            const ax = Number(aMetrics.total_return ?? aMetrics.excess_return ?? a.score);
+            const bx = Number(bMetrics.total_return ?? bMetrics.excess_return ?? b.score);
             return (Number.isFinite(bx) ? bx : Number(b.score || 0)) - (Number.isFinite(ax) ? ax : Number(a.score || 0));
         });
-        const top = sorted.slice(0, 5);
-        const bottom = sorted.length > 5 ? sorted.slice(-5) : [];
+        const top = sorted.slice(0, 10);
+        const bottom = sorted.length > 10 ? sorted.slice(-10) : [];
         const map = new Map();
         [...top, ...bottom].forEach(item => {
             if (!item || item.id === undefined) return;
-            const key = miningCurveSignature(item);
+            const key = item.id;
             if (!map.has(key)) map.set(key, item);
         });
         return Array.from(map.values());
@@ -9325,7 +9353,7 @@ function FactorMiningPage({ showToast }) {
         const pad = Math.max((maxVal - minVal) * 0.18, 0.02);
         return [Number((minVal - pad).toFixed(4)), Number((maxVal + pad).toFixed(4))];
     }, [chartData]);
-    const palette = ['#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#22d3ee', '#fb7185', '#84cc16'];
+    const palette = ['#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#22d3ee', '#fb7185', '#84cc16', '#facc15', '#38bdf8', '#c084fc', '#2dd4bf', '#fb923c', '#4ade80', '#e879f9', '#93c5fd', '#f87171', '#a3e635', '#67e8f9', '#fdba74'];
     const pct = (value) => {
         const num = Number(value);
         return Number.isFinite(num) ? num.toFixed(2) + '%' : '-';
@@ -9354,12 +9382,19 @@ function FactorMiningPage({ showToast }) {
         const metrics = item && item.display_metrics;
         return metrics && Object.keys(metrics).length ? metrics : ((item && item.backtest_metrics) || {});
     };
+    const technicalOpsText = (item) => {
+        const ops = item && (item.technical_operators || (item.fingerprint && item.fingerprint.technical_operators));
+        return Array.isArray(ops) && ops.length ? ops.join(', ') : '-';
+    };
     const csvEscape = (value) => `"${String(value === undefined || value === null ? '' : value).replace(/"/g, '""')}"`;
     const downloadSummary = () => {
-        const headers = ['因子名称', '主题', '因子公式', '测试IC', '测试IR', 'p-value', 'DSR', 'PBO风险', '展示最大回撤', '展示超额', '展示年化收益', '测试超额', '协议版本'];
+        const headers = ['因子名称', '搜索来源', '主题', '因子类型', '技术算子', '因子公式', '测试IC', '测试IR', 'p-value', 'DSR', 'PBO风险', '展示最大回撤', '展示超额', '展示年化收益', '测试超额', '协议版本'];
         const rows = results.map(item => [
             item.name || '',
+            item.search_source || item.source || '',
             item.theme || '',
+            item.event_driven ? '事件型' : '连续型',
+            technicalOpsText(item),
             item.expression || '',
             num(item.test_metrics && item.test_metrics.ic_mean, 6),
             num(item.test_metrics && item.test_metrics.ic_ir, 6),
@@ -9402,12 +9437,12 @@ function FactorMiningPage({ showToast }) {
         });
     };
 
-    const hydrateSessionResults = async (sid) => {
+    const hydrateSessionResults = async (sid, pinnedOnly = false) => {
         if (!sid) return;
         let cursor = 0;
         let allItems = [];
         for (let i = 0; i < 8; i++) {
-            const res = await api.get(`/api/factor_mining/sessions/${sid}/results?after_id=${cursor}&limit=200`);
+            const res = await api.get(`/api/factor_mining/sessions/${sid}/results?after_id=${cursor}&limit=200&pinned_only=${pinnedOnly ? 'true' : 'false'}`);
             const items = Array.isArray(res && res.items) ? res.items : [];
             if (!items.length) break;
             allItems = allItems.concat(items);
@@ -9446,7 +9481,7 @@ function FactorMiningPage({ showToast }) {
                 capacity_limit_pct: Number(st.capacity_limit_pct || prev.capacity_limit_pct),
                 min_dsr: Number(st.min_dsr ?? prev.min_dsr),
             }));
-            await hydrateSessionResults(sid);
+            await hydrateSessionResults(sid, !res.active);
             appendLog(res.active ? '\u5df2\u7eed\u63a5\u6b63\u5728\u8fd0\u884c\u7684\u56e0\u5b50\u6316\u6398\u4f1a\u8bdd' : '\u5df2\u6062\u590d\u6700\u8fd1\u4e00\u6b21\u56e0\u5b50\u6316\u6398\u7ed3\u679c');
             if (st.running) pollSession(sid);
         } catch (e) {
@@ -9463,6 +9498,7 @@ function FactorMiningPage({ showToast }) {
             lastIdRef.current = nextId;
             setLastId(nextId);
         }
+        return items.length;
     };
 
     const pollSession = (sid) => {
@@ -9472,7 +9508,10 @@ function FactorMiningPage({ showToast }) {
                 const st = await api.get(`/api/factor_mining/sessions/${sid}/status`);
                 setStatus(st);
                 appendLog(st.message);
-                await fetchIncrementalResults(sid);
+                const added = await fetchIncrementalResults(sid);
+                if (!added && Number(st && st.accepted_count || 0) > resultsCountRef.current) {
+                    await hydrateSessionResults(sid);
+                }
                 if (!st.running && pollRef.current) {
                     clearInterval(pollRef.current);
                     pollRef.current = null;
@@ -9566,6 +9605,32 @@ function FactorMiningPage({ showToast }) {
             showToast((e && e.detail) || '\u4fdd\u5b58\u56e0\u5b50\u5931\u8d25', 'error');
         }
         setSavingExpression('');
+    };
+
+    const pinCandidate = async (item) => {
+        if (!item || !item.id || item.is_pinned) return;
+        try {
+            const res = await api.post(`/api/factor_mining/candidates/${item.id}/pin`, {});
+            if (res && res.candidate) {
+                mergeResults([res.candidate]);
+            } else {
+                mergeResults([{ ...item, is_pinned: true }]);
+            }
+            showToast('\u56e0\u5b50\u5df2\u4e0a\u9501\u4fdd\u7559', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u4fdd\u7559\u56e0\u5b50\u5931\u8d25', 'error');
+        }
+    };
+
+    const deleteCandidate = async (item) => {
+        if (!item || !item.id) return;
+        try {
+            await api.remove(`/api/factor_mining/candidates/${item.id}`);
+            setResults(prev => prev.filter(row => row && row.id !== item.id));
+            showToast('\u56e0\u5b50\u5df2\u5220\u9664', 'success');
+        } catch (e) {
+            showToast((e && e.detail) || '\u5220\u9664\u56e0\u5b50\u5931\u8d25', 'error');
+        }
     };
 
     const revalidateCandidate = async (item) => {
@@ -9739,14 +9804,14 @@ function FactorMiningPage({ showToast }) {
                                     <YAxis tick={{fill:'#94a3b8',fontSize:10}} domain={chartYDomain} tickFormatter={v => Number(v).toFixed(1) + '%'}/>
                                      <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}} formatter={v => Number(v).toFixed(2) + '%'}/>
                                      <Legend/>
-                                    {best && <Line type="monotone" dataKey="benchmark" name={'\u57fa\u51c6'} dot={false} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.6}/>}
-                                    {best && <Line type="monotone" dataKey="excess" name={'\u8d85\u989d'} dot={false} stroke="#22c55e" strokeDasharray="2 2" strokeWidth={1.8}/>}
-                                     {chartResults.map((item, idx) => <Line key={idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6}/>)}
+                                    {best && <Line type="monotone" dataKey="benchmark" name={'\u57fa\u51c6'} dot={false} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
+                                    {best && <Line type="monotone" dataKey="excess" name={'\u8d85\u989d'} dot={false} stroke="#22c55e" strokeDasharray="2 2" strokeWidth={1.8} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
+                                     {chartResults.map((item, idx) => <Line key={item.id || idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>)}
                                 </ComposedChart>
                             </ResponsiveContainer>
                         ) : <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u8bc4\u4f30\u56e0\u5b50\u548c\u56de\u6d4b\u66f2\u7ebf...' : '\u5c1a\u672a\u8fd0\u884c\u6316\u6398'}</div>}
                     </div>
-                    <div className="factor-mining-toggle">{'\u603b\u56fe\u4ec5\u5c55\u793a\u7efc\u5408\u8bc4\u5206 Top5 \u548c Bottom5\uff0c\u5e76\u5bf9\u7b26\u53f7\u53cd\u5411\u4f46\u4ea4\u6613\u66b4\u9732\u76f8\u540c\u7684\u66f2\u7ebf\u53bb\u91cd\uff1b\u53f3\u4fa7\u548c\u5e95\u90e8\u8868\u683c\u4fdd\u7559\u5168\u90e8\u5165\u5e93\u56e0\u5b50\u3002'}</div>
+                    <div className="factor-mining-toggle">{'\u603b\u56fe\u4ec5\u5c55\u793a\u6536\u76ca\u7387\u6700\u9ad8\u524d10\u4e2a\u548c\u6700\u4f4e10\u4e2a\u56e0\u5b50\uff0c\u6bcf\u6b21\u65b0\u589e\u6216\u5220\u9664\u56e0\u5b50\u90fd\u4f1a\u81ea\u52a8\u66f4\u65b0\uff1b\u672a\u4e0a\u9501\u56e0\u5b50\u5728\u7cfb\u7edf\u91cd\u542f\u540e\u4e0d\u518d\u6062\u590d\u663e\u793a\u3002'}</div>
                     <div className="factor-mining-log">
                         {logs.length ? logs.slice().reverse().map((log, idx) => <div key={idx}>[{log.time}] {log.text}</div>) : <div>{'\u6682\u65e0\u6316\u6398\u65e5\u5fd7'}</div>}
                     </div>
@@ -9761,19 +9826,25 @@ function FactorMiningPage({ showToast }) {
                     </div>
                     <div className="factor-mining-list">
                         {results.length === 0 ? <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u751f\u6210\u5019\u9009...' : '\u6682\u65e0\u5019\u9009\u56e0\u5b50'}</div> : results.map((item, idx) => (
-                            <div key={item.expression + idx} className="factor-mining-item">
+                            <div key={item.id || item.expression || idx} className="factor-mining-item">
                                 <div className="factor-mining-item-head">
                                     <div>
-                                        <div className="factor-mining-name">{idx + 1}. {item.name}</div>
+                                        <div className="factor-mining-name-line">
+                                            <div className="factor-mining-name">{idx + 1}. {item.name}</div>
+                                            {item.is_pinned && <span className="factor-mining-lock">{'\ud83d\udd12 \u5df2\u4fdd\u7559'}</span>}
+                                        </div>
                                         <div className="factor-mining-meta">{item.description}</div>
                                     </div>
-                                    <span className="factor-mining-badge">{item.source}</span>
+                                    <span className={'factor-mining-badge ' + (item.is_pinned ? 'pinned' : '')}>{item.is_pinned ? '\u5df2\u4fdd\u7559' : item.source}</span>
                                 </div>
                                 <div className="factor-mining-meta">
                                     {'\u6837\u672c\u5916\u8bc4\u5206'} {num(item.score, 4)} | {'\u6d4b\u8bd5IC'} {num(item.test_metrics && item.test_metrics.ic_mean, 4)} | {'\u6d4b\u8bd5IR'} {num(item.test_metrics && item.test_metrics.ic_ir, 3)} | {'\u6d4b\u8bd5\u8d85\u989d'} {pct(item.backtest_metrics && item.backtest_metrics.excess_return)} | {'\u53e3\u5f84'} {item.protocol_version || 'legacy_unverified'}
                                 </div>
                                 <div className="factor-mining-meta">
                                     {'\u4e3b\u9898'} {item.theme || '-'} | {'\u5047\u8bbe'} {item.hypothesis || '-'}
+                                </div>
+                                <div className="factor-mining-meta">
+                                    {'\u6765\u6e90'} {item.search_source || item.source || '-'} | {'\u7c7b\u578b'} {item.event_driven ? '\u4e8b\u4ef6\u578b' : '\u8fde\u7eed\u578b'} | {'\u6280\u672f\u7b97\u5b50'} {technicalOpsText(item)}
                                 </div>
                                 {item.legacy_warning && <div className="factor-mining-warning">{'\u65e7\u6316\u6398\u53e3\u5f84\uff0c\u53ef\u80fd\u5b58\u5728\u8fc7\u62df\u5408\u6216\u56de\u6d4b\u504f\u4e50\u89c2\uff0c\u5efa\u8bae\u70b9\u51fb\u91cd\u65b0\u4e25\u683c\u9a8c\u8bc1\u3002'}</div>}
                                 <div className="factor-mining-metric-grid">
@@ -9803,11 +9874,17 @@ function FactorMiningPage({ showToast }) {
                                         <ComposedChart data={item.normalized_curve || []}>
                                             <XAxis dataKey="date" hide/>
                                             <YAxis hide domain={['dataMin', 'dataMax']}/>
-                                            <Line type="monotone" dataKey="value" dot={false} stroke={palette[idx % palette.length]} strokeWidth={1.8}/>
+                                            <Line type="monotone" dataKey="value" dot={false} stroke={palette[idx % palette.length]} strokeWidth={1.8} isAnimationActive={true} animationDuration={500} animationEasing="ease-out"/>
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
                                 <div className="factor-mining-actions-row">
+                                    <button className="btn btn-secondary factor-mining-pin-btn" onClick={() => pinCandidate(item)} disabled={item.is_pinned}>
+                                        {item.is_pinned ? '\u5df2\u4fdd\u7559' : '\u4fdd\u7559\u56e0\u5b50'}
+                                    </button>
+                                    <button className="btn btn-danger factor-mining-delete-btn" onClick={() => deleteCandidate(item)}>
+                                        {'\u5220\u9664\u56e0\u5b50'}
+                                    </button>
                                     <button className="btn btn-secondary" onClick={() => openResearchReport(item)} disabled={reportLoadingId === item.id}>
                                         {reportLoadingId === item.id ? '\u52a0\u8f7d\u4e2d...' : '\u7814\u7a76\u62a5\u544a'}
                                     </button>
@@ -9836,7 +9913,12 @@ function FactorMiningPage({ showToast }) {
                     <table>
                         <thead>
                             <tr>
+                                <th>{'\u64cd\u4f5c'}</th>
+                                <th>{'\u72b6\u6001'}</th>
                                 <th>{'\u56e0\u5b50\u540d\u79f0'}</th>
+                                <th>{'\u6765\u6e90'}</th>
+                                <th>{'\u7c7b\u578b'}</th>
+                                <th>{'\u6280\u672f\u7b97\u5b50'}</th>
                                 <th>{'\u56e0\u5b50\u516c\u5f0f'}</th>
                                 <th>IC</th>
                                 <th>IR</th>
@@ -9849,10 +9931,20 @@ function FactorMiningPage({ showToast }) {
                         </thead>
                         <tbody>
                             {results.length === 0 ? (
-                                <tr><td colSpan="9" className="text-center text-muted">{'\u6682\u65e0\u6316\u6398\u7ed3\u679c'}</td></tr>
+                                <tr><td colSpan="14" className="text-center text-muted">{'\u6682\u65e0\u6316\u6398\u7ed3\u679c'}</td></tr>
                             ) : results.map(item => (
                                 <tr key={'summary-' + item.id}>
-                                    <td>{item.name || '-'}</td>
+                                    <td>
+                                        <div className="factor-mining-table-actions">
+                                            <button className="btn btn-secondary factor-mining-pin-btn" onClick={() => pinCandidate(item)} disabled={item.is_pinned}>{item.is_pinned ? '\u5df2\u4fdd\u7559' : '\u4fdd\u7559\u56e0\u5b50'}</button>
+                                            <button className="btn btn-danger factor-mining-delete-btn" onClick={() => deleteCandidate(item)}>{'\u5220\u9664'}</button>
+                                        </div>
+                                    </td>
+                                    <td>{item.is_pinned ? <span className="factor-mining-lock">{'\u5df2\u4fdd\u7559'}</span> : <span className="text-muted">{'\u4e34\u65f6'}</span>}</td>
+                                    <td>{item.is_pinned ? '\ud83d\udd12 ' : ''}{item.name || '-'}</td>
+                                    <td>{item.search_source || item.source || '-'}</td>
+                                    <td>{item.event_driven ? '\u4e8b\u4ef6\u578b' : '\u8fde\u7eed\u578b'}</td>
+                                    <td>{technicalOpsText(item)}</td>
                                     <td className="formula-cell" title={item.expression || ''}>{item.expression || '-'}</td>
                                     <td className={metricValueClass(item.test_metrics && item.test_metrics.ic_mean)}>{num(item.test_metrics && item.test_metrics.ic_mean, 4)}</td>
                                     <td>{num(item.test_metrics && item.test_metrics.ic_ir, 3)}</td>
@@ -9987,7 +10079,7 @@ function App() {
                 </nav>
             </header>
             <SystemHealthStrip health={health} onRefresh={loadHealth} />
-            <main className="main">
+            <main className={'main' + (page === 'factormining' ? ' factor-mining-main' : '')}>
                 {page === 'settings' && <SettingsPage showToast={showToast} />}
                 {page === 'strategy' && <StrategyPage showToast={showToast} openBacktestWithStrategy={() => setPage('backtest')} />}
                 {page === 'backtest' && <BacktestPage showToast={showToast} openHistoryWithResult={() => setPage('history')} />}

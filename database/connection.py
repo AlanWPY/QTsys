@@ -116,6 +116,8 @@ async def _init_schema(engine):
             ("factor_mining_candidates", "fingerprint", "JSON DEFAULT '{}'"),
             ("factor_mining_candidates", "correlation_cluster", "VARCHAR(80) DEFAULT ''"),
             ("factor_mining_candidates", "revalidation_status", "VARCHAR(40) DEFAULT ''"),
+            ("factor_mining_candidates", "is_pinned", "INTEGER DEFAULT 0"),
+            ("factor_mining_candidates", "is_deleted", "INTEGER DEFAULT 0"),
         ]
         for table, col, typedef in _migrate_cols:
             try:

@@ -552,6 +552,31 @@ PROFESSIONAL_FACTOR_THEMES = [
         ],
     },
     {
+        "name": "macd_volume_confirmation",
+        "source": "technical_event",
+        "hypothesis": "MACD and moving-average crosses are weak alone; repeated crosses plus volume expansion can proxy repaired trend participation.",
+        "templates": [
+            {"name": "macd_second_cross_volume_20", "expression": "where((count_true(cross_up(macd_dif(close, 12, 26), macd_dea(close, 12, 26, 9)), 40) >= 2) & (vol_zscore(20) > 1.0), macd_hist(close, 12, 26, 9) + pctchange(close, 5), -std(returns, 20))", "description": "Second MACD golden-cross with volume confirmation."},
+            {"name": "ma_second_cross_volume_20", "expression": "where((count_true(cross_up(ema(close, 5), ema(close, 20)), 40) >= 2) & (vol_zscore(20) > 1.0), pctchange(close, 5) - drawdown_from_high(close, 40), -std(returns, 20))", "description": "Second moving-average golden-cross with volume expansion."},
+        ],
+    },
+    {
+        "name": "rsi_mean_reversion_repair",
+        "source": "technical_event",
+        "hypothesis": "RSI recovery from oversold conditions is more useful when price stabilizes and volume confirms real demand.",
+        "templates": [
+            {"name": "rsi_repair_volume_20", "expression": "where((rsi(close, 14) > 35) & (delay(rsi(close, 14), 5) < 35) & (vol_zscore(20) > 0.5), (50 - abs(rsi(close, 14) - 50)) / 50 + pctchange(close, 5), -abs(drawdown_from_high(close, 40)))", "description": "RSI repair with moderate volume confirmation."},
+        ],
+    },
+    {
+        "name": "compression_breakout",
+        "source": "technical_event",
+        "hypothesis": "Breakouts after volatility compression and volume confirmation are more tradable than already-crowded high-volatility breakouts.",
+        "templates": [
+            {"name": "breakout_compression_volume_20", "expression": "where((breakout(close, 40) > 0) & (std(returns, 20) < std(returns, 40)) & (vol_zscore(20) > 0.8), pctchange(close, 20) / (std(returns, 20) + 0.0001), -abs(pctchange(close, 5)))", "description": "Low-volatility compression followed by volume-confirmed breakout."},
+        ],
+    },
+    {
         "name": "fundamental_value",
         "source": "research_seed",
         "hypothesis": "估值与质量因子体现横截面风险补偿，但稳定性依赖中性化和财务披露时点。",
@@ -1086,15 +1111,40 @@ async def save_mined_factor(db: AsyncSession, payload: dict) -> dict:
     return {"id": factor.id, "name": factor.name}
 
 
-WINDOW_SPACE = [2, 3, 5, 8, 10, 11, 15, 20, 30, 60, 120]
+FIB_WINDOW_SPACE = [2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+EXTRA_WINDOW_SPACE = [4, 6, 7, 9, 10, 11, 12, 15, 16, 18, 20, 24, 30, 40, 60, 90, 120]
+WINDOW_SPACE = sorted(set(FIB_WINDOW_SPACE + EXTRA_WINDOW_SPACE))
+FIB_RATIO_WEIGHTS = [0.236, 0.382, 0.5, 0.618, 0.786, 1.0]
 TERMINAL_SPACE = [
     "close", "open", "high", "low", "vol", "returns", "vwap", "amount",
     "pe", "pb", "ps", "turnover_rate", "circ_mv",
 ]
+
+
+def _sample_window(min_window: int = 2, max_window: int = 144, *, fib_bias: float = 0.78) -> int:
+    """Sample windows with a Fibonacci bias plus non-Fibonacci exploration."""
+    min_window = int(min_window or 2)
+    max_window = int(max_window or 144)
+    fib_pool = [w for w in FIB_WINDOW_SPACE if min_window <= w <= max_window]
+    extra_pool = [w for w in EXTRA_WINDOW_SPACE if min_window <= w <= max_window]
+    if fib_pool and random.random() < fib_bias:
+        return int(random.choice(fib_pool))
+    if extra_pool and random.random() < 0.75:
+        return int(random.choice(extra_pool))
+    return int(random.randint(min_window, max(max_window, min_window)))
+
+
+def _sample_weight() -> float:
+    if random.random() < 0.68:
+        return float(random.choice(FIB_RATIO_WEIGHTS))
+    return round(random.uniform(0.15, 0.85), 3)
 UNARY_TEMPLATES = [
     "rank({})", "cs_rank({})", "abs({})", "neg({})",
     "log(abs({}) + 1)", "sqrt(abs({}) + 0.0001)",
     "signedpower({}, 2)", "clip({}, -3, 3)",
+    "rsi({}, 14)", "macd_hist({}, 12, 26, 9)",
+    "drawdown_from_high({}, 20)", "breakout({}, 20)",
+    "efficiency_ratio({}, 20)",
 ]
 BINARY_TEMPLATES = [
     "({} + {})", "({} - {})", "({} * {})", "({} / (abs({}) + 0.0001))",
@@ -1104,6 +1154,8 @@ ROLLING_TEMPLATES = [
     "mean({}, {w})", "std({}, {w})", "sum({}, {w})", "ts_max({}, {w})",
     "ts_min({}, {w})", "ts_rank({}, {w})", "delta({}, {w})", "delay({}, {w})",
     "pctchange({}, {w})", "ts_decay({}, {w})", "ewm({}, {w})",
+    "ema({}, {w})", "zscore({}, {w})",
+    "skew({}, {w})", "kurt({}, {w})", "downside_std({}, {w})", "upside_std({}, {w})", "efficiency_ratio({}, {w})",
     "ts_argmax({}, {w})", "ts_argmin({}, {w})", "wma({}, {w})",
     "decaylinear({}, {w})",
 ]
@@ -1114,6 +1166,7 @@ PAIR_ROLLING_TEMPLATES = [
 CONDITION_TEMPLATES = [
     "where(({} > {}), {}, {})",
     "where(({} < {}), {}, {})",
+    "where((cross_up({}, {}) > 0), {}, {})",
     "ternary(({} > {}), {}, {})",
 ]
 
@@ -2149,8 +2202,18 @@ def _factor_fingerprint(expression: str) -> dict:
     operators = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", text)
     variables = sorted(set(re.findall(r"\b(close|open|high|low|vol|volume|amount|vwap|returns|pe|pb|ps|turnover_rate|circ_mv|total_mv)\b", text)))
     windows = sorted({int(x) for x in re.findall(r",\s*(\d+)\)", text) if str(x).isdigit()})
-    if any(var in variables for var in ("pe", "pb", "ps", "turnover_rate", "circ_mv", "total_mv")):
+    technical_ops = sorted(set(operators) & {
+        "ema", "macd_dif", "macd_dea", "macd_hist", "rsi", "cross_up", "cross_down",
+        "bars_since", "count_true", "vol_zscore", "gap_pct", "breakout", "drawdown_from_high",
+        "skew", "kurt", "downside_std", "upside_std", "efficiency_ratio",
+    })
+    shape_ops = sorted(set(operators) & {"skew", "kurt", "downside_std", "upside_std", "efficiency_ratio"})
+    if shape_ops:
+        family = "distribution_shape"
+    elif any(var in variables for var in ("pe", "pb", "ps", "turnover_rate", "circ_mv", "total_mv")):
         family = "fundamental_or_liquidity"
+    elif technical_ops:
+        family = "technical_event"
     elif "vol" in variables or "volume" in variables or "amount" in variables:
         family = "volume_price"
     elif "returns" in variables or "pctchange" in operators:
@@ -2161,11 +2224,79 @@ def _factor_fingerprint(expression: str) -> dict:
         "family": family,
         "operators": sorted(set(operators)),
         "operator_count": len(operators),
+        "technical_operators": technical_ops,
+        "technical_operator_count": len(technical_ops),
+        "shape_operators": shape_ops,
+        "event_driven": bool(technical_ops or "where" in operators or "ternary" in operators),
         "variables": variables,
         "windows": windows,
         "max_window": max(windows) if windows else 0,
         "expression_length": len(text),
     }
+
+
+def _window_bucket(window: int) -> str:
+    value = int(window or 0)
+    if value <= 0:
+        return "none"
+    if value <= 5:
+        return "xs"
+    if value <= 15:
+        return "s"
+    if value <= 30:
+        return "m"
+    if value <= 60:
+        return "l"
+    return "xl"
+
+
+def _novelty_key_from_fingerprint(fingerprint: dict) -> str:
+    operators = [op for op in (fingerprint.get("operators") or []) if op not in {"rank", "cs_rank", "abs", "neg", "clip"}]
+    variables = sorted(fingerprint.get("variables") or [])
+    buckets = sorted({_window_bucket(int(w)) for w in (fingerprint.get("windows") or [])})
+    key_parts = [
+        str(fingerprint.get("family") or "unknown"),
+        "+".join(sorted(operators)[:8]) or "raw",
+        "+".join(variables[:8]) or "no_var",
+        "+".join(buckets) or "no_window",
+        "event" if fingerprint.get("event_driven") else "continuous",
+    ]
+    return "|".join(key_parts)
+
+
+def _expression_novelty_key(expression: str) -> str:
+    return _novelty_key_from_fingerprint(_factor_fingerprint(expression))
+
+
+def _payload_homogeneity_reason(payload: dict, elites: list[dict], accepted_structure_counts: dict[str, int]) -> str:
+    fingerprint = payload.get("fingerprint") or _factor_fingerprint(payload.get("expression", ""))
+    novelty_key = _novelty_key_from_fingerprint(fingerprint)
+    if accepted_structure_counts.get(novelty_key, 0) >= 3:
+        return "same_structure_quota_reached"
+    curve = _curve_value_map(payload.get("normalized_curve") or [])
+    if len(curve) < 5:
+        return ""
+    family = fingerprint.get("family")
+    theme = payload.get("theme")
+    score = _safe_float(payload.get("score"))
+    for item in elites:
+        other_curve = _curve_value_map(item.get("normalized_curve") or [])
+        dates = sorted(set(curve) & set(other_curve))
+        if len(dates) < 20:
+            continue
+        left = np.array([curve[d] for d in dates], dtype=float)
+        right = np.array([other_curve[d] for d in dates], dtype=float)
+        if np.nanstd(left) <= 0 or np.nanstd(right) <= 0:
+            continue
+        corr = abs(float(np.corrcoef(left, right)[0, 1]))
+        other_fp = item.get("fingerprint") or {}
+        if corr >= 0.985:
+            return "near_duplicate_equity_curve"
+        if corr >= 0.96 and family and family == other_fp.get("family") and score <= _safe_float(item.get("score")) + 0.05:
+            return "same_family_high_curve_correlation"
+        if corr >= 0.94 and theme and theme == item.get("theme") and score <= _safe_float(item.get("score")) + 0.10:
+            return "same_theme_high_curve_correlation"
+    return ""
 
 
 def _robustness_summary(
@@ -2442,6 +2573,10 @@ def _evaluate_candidate(candidate: Candidate, ctx: MiningDataContext, config: St
         "discovery_score": discovery_score,
         "validation_selection_score": protocol["selection_score"],
         "chosen_rebalance_days": chosen_rebalance_days,
+        "search_source": candidate.source,
+        "search_theme": candidate.theme or "general_formula",
+        "event_driven": bool(fingerprint.get("event_driven")),
+        "technical_operators": fingerprint.get("technical_operators", []),
         "test_excess_return": _safe_float(test_backtest["metrics"].get("excess_return")),
         "validation_excess_return": _safe_float(valid_backtest["metrics"].get("excess_return")),
         "protocol_version": STRICT_MINING_PROTOCOL_VERSION,
@@ -2625,12 +2760,12 @@ def _random_expr(depth: int = 0, max_depth: int = 4) -> str:
             return template.format(left, right, right)
         return template.format(left, right)
     if roll < 0.76:
-        return random.choice(ROLLING_TEMPLATES).format(_random_expr(depth + 1, max_depth), w=random.choice(WINDOW_SPACE))
+        return random.choice(ROLLING_TEMPLATES).format(_random_expr(depth + 1, max_depth), w=_sample_window())
     if roll < 0.92:
         return random.choice(PAIR_ROLLING_TEMPLATES).format(
             _random_expr(depth + 1, max_depth),
             _random_expr(depth + 1, max_depth),
-            w=random.choice(WINDOW_SPACE),
+            w=_sample_window(),
         )
     return random.choice(CONDITION_TEMPLATES).format(
         _random_expr(depth + 1, max_depth),
@@ -2645,7 +2780,9 @@ def _mutate_expression(expression: str) -> str:
     windows = [int(x) for x in re.findall(r",\s*(\d+)\)", text)]
     if windows:
         old = random.choice(windows)
-        new = random.choice([w for w in WINDOW_SPACE if w != old])
+        new = _sample_window(max_window=max(max(WINDOW_SPACE), old + 5))
+        if new == old:
+            new = random.choice([w for w in WINDOW_SPACE if w != old])
         return re.sub(rf",\s*{old}\)", f", {new})", text, count=1)
     terminal = random.choice(TERMINAL_SPACE)
     replacement = random.choice([x for x in TERMINAL_SPACE if x != terminal])
@@ -2659,9 +2796,126 @@ def _combine_expressions(left: str, right: str) -> str:
     if mode == "spread":
         return f"(rank({left}) - rank({right}))"
     if mode == "weighted":
-        weight = random.choice([0.35, 0.5, 0.65])
+        weight = _sample_weight()
         return f"({weight} * rank({left}) + {round(1 - weight, 2)} * rank({right}))"
     return f"(rank({left}) + rank({right})) / 2"
+
+
+def _stochastic_leaf() -> str:
+    variable = random.choice(TERMINAL_SPACE)
+    roll = random.random()
+    if roll < 0.18:
+        return f"pctchange({variable}, {_sample_window(2, 34)})"
+    if roll < 0.34:
+        return f"zscore({variable}, {_sample_window(5, 55)})"
+    if roll < 0.48:
+        return f"delta({variable}, {_sample_window(2, 34)})"
+    if roll < 0.62:
+        return f"mean({variable}, {_sample_window(3, 55)})"
+    if roll < 0.76:
+        return f"std({variable}, {_sample_window(3, 55)})"
+    if roll < 0.88:
+        return f"efficiency_ratio({variable}, {_sample_window(5, 55)})"
+    return variable
+
+
+def _stochastic_series_expr(depth: int = 0, max_depth: int = 4) -> str:
+    if depth >= max_depth or random.random() < 0.24:
+        return _stochastic_leaf()
+    roll = random.random()
+    if roll < 0.18:
+        op = random.choice(["rank", "cs_rank", "abs", "neg", "log", "sqrt"])
+        inner = _stochastic_series_expr(depth + 1, max_depth)
+        if op == "log":
+            return f"log(abs({inner}) + 1)"
+        if op == "sqrt":
+            return f"sqrt(abs({inner}) + 0.0001)"
+        return f"{op}({inner})"
+    if roll < 0.45:
+        op = random.choice(["+", "-", "*"])
+        return f"({_stochastic_series_expr(depth + 1, max_depth)} {op} {_stochastic_series_expr(depth + 1, max_depth)})"
+    if roll < 0.56:
+        left = _stochastic_series_expr(depth + 1, max_depth)
+        right = _stochastic_series_expr(depth + 1, max_depth)
+        return f"({left} / (abs({right}) + 0.0001))"
+    if roll < 0.74:
+        op = random.choice(["mean", "std", "ts_rank", "ts_decay", "skew", "kurt", "downside_std", "upside_std", "efficiency_ratio"])
+        min_window = 5 if op in {"skew", "kurt"} else 3
+        return f"{op}({_stochastic_series_expr(depth + 1, max_depth)}, {_sample_window(min_window, 55)})"
+    if roll < 0.88:
+        op = random.choice(["corr", "cov", "regbeta"])
+        return f"{op}({_stochastic_series_expr(depth + 1, max_depth)}, {_stochastic_series_expr(depth + 1, max_depth)}, {_sample_window(5, 89)})"
+    condition = _stochastic_condition(depth + 1, max_depth)
+    return f"where({condition}, {_stochastic_series_expr(depth + 1, max_depth)}, {_stochastic_series_expr(depth + 1, max_depth)})"
+
+
+def _stochastic_condition(depth: int = 0, max_depth: int = 4) -> str:
+    threshold = random.choice([-2.0, -1.0, -0.618, -0.382, 0.0, 0.382, 0.618, 1.0, 2.0])
+    roll = random.random()
+    if roll < 0.28:
+        return f"(zscore({_stochastic_leaf()}, {_sample_window(5, 55)}) > {threshold})"
+    if roll < 0.50:
+        return f"({_stochastic_series_expr(depth + 1, max_depth)} > {_stochastic_series_expr(depth + 1, max_depth)})"
+    if roll < 0.68:
+        return f"(vol_zscore({_sample_window(5, 55)}) > {threshold})"
+    if roll < 0.84:
+        return f"(drawdown_from_high(close, {_sample_window(13, 144)}) < {-abs(threshold) / 20 - 0.02:.4f})"
+    return f"(cross_up({_stochastic_series_expr(depth + 1, max_depth)}, {_stochastic_series_expr(depth + 1, max_depth)}) > 0)"
+
+
+def _stochastic_formula_expression(max_depth: int = 4) -> str:
+    parts = []
+    for _ in range(random.choice([2, 3, 3, 4])):
+        expr = _stochastic_series_expr(0, max_depth)
+        if random.random() < 0.72:
+            expr = f"rank({expr})"
+        sign = "-" if random.random() < 0.35 else ""
+        weight = _sample_weight()
+        parts.append(f"{sign}{weight} * {expr}")
+    expression = "(" + " + ".join(parts) + ")"
+    if random.random() < 0.38:
+        expression = f"where({_stochastic_condition(0, max_depth)}, {expression}, -rank(std(returns, {_sample_window(5, 55)})))"
+    return expression
+
+
+def _stochastic_expression_budget_ok(expression: str, max_length: int) -> bool:
+    if not _safe_mining_expression(expression, max_length):
+        return False
+    windows = [int(x) for x in re.findall(r",\s*(\d+)\)", str(expression or ""))]
+    if sum(windows) > 160:
+        return False
+    if len(re.findall(r"[A-Za-z_][A-Za-z0-9_]*\s*\(", str(expression or ""))) > 26:
+        return False
+    return True
+
+
+def _stochastic_grammar_candidate_bank(config: StreamingMiningConfig, limit: int = 140) -> list[Candidate]:
+    rows: list[Candidate] = []
+    attempts = max(int(limit or 0) * 5, 80)
+    for idx in range(attempts):
+        expression = _stochastic_formula_expression(min(config.max_depth, 2))
+        if not _stochastic_expression_budget_ok(expression, config.max_expression_length):
+            continue
+        fingerprint = _factor_fingerprint(expression)
+        windows = fingerprint.get("windows") or []
+        fib_count = sum(1 for window in windows if int(window) in FIB_WINDOW_SPACE)
+        theme = "fib_stochastic_formula" if fib_count >= max(1, len(windows) // 2) else "stochastic_formula"
+        rows.append(
+            Candidate(
+                name=f"{theme}_{idx + 1}",
+                expression=expression,
+                description=f"Randomly composed operator tree with Fibonacci-biased windows; windows={windows[:8]}.",
+                source="stochastic_grammar",
+                theme=theme,
+                hypothesis="The system explores non-template operator trees and relies on strict real-data validation to decide whether any random structure is useful.",
+            )
+        )
+        if len(rows) >= limit:
+            break
+    if config.factor_themes:
+        allowed = set(config.factor_themes)
+        rows = [item for item in rows if item.theme in allowed]
+    return _dedupe_candidate_list(rows)
 
 
 def _safe_mining_expression(expression: str, max_length: int = 600) -> bool:
@@ -2761,6 +3015,431 @@ def _institutional_candidate_bank(config: StreamingMiningConfig) -> list[Candida
     return deduped
 
 
+def _technical_event_candidate_bank(config: StreamingMiningConfig) -> list[Candidate]:
+    """Event-style technical factors: trend state, repeated crosses, volume confirmation.
+
+    These candidates are still ordinary factor expressions. The execution path remains
+    canonical next-open selection; no result is displayed without real-data validation.
+    """
+    windows = [5, 8, 10, 13, 20, 30, 60]
+    threshold_pairs = [(1.0, 2), (1.5, 2), (2.0, 1)]
+    rows: list[Candidate] = []
+    for window in windows:
+        short = max(3, min(12, window // 2 + 2))
+        long = max(20, window * 2)
+        signal = 9
+        rows.extend(
+            [
+                Candidate(
+                    f"macd_second_cross_volume_{window}d",
+                    f"where((count_true(cross_up(macd_dif(close, 12, 26), macd_dea(close, 12, 26, {signal})), {long}) >= 2) & (vol_zscore({window}) > 1.0), macd_hist(close, 12, 26, {signal}) + pctchange(close, {short}), -std(returns, {window}))",
+                    "Second MACD golden-cross with volume confirmation; penalizes noisy high-volatility states.",
+                    "technical_event",
+                    "macd_volume_confirmation",
+                    "Repeated bullish crosses with expanding volume may identify renewed institutional participation; volatility penalty reduces chase risk.",
+                ),
+                Candidate(
+                    f"ma_second_cross_volume_{window}d",
+                    f"where((count_true(cross_up(ema(close, {short}), ema(close, {long})), {long}) >= 2) & (vol_zscore({window}) > 1.0), pctchange(close, {short}) - drawdown_from_high(close, {long}), -std(returns, {window}))",
+                    "Second moving-average golden-cross with volume expansion and drawdown control.",
+                    "technical_event",
+                    "ma_cross_volume_confirmation",
+                    "A second cross after a prior failed attempt can mark trend repair, but only when volume confirms and drawdown is controlled.",
+                ),
+                Candidate(
+                    f"rsi_repair_volume_{window}d",
+                    f"where((rsi(close, 14) > 35) & (delay(rsi(close, 14), {short}) < 35) & (vol_zscore({window}) > 0.5), (50 - abs(rsi(close, 14) - 50)) / 50 + pctchange(close, {short}), -abs(drawdown_from_high(close, {long})))",
+                    "RSI recovery from oversold zone with moderate volume confirmation.",
+                    "technical_event",
+                    "rsi_mean_reversion_repair",
+                    "Oversold recovery becomes more tradable when price stabilizes and volume confirms demand rather than pure illiquidity bounce.",
+                ),
+                Candidate(
+                    f"breakout_compression_volume_{window}d",
+                    f"where((breakout(close, {long}) > 0) & (std(returns, {window}) < std(returns, {long})) & (vol_zscore({window}) > 0.8), pctchange(close, {window}) / (std(returns, {window}) + 0.0001), -abs(pctchange(close, {short})))",
+                    "Low-volatility compression followed by volume-confirmed price breakout.",
+                    "technical_event",
+                    "compression_breakout",
+                    "Breakouts after volatility compression are more informative than breakouts from already crowded high-volatility states.",
+                ),
+                Candidate(
+                    f"pullback_then_volume_reclaim_{window}d",
+                    f"where((drawdown_from_high(close, {long}) < -0.04) & (close > ema(close, {window})) & (vol_zscore({window}) > 0.5), -drawdown_from_high(close, {long}) + pctchange(close, {short}), -std(returns, {window}))",
+                    "Pullback recovery: drawdown from recent high, reclaim EMA, and volume expansion.",
+                    "technical_event",
+                    "pullback_reclaim",
+                    "Controlled pullbacks that reclaim trend averages on volume may offer better entry than chasing new highs.",
+                ),
+                Candidate(
+                    f"gap_reversal_liquidity_{window}d",
+                    f"where((gap_pct() < -0.015) & (close > open) & (vol_zscore({window}) > 0.5), (close - open) / (high - low + 0.0001) - std(returns, {window}), -abs(gap_pct()))",
+                    "Down-gap intraday repair with volume; captures panic reversal rather than weak follow-through.",
+                    "technical_event",
+                    "gap_reversal",
+                    "A negative open gap that is repaired intraday can indicate forced selling absorption, but volume and volatility controls are required.",
+                ),
+            ]
+        )
+        for threshold, cross_count in threshold_pairs:
+            rows.append(
+                Candidate(
+                    f"adaptive_cross_flow_{window}d_z{threshold}",
+                    f"where((count_true(cross_up(ema(close, {short}), ema(close, {long})), {long}) >= {cross_count}) & (vol_zscore({window}) > {threshold}), rank(pctchange(close, {short})) + rank(macd_hist(close, 12, 26, 9)), -rank(std(returns, {window})))",
+                    "Parameterized cross-flow candidate with adaptive volume threshold.",
+                    "technical_event_param_scan",
+                    "adaptive_cross_flow",
+                    "Parameter scanning tests whether the cross signal is only useful under specific volume-confirmation strength.",
+                )
+            )
+    if config.factor_themes:
+        allowed = set(config.factor_themes)
+        rows = [item for item in rows if item.theme in allowed or item.source == "technical_event_param_scan"]
+    deduped: list[Candidate] = []
+    seen: set[str] = set()
+    for item in rows:
+        if item.expression in seen:
+            continue
+        seen.add(item.expression)
+        deduped.append(item)
+    return deduped
+
+
+def _creative_random_candidate_bank(config: StreamingMiningConfig, limit: int = 120) -> list[Candidate]:
+    """Diverse formula candidates beyond MACD/cross logic.
+
+    This bank intentionally mixes behavioral reversal, liquidity, range shape,
+    gap repair, volatility compression, valuation overlays and price-volume lead/lag.
+    Candidates are still only hypotheses; `_evaluate_candidate` performs the real
+    out-of-sample validation and canonical execution backtest.
+    """
+    rows: list[Candidate] = []
+    windows = [3, 5, 8, 10, 11, 15, 20, 30, 60]
+    long_windows = [20, 30, 60, 120]
+    for idx in range(max(int(limit or 0) * 2, 40)):
+        w = random.choice(windows)
+        long = random.choice([x for x in long_windows if x >= max(20, w)])
+        short = random.choice([2, 3, 5, 8, 10])
+        lag = random.choice([1, 2, 3])
+        mode = random.choice(
+            [
+                "gap_absorption",
+                "volume_dryup_squeeze",
+                "wick_supply_pressure",
+                "amihud_liquidity",
+                "volume_lead_price",
+                "crowding_reversal",
+                "trend_efficiency",
+                "vwap_dislocation",
+                "range_entropy",
+                "valuation_risk_overlay",
+                "overnight_intraday_contrast",
+                "drawdown_repair",
+            ]
+        )
+        if mode == "gap_absorption":
+            expr = (
+                f"where((gap_pct() < -0.015) & (((close - low) / (high - low + 0.0001)) > 0.65), "
+                f"rank((close - open) / (high - low + 0.0001)) - rank(std(returns, {w})), -abs(gap_pct()))"
+            )
+            hypothesis = "Panic down-gaps that are absorbed intraday may signal forced selling exhaustion."
+        elif mode == "volume_dryup_squeeze":
+            expr = (
+                f"where((vol_zscore({w}) < -0.8) & (std(returns, {w}) < std(returns, {long})), "
+                f"rank((close - ts_min(low, {long})) / (ts_max(high, {long}) - ts_min(low, {long}) + 0.0001)) - rank(std(returns, {w})), "
+                f"-rank(abs(pctchange(close, {short}))))"
+            )
+            hypothesis = "Quiet volume and compressed volatility can precede cleaner repricing when range position improves."
+        elif mode == "wick_supply_pressure":
+            expr = (
+                f"-mean((high - max(open, close)) / (high - low + 0.0001), {w}) "
+                f"+ mean((close - low) / (high - low + 0.0001), {short})"
+            )
+            hypothesis = "Persistent upper wicks indicate supply pressure; strong closes reduce that penalty."
+        elif mode == "amihud_liquidity":
+            expr = f"-mean(abs(returns) / (amount + 1.0), {w}) - std(returns, {w})"
+            hypothesis = "Lower price impact and lower realized volatility should improve implementable alpha capacity."
+        elif mode == "volume_lead_price":
+            expr = f"corr(delay(pctchange(vol, 1), {lag}), pctchange(close, 1), {w}) - std(returns, {short})"
+            hypothesis = "Volume changes that lead price changes can proxy early participation before prices fully adjust."
+        elif mode == "crowding_reversal":
+            expr = (
+                f"where((abs(pctchange(close, {short})) > 0.035) & (vol_zscore({w}) > 1.2), "
+                f"-pctchange(close, {short}) / (std(returns, {w}) + 0.0001), "
+                f"pctchange(close, {long}) / (std(returns, {long}) + 0.0001))"
+            )
+            hypothesis = "Crowded short-term moves on unusual volume often mean-revert, while calmer long trends can persist."
+        elif mode == "trend_efficiency":
+            expr = (
+                f"pctchange(close, {w}) / (mean(tr, {w}) / (mean(close, {w}) + 0.0001) + 0.0001) "
+                f"- abs(drawdown_from_high(close, {long}))"
+            )
+            hypothesis = "Efficient trends travel far relative to true range while avoiding deep drawdowns."
+        elif mode == "vwap_dislocation":
+            expr = f"-((close - vwap) / (mean(tr, {w}) + 0.0001)) + rank(pctchange(amount, {short}))"
+            hypothesis = "Close-to-VWAP dislocations can fade unless confirmed by genuine amount expansion."
+        elif mode == "range_entropy":
+            expr = (
+                f"-(std((close - low) / (high - low + 0.0001), {w})) "
+                f"+ mean((close - low) / (high - low + 0.0001), {short})"
+            )
+            hypothesis = "Stable closes near the upper intraday range can be more informative than noisy breakouts."
+        elif mode == "valuation_risk_overlay":
+            expr = f"rank(-pb) + rank(-pe) - rank(std(returns, {w})) - rank(turnover_rate)"
+            hypothesis = "Cheap valuation needs volatility and turnover controls to avoid value traps and crowded exits."
+        elif mode == "overnight_intraday_contrast":
+            expr = f"-(open / delay(close, 1) - 1) + (close / open - 1) - std(returns, {w})"
+            hypothesis = "Weak overnight sentiment that repairs intraday may reflect liquidity absorption."
+        else:
+            expr = (
+                f"where((drawdown_from_high(close, {long}) < -0.06) & (close > mean(close, {w})), "
+                f"-drawdown_from_high(close, {long}) + pctchange(amount, {short}) / (std(returns, {w}) + 0.0001), "
+                f"-abs(drawdown_from_high(close, {long})))"
+            )
+            hypothesis = "Post-drawdown reclaim with amount confirmation can capture repaired risk appetite."
+        rows.append(
+            Candidate(
+                name=f"{mode}_{w}_{short}_{long}_{idx + 1}",
+                expression=expr,
+                description=f"Creative randomized research candidate: {mode}; windows={w}/{short}/{long}.",
+                source="creative_random",
+                theme=mode,
+                hypothesis=hypothesis,
+            )
+        )
+        if len(rows) >= limit:
+            break
+    if config.factor_themes:
+        allowed = set(config.factor_themes)
+        rows = [item for item in rows if item.theme in allowed]
+    return _dedupe_candidate_list(rows)
+
+
+def _novel_motif_candidate_bank(config: StreamingMiningConfig, limit: int = 160) -> list[Candidate]:
+    """Generate higher-novelty motifs from distribution shape and cross-domain disagreement."""
+    rows: list[Candidate] = []
+    windows = [5, 8, 10, 11, 15, 20, 30, 60]
+    long_windows = [30, 60, 90, 120]
+    motif_builders = [
+        (
+            "asymmetric_vol_carry",
+            lambda w, s, long: f"rank(upside_std(returns, {w}) - downside_std(returns, {w})) + rank(efficiency_ratio(close, {long})) - rank(kurt(returns, {long}))",
+            "Upside/downside volatility asymmetry combined with efficient price travel and tail-risk penalty.",
+            "Return asymmetry may separate orderly accumulation from noisy high-volatility rebounds.",
+        ),
+        (
+            "tail_reversal_filter",
+            lambda w, s, long: f"where((kurt(returns, {long}) > 3) & (pctchange(close, {s}) < 0), -pctchange(close, {s}) - downside_std(returns, {w}), rank(efficiency_ratio(close, {w})) - rank(kurt(returns, {w})))",
+            "Tail-event reversal with downside-volatility filter.",
+            "Extreme downside tails can mean-revert, but only if recent downside dispersion is controlled.",
+        ),
+        (
+            "efficient_pullback",
+            lambda w, s, long: f"where((drawdown_from_high(close, {long}) < -0.04) & (efficiency_ratio(close, {w}) > 0.35), -drawdown_from_high(close, {long}) + rank(pctchange(amount, {s})), -rank(downside_std(returns, {w})))",
+            "Drawdown repair gated by trend efficiency and amount confirmation.",
+            "A pullback is more tradable when path efficiency improves and amount expands without excess downside volatility.",
+        ),
+        (
+            "shape_volume_disagreement",
+            lambda w, s, long: f"rank(skew(returns, {w})) - rank(kurt(returns, {long})) + rank(corr(pctchange(amount, 1), pctchange(close, 1), {w}))",
+            "Return skew, tail risk and amount-price agreement combined.",
+            "Positive return asymmetry plus real amount-price agreement can identify healthier demand than price alone.",
+        ),
+        (
+            "valuation_flow_dislocation",
+            lambda w, s, long: f"rank(-pb) + rank(-pe) + rank(pctchange(amount, {s})) - rank(abs(pctchange(close, {s}))) - rank(downside_std(returns, {w}))",
+            "Cheap valuation with amount improvement but without crowded price chase.",
+            "Value exposure is more useful when flow improves before large price moves and downside volatility remains low.",
+        ),
+        (
+            "quiet_accumulation",
+            lambda w, s, long: f"where((vol_zscore({w}) < 0.3) & (efficiency_ratio(close, {long}) > 0.25), rank(mean((close - low) / (high - low + 0.0001), {w})) + rank(pctchange(amount, {s})), -rank(std(returns, {w})))",
+            "Quiet accumulation via close-location persistence and amount drift.",
+            "Institutional accumulation often appears as persistent strong closes with moderate rather than explosive volume.",
+        ),
+        (
+            "fragility_penalty",
+            lambda w, s, long: f"-(rank(kurt(returns, {w})) + rank(downside_std(returns, {w})) + rank(abs(gap_pct()))) + rank(efficiency_ratio(close, {long}))",
+            "Anti-fragility score penalizing tail risk, downside dispersion and gap instability.",
+            "Lower fragility can improve realized implementability even if raw alpha is weak.",
+        ),
+        (
+            "range_memory",
+            lambda w, s, long: f"rank(mean((close - ts_min(low, {w})) / (ts_max(high, {w}) - ts_min(low, {w}) + 0.0001), {s})) - rank(std((close - low) / (high - low + 0.0001), {w}))",
+            "Persistent high range position with low close-location entropy.",
+            "Stable range memory can indicate persistent demand rather than one-day breakout noise.",
+        ),
+    ]
+    for idx in range(max(int(limit or 0) * 2, 40)):
+        w = random.choice(windows)
+        short = random.choice([2, 3, 5, 8, 10])
+        long = random.choice([x for x in long_windows if x >= max(30, w)])
+        theme, builder, description, hypothesis = random.choice(motif_builders)
+        rows.append(
+            Candidate(
+                name=f"{theme}_{w}_{short}_{long}_{idx + 1}",
+                expression=builder(w, short, long),
+                description=description,
+                source="novel_motif",
+                theme=theme,
+                hypothesis=hypothesis,
+            )
+        )
+        if len(rows) >= limit:
+            break
+    if config.factor_themes:
+        allowed = set(config.factor_themes)
+        rows = [item for item in rows if item.theme in allowed]
+    return _dedupe_candidate_list(rows)
+
+
+def _candidate_allowed(candidate: Candidate, config: StreamingMiningConfig) -> bool:
+    if not config.factor_themes:
+        return True
+    if not candidate.theme:
+        return True
+    return candidate.theme in set(config.factor_themes)
+
+
+def _dedupe_candidate_list(items: list[Candidate]) -> list[Candidate]:
+    result: list[Candidate] = []
+    seen: set[str] = set()
+    for item in items:
+        expression_key = re.sub(r"\s+", "", str(item.expression or ""))
+        if not expression_key or expression_key in seen:
+            continue
+        seen.add(expression_key)
+        result.append(item)
+    return result
+
+
+def _candidate_with_parameter_neighbors(candidate: Candidate, *, max_neighbors: int = 4):
+    yield candidate
+    for mutated, window in _parameter_neighbors(candidate.expression)[:max_neighbors]:
+        yield Candidate(
+            _parameterized_factor_name(candidate.name, window),
+            mutated,
+            f"Parameter-neighborhood validation using a {window}-day window.",
+            "param_scan",
+            candidate.theme,
+            candidate.hypothesis,
+        )
+
+
+def _priority_seed_candidates(config: StreamingMiningConfig) -> list[Candidate]:
+    """High-signal candidates evaluated with source diversity.
+
+    The previous scheduler evaluated most technical-event candidates first, so
+    early sessions looked dominated by MACD/MA cross variants. This interleaves
+    creative random hypotheses, institutional seeds, broad templates and
+    technical events to surface diverse ideas immediately.
+    """
+    stochastic = _stochastic_grammar_candidate_bank(config, 180)
+    novel = _novel_motif_candidate_bank(config, 160)
+    creative = _creative_random_candidate_bank(config, 140)
+    institutional = _institutional_candidate_bank(config)
+    templates = _generate_template_candidates(180)
+    technical = _technical_event_candidate_bank(config)
+    buckets = [stochastic, novel, creative, institutional, templates, technical]
+    for bucket in buckets:
+        random.shuffle(bucket)
+    ordered: list[Candidate] = []
+    max_len = max((len(bucket) for bucket in buckets), default=0)
+    for idx in range(max_len):
+        for bucket in buckets:
+            if idx >= len(bucket):
+                continue
+            item = bucket[idx]
+            if _candidate_allowed(item, config):
+                ordered.append(item)
+    return _dedupe_candidate_list(ordered)
+
+
+def _theme_score_map(elites: list[dict]) -> dict[str, float]:
+    scores: dict[str, float] = {}
+    for rank, item in enumerate(elites[:80], start=1):
+        theme = str(item.get("theme") or "general_formula")
+        score = max(_safe_float(item.get("score")), -0.5)
+        metrics = item.get("backtest_metrics") or {}
+        excess = _safe_float(metrics.get("excess_return"))
+        bonus = max(excess, -5.0) / 50.0
+        scores[theme] = scores.get(theme, 0.0) + max(score + bonus, 0.02) / math.sqrt(rank)
+    return scores
+
+
+def _adaptive_theme_candidates(config: StreamingMiningConfig, elites: list[dict], limit: int = 10) -> list[Candidate]:
+    if not elites:
+        return []
+    theme_scores = _theme_score_map(elites)
+    if not theme_scores:
+        return []
+    themes = [theme for theme, _ in sorted(theme_scores.items(), key=lambda item: item[1], reverse=True)[:3]]
+    bank = _dedupe_candidate_list(
+        _stochastic_grammar_candidate_bank(config, 120)
+        + _novel_motif_candidate_bank(config, 100)
+        + _creative_random_candidate_bank(config, 80)
+        + _institutional_candidate_bank(config)
+        + _generate_template_candidates(120)
+        + _technical_event_candidate_bank(config)
+    )
+    rows: list[Candidate] = []
+    for theme in themes:
+        for item in bank:
+            if item.theme != theme:
+                continue
+            rows.append(
+                Candidate(
+                    f"{item.name}_adaptive",
+                    _mutate_expression(item.expression),
+                    f"Adaptive theme search from recent elite theme: {theme}.",
+                    "adaptive_theme_search",
+                    item.theme,
+                    item.hypothesis,
+                )
+            )
+            if len(rows) >= limit:
+                return _dedupe_candidate_list(rows)
+    return _dedupe_candidate_list(rows)
+
+
+def _adaptive_stochastic_candidates(config: StreamingMiningConfig, elites: list[dict], limit: int = 10) -> list[Candidate]:
+    """Cross validated elites with fresh stochastic trees to adjust exploration online."""
+    if not elites:
+        return _stochastic_grammar_candidate_bank(config, limit)
+    rows: list[Candidate] = []
+    ranked = sorted(elites[:50], key=lambda item: _safe_float(item.get("score")), reverse=True)
+    for idx in range(max(limit * 3, 12)):
+        base = random.choice(ranked[: min(len(ranked), 12)])
+        base_expr = str(base.get("expression") or "")
+        if not base_expr:
+            continue
+        fresh = _stochastic_formula_expression(1)
+        weight = _sample_weight()
+        mode = random.choice(["elite_residual", "elite_gate", "elite_spread", "elite_blend"])
+        if mode == "elite_gate":
+            expression = f"where({_stochastic_condition(0, 1)}, rank({base_expr}), rank({fresh}))"
+        elif mode == "elite_spread":
+            expression = f"(rank({base_expr}) - {weight} * rank({fresh}))"
+        elif mode == "elite_residual":
+            expression = f"(rank({fresh}) - {weight} * rank({base_expr}))"
+        else:
+            expression = f"({weight} * rank({base_expr}) + {round(1 - weight, 3)} * rank({fresh}))"
+        if not _stochastic_expression_budget_ok(expression, config.max_expression_length):
+            continue
+        rows.append(
+            Candidate(
+                name=f"adaptive_stochastic_{mode}_{idx + 1}",
+                expression=expression,
+                description=f"Online adaptive crossover between elite factor {base.get('name', 'elite')} and a fresh stochastic operator tree.",
+                source="adaptive_stochastic",
+                theme=base.get("theme") or "adaptive_stochastic",
+                hypothesis="Validated weak signals are crossed with fresh random operator trees to escape local parameter neighborhoods while preserving useful structure.",
+            )
+        )
+        if len(rows) >= limit:
+            break
+    return _dedupe_candidate_list(rows)
+
+
 def _parse_llm_candidates(raw_text: str, config: StreamingMiningConfig) -> list[Candidate]:
     text = str(raw_text or "").strip()
     if not text:
@@ -2824,7 +3503,10 @@ close, open, high, low, vol, volume, returns, vwap, amount, pe, pb, ps, turnover
 Allowed functions/operators:
 rank, cs_rank, abs, neg, log, sqrt, signedpower, clip, mean, std, sum, ts_max, ts_min,
 ts_rank, delta, delay, pctchange, ts_decay, ewm, ts_argmax, ts_argmin, wma, decaylinear,
-corr, cov, regbeta, regresi, max, min, where, ternary.
+corr, cov, regbeta, regresi, max, min, where, ternary,
+ema, macd_dif, macd_dea, macd_hist, rsi, cross_up, cross_down, bars_since,
+count_true, zscore, vol_zscore, gap_pct, breakout, drawdown_from_high,
+skew, kurt, downside_std, upside_std, efficiency_ratio.
 
 Rules:
 - Use only data available at or before the signal day; no future functions.
@@ -2833,7 +3515,8 @@ Rules:
 - Use A-share research themes: short reversal, volatility-adjusted momentum, liquidity/crowding,
   value-quality, price-volume confirmation, range-compression breakout.
 - Generate 8 diverse expressions under {config.max_expression_length} characters.
-- Include parameter variants when relevant: 3, 5, 8, 10, 20, 30, 60, 120 days.
+- Prefer Fibonacci-style windows when relevant: 2, 3, 5, 8, 13, 21, 34, 55, 89, 144 days,
+  but occasionally use non-Fibonacci windows such as 7, 10, 15, 20, 30, 60, 120.
 
 Current validated elite factors:
 {chr(10).join(elite_lines) if elite_lines else "- No elite factor yet; prioritize robust research seeds."}
@@ -2873,6 +3556,8 @@ def _candidate_stream(config: StreamingMiningConfig, elite_provider) -> Candidat
                 item.hypothesis,
             )
     for item in _institutional_candidate_bank(config):
+        yield item
+    for item in _technical_event_candidate_bank(config):
         yield item
     for item in _llm_guided_candidates(config, []):
         yield item
@@ -2917,6 +3602,111 @@ def _candidate_stream(config: StreamingMiningConfig, elite_provider) -> Candidat
                 "grammar_search",
                 "Machine search explores economically plausible formula neighborhoods, then relies on strict out-of-sample validation.",
             )
+        index += 1
+
+
+def _candidate_stream_v2(config: StreamingMiningConfig, elite_provider) -> Candidate:
+    """Priority and adaptive scheduler for professional factor mining."""
+    random.seed(int(time.time()) % 10_000_000)
+    emitted: set[str] = set()
+    structure_counts: dict[str, int] = {}
+
+    def should_emit(item: Candidate) -> bool:
+        if not _candidate_allowed(item, config):
+            return False
+        expression_key = re.sub(r"\s+", "", str(item.expression or ""))
+        if not expression_key or expression_key in emitted:
+            return False
+        novelty_key = _expression_novelty_key(item.expression)
+        limit = 2 if item.source == "param_scan" else 5
+        if structure_counts.get(novelty_key, 0) >= limit:
+            return False
+        emitted.add(expression_key)
+        structure_counts[novelty_key] = structure_counts.get(novelty_key, 0) + 1
+        return True
+
+    neighbor_queue: list[Candidate] = []
+    for idx, seed in enumerate(_priority_seed_candidates(config), start=1):
+        if should_emit(seed):
+            yield seed
+        neighbor_queue.extend(list(_candidate_with_parameter_neighbors(seed, max_neighbors=2))[1:])
+        if idx % 4 == 0 and neighbor_queue:
+            neighbor = neighbor_queue.pop(0)
+            if should_emit(neighbor):
+                yield neighbor
+
+    for item in _llm_guided_candidates(config, []):
+        if should_emit(item):
+            yield item
+
+    index = 1
+    llm_batches = 1
+    _operator_pool_available()
+    while True:
+        elites = elite_provider()
+        if elites and index % 40 == 0:
+            for item in _adaptive_theme_candidates(config, elites, limit=10):
+                if should_emit(item):
+                    yield item
+        if elites and index % 13 == 0:
+            for item in _adaptive_stochastic_candidates(config, elites, limit=8):
+                if should_emit(item):
+                    yield item
+        if index % 5 == 0 and neighbor_queue:
+            neighbor = neighbor_queue.pop(0)
+            if should_emit(neighbor):
+                yield neighbor
+        if index % 7 == 0:
+            for item in _novel_motif_candidate_bank(config, 4):
+                if should_emit(item):
+                    yield item
+        if index % 9 == 0:
+            for item in _stochastic_grammar_candidate_bank(config, 4):
+                if should_emit(item):
+                    yield item
+        if llm_batches < 4 and (index == 1 or (elites and index % 80 == 0)):
+            llm_batches += 1
+            for item in _llm_guided_candidates(config, elites):
+                if should_emit(item):
+                    yield item
+        if len(elites) >= 2 and random.random() < 0.42:
+            left, right = random.sample(elites[: min(len(elites), 20)], 2)
+            left_name = re.sub(r"\s+", "", str(left.get("name") or "factorA"))[:12]
+            right_name = re.sub(r"\s+", "", str(right.get("name") or "factorB"))[:12]
+            candidate = Candidate(
+                f"elite_combo_{left_name}_{right_name}",
+                _combine_expressions(left["expression"], right["expression"]),
+                "Non-negative rank ensemble of validated elite factors.",
+                "ensemble",
+                "ensemble_factor",
+                "Low-correlation validated factors may diversify idiosyncratic noise.",
+            )
+            if should_emit(candidate):
+                yield candidate
+        elif elites and random.random() < 0.38:
+            base = random.choice(elites[: min(len(elites), 20)])
+            base_name = re.sub(r"\s+", "", str(base.get("name") or "factor"))[:16]
+            candidate = Candidate(
+                f"{base_name}_adaptive_neighbor_{index}",
+                _mutate_expression(base["expression"]),
+                "Neighborhood mutation of a validated elite factor.",
+                "elite_mutation",
+                base.get("theme") or "elite_mutation",
+                base.get("hypothesis") or "Elite mutation tests whether nearby formulas preserve economic signal.",
+            )
+            if should_emit(candidate):
+                yield candidate
+        else:
+            candidate = Candidate(
+                f"typed_grammar_{index}",
+                _random_expr(0, config.max_depth),
+                "Typed grammar expression generated from the factor operator space.",
+                "grammar",
+                "grammar_search",
+                "Machine search explores economically plausible formula neighborhoods, then relies on strict out-of-sample validation.",
+            )
+            if should_emit(candidate):
+                yield candidate
         index += 1
 
 
@@ -3117,6 +3907,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
     best_score = -999.0
     seen_hashes: set[str] = set()
     elites: list[dict] = []
+    accepted_structure_counts: dict[str, int] = {}
     client = TushareClient(config.settings.tushare_token)
     cache = DataCache(client, mysql_conn=make_mysql_conn(config.settings))
     engine = FactorEngine(cache)
@@ -3163,7 +3954,7 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
         def elite_provider():
             return list(elites)
 
-        for candidate in _candidate_stream(config, elite_provider):
+        for candidate in _candidate_stream_v2(config, elite_provider):
             if stop_event.is_set():
                 break
             expression_hash = _expression_hash(candidate.expression)
@@ -3212,6 +4003,23 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
                 continue
             if equivalence_key:
                 seen_hashes.add(equivalence_seen_key)
+            homogeneity_reason = _payload_homogeneity_reason(payload, elites, accepted_structure_counts)
+            if homogeneity_reason:
+                run_async(_insert_trial_log(
+                    session_id,
+                    candidate,
+                    "homogeneity_reject",
+                    [homogeneity_reason],
+                    score=_safe_float(payload.get("score")),
+                    metrics={
+                        "novelty_key": _novelty_key_from_fingerprint(payload.get("fingerprint") or {}),
+                        "theme": payload.get("theme"),
+                        "source": payload.get("source"),
+                    },
+                ))
+                if config.max_trials and tested >= config.max_trials:
+                    break
+                continue
             inserted_id = run_async(_insert_candidate(session_id, payload))
             if inserted_id is None:
                 continue
@@ -3221,6 +4029,8 @@ def _run_streaming_mining_thread(config: StreamingMiningConfig, stop_event: thre
             accepted += 1
             payload["id"] = inserted_id
             payload["correlation_cluster"] = cluster_key
+            novelty_key = _novelty_key_from_fingerprint(payload.get("fingerprint") or {})
+            accepted_structure_counts[novelty_key] = accepted_structure_counts.get(novelty_key, 0) + 1
             elites.append(payload)
             elites.sort(key=lambda item: item["score"], reverse=True)
             elites[:] = elites[:200]
@@ -3495,18 +4305,32 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
         "neutralization": backtest_metrics.get("neutralization", (item.preprocessing or {}).get("method", "")),
         "turnover": backtest_metrics.get("turnover", 0.0),
         "trade_count": backtest_metrics.get("trade_count", 0),
+        "search_source": backtest_metrics.get("search_source", item.source or ""),
+        "search_theme": backtest_metrics.get("search_theme", item.theme or ""),
+        "event_driven": bool(backtest_metrics.get("event_driven") or (item.fingerprint or {}).get("event_driven")),
+        "technical_operators": backtest_metrics.get("technical_operators", (item.fingerprint or {}).get("technical_operators", [])),
         "rejection_reasons": backtest_metrics.get("rejection_reasons", {}),
         "validation_reasons": backtest_metrics.get("validation_reasons", []),
         "legacy_warning": (backtest_metrics.get("protocol_version") or (item.metrics or {}).get("protocol_version")) != STRICT_MINING_PROTOCOL_VERSION,
+        "is_pinned": bool(getattr(item, "is_pinned", 0)),
+        "is_deleted": bool(getattr(item, "is_deleted", 0)),
         "created_at": item.created_at.isoformat() if item.created_at else "",
     }
 
 
-async def get_streaming_mining_results(db: AsyncSession, session_id: str, after_id: int = 0, limit: int = 50) -> dict:
+async def get_streaming_mining_results(db: AsyncSession, session_id: str, after_id: int = 0, limit: int = 50, pinned_only: bool = False) -> dict:
     limit = max(1, min(int(limit or 50), 200))
+    conditions = [
+        FactorMiningCandidate.id > int(after_id or 0),
+        FactorMiningCandidate.is_deleted == 0,
+    ]
+    if pinned_only:
+        conditions.append(FactorMiningCandidate.is_pinned == 1)
+    else:
+        conditions.append(FactorMiningCandidate.session_id == session_id)
     result = await db.execute(
         select(FactorMiningCandidate)
-        .where(FactorMiningCandidate.session_id == session_id, FactorMiningCandidate.id > int(after_id or 0))
+        .where(*conditions)
         .order_by(FactorMiningCandidate.id.asc())
         .limit(limit)
     )
@@ -3515,6 +4339,32 @@ async def get_streaming_mining_results(db: AsyncSession, session_id: str, after_
         "items": [_serialize_candidate(item) for item in rows],
         "last_id": rows[-1].id if rows else int(after_id or 0),
     }
+
+
+async def pin_mining_candidate(db: AsyncSession, candidate_id: int) -> dict:
+    result = await db.execute(
+        select(FactorMiningCandidate).where(
+            FactorMiningCandidate.id == int(candidate_id),
+            FactorMiningCandidate.is_deleted == 0,
+        )
+    )
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise ValueError("mining candidate not found")
+    candidate.is_pinned = 1
+    await db.commit()
+    await db.refresh(candidate)
+    return {"success": True, "candidate": _serialize_candidate(candidate)}
+
+
+async def delete_mining_candidate(db: AsyncSession, candidate_id: int) -> dict:
+    result = await db.execute(select(FactorMiningCandidate).where(FactorMiningCandidate.id == int(candidate_id)))
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise ValueError("mining candidate not found")
+    candidate.is_deleted = 1
+    await db.commit()
+    return {"success": True, "candidate_id": int(candidate_id)}
 
 
 async def get_mining_research_report(db: AsyncSession, candidate_id: int) -> dict:

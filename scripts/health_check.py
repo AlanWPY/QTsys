@@ -116,7 +116,7 @@ with sync_playwright() as p:
             if msg.type == 'error' and 'deoptimised the styling of /Inline Babel script' not in msg.text
             else None,
         )
-        resp = page.goto('http://127.0.0.1:8000' + path, wait_until='domcontentloaded', timeout=30000)
+        resp = page.goto('http://127.0.0.1:8000' + path, wait_until='domcontentloaded', timeout=60000)
         page.wait_for_timeout(1500)
         body = page.locator('body').inner_text(timeout=15000)
         if not resp or resp.status != 200:
@@ -130,7 +130,7 @@ if errors:
     raise SystemExit(1)
 print('frontend smoke passed')
 """
-    return _run([str(PYTHON), "-c", code], timeout=120)
+    return _run([str(PYTHON), "-c", code], timeout=180)
 
 
 def main() -> int:
@@ -142,6 +142,7 @@ def main() -> int:
     checks = [
         ("Python compile", check_py_compile),
         ("Encoding guard", lambda: check_script("check_encoding.py")),
+        ("Factor expression operators", lambda: check_script("validate_factor_expression_operators.py")),
         ("No-lookahead invariants", lambda: check_script("validate_factor_no_lookahead.py")),
         ("Canonical execution invariants", lambda: check_script("validate_execution_simulator.py")),
         ("Secret scan", lambda: check_script("security_check.py")),

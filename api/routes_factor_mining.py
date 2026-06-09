@@ -14,6 +14,8 @@ from services.factor_mining_service import (
     get_mining_research_report,
     get_streaming_mining_results,
     get_streaming_mining_status,
+    delete_mining_candidate,
+    pin_mining_candidate,
     revalidate_mining_candidate,
     run_factor_mining_workflow,
     save_mined_factor,
@@ -101,10 +103,11 @@ async def session_results(
     session_id: str,
     after_id: int = 0,
     limit: int = 50,
+    pinned_only: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await get_streaming_mining_results(db, session_id, after_id=after_id, limit=limit)
+        return await get_streaming_mining_results(db, session_id, after_id=after_id, limit=limit, pinned_only=pinned_only)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -131,6 +134,22 @@ async def revalidate_candidate(candidate_id: int, db: AsyncSession = Depends(get
         return await revalidate_mining_candidate(db, candidate_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/candidates/{candidate_id}/pin")
+async def pin_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        return await pin_mining_candidate(db, candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.delete("/candidates/{candidate_id}")
+async def delete_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        return await delete_mining_candidate(db, candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/candidates/{candidate_id}/strict_revalidate")

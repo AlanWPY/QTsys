@@ -136,6 +136,8 @@ class FactorMiningCandidate(Base):
     backtest_metrics = Column(JSON, default=dict)
     equity_curve = Column(JSON, default=list)
     normalized_curve = Column(JSON, default=list)
+    is_pinned = Column(Integer, default=0)
+    is_deleted = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (UniqueConstraint("session_id", "expression_hash"),)
 

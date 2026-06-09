@@ -210,6 +210,87 @@ class FactorEngine:
         def _where(cond, true_val, false_val):
             return pd.Series(np.where(cond, true_val, false_val), index=closes.index)
 
+        def _ema(s, span):
+            return s.ewm(span=int(span), adjust=False).mean()
+
+        def _macd_dif(s, fast=12, slow=26):
+            return _ema(s, int(fast)) - _ema(s, int(slow))
+
+        def _macd_dea(s, fast=12, slow=26, signal=9):
+            return _ema(_macd_dif(s, int(fast), int(slow)), int(signal))
+
+        def _macd_hist(s, fast=12, slow=26, signal=9):
+            dif = _macd_dif(s, int(fast), int(slow))
+            dea = _ema(dif, int(signal))
+            return dif - dea
+
+        def _rsi(s, window=14):
+            delta = s.diff()
+            gain = delta.clip(lower=0).rolling(int(window)).mean()
+            loss = (-delta.clip(upper=0)).rolling(int(window)).mean()
+            return 100 - 100 / (1 + gain / loss.replace(0, np.nan))
+
+        def _cross_up(left, right):
+            return ((left > right) & (left.shift(1) <= right.shift(1))).astype(float)
+
+        def _cross_down(left, right):
+            return ((left < right) & (left.shift(1) >= right.shift(1))).astype(float)
+
+        def _bars_since(event):
+            values = []
+            last_seen = None
+            for idx, flag in enumerate(pd.Series(event, index=closes.index).fillna(0).astype(float).values):
+                if flag > 0:
+                    last_seen = idx
+                    values.append(0.0)
+                elif last_seen is None:
+                    values.append(np.nan)
+                else:
+                    values.append(float(idx - last_seen))
+            return pd.Series(values, index=closes.index)
+
+        def _count_true(event, window):
+            return (pd.Series(event, index=closes.index).fillna(0).astype(float) > 0).rolling(int(window)).sum()
+
+        def _zscore(s, window):
+            mean = s.rolling(int(window)).mean()
+            std = s.rolling(int(window)).std()
+            return (s - mean) / std.replace(0, np.nan)
+
+        def _vol_zscore(window):
+            return _zscore(volumes.astype(float), int(window))
+
+        def _gap_pct():
+            return opens / closes.shift(1).replace(0, np.nan) - 1
+
+        def _breakout(s, window):
+            prev_high = s.rolling(int(window)).max().shift(1)
+            return ((s > prev_high) & prev_high.notna()).astype(float)
+
+        def _drawdown_from_high(s, window):
+            peak = s.rolling(int(window)).max()
+            return s / peak.replace(0, np.nan) - 1
+
+        def _skew(s, window):
+            return s.rolling(int(window)).skew()
+
+        def _kurt(s, window):
+            return s.rolling(int(window)).kurt()
+
+        def _downside_std(s, window):
+            downside = s.where(s < 0, 0.0)
+            return downside.rolling(int(window)).std()
+
+        def _upside_std(s, window):
+            upside = s.where(s > 0, 0.0)
+            return upside.rolling(int(window)).std()
+
+        def _efficiency_ratio(s, window):
+            window = int(window)
+            direction = (s - s.shift(window)).abs()
+            path = s.diff().abs().rolling(window).sum()
+            return direction / path.replace(0, np.nan)
+
         # Compute derived data sources
         if amounts is None:
             amounts = volumes * closes
@@ -251,6 +332,11 @@ class FactorEngine:
             "ts_rank": lambda s, n: s.rolling(n).apply(_ts_rank_func, raw=True),
             "ts_decay": _ts_decay,
             "ewm": _ewm_func,
+            "ema": _ema,
+            "macd_dif": _macd_dif,
+            "macd_dea": _macd_dea,
+            "macd_hist": _macd_hist,
+            "rsi": _rsi,
             "ts_argmax": _ts_argmax, "ts_argmin": _ts_argmin,
             "ts_product": _ts_product,
             "highday": _highday, "lowday": _lowday,
@@ -267,6 +353,20 @@ class FactorEngine:
             "advm": lambda s, n: s.rolling(n).mean(),
             # 条件逻辑
             "ternary": _ternary, "where": _where,
+            "cross_up": _cross_up,
+            "cross_down": _cross_down,
+            "bars_since": _bars_since,
+            "count_true": _count_true,
+            "zscore": _zscore,
+            "vol_zscore": _vol_zscore,
+            "gap_pct": _gap_pct,
+            "breakout": _breakout,
+            "drawdown_from_high": _drawdown_from_high,
+            "skew": _skew,
+            "kurt": _kurt,
+            "downside_std": _downside_std,
+            "upside_std": _upside_std,
+            "efficiency_ratio": _efficiency_ratio,
         }
 
         # 注入财务指标

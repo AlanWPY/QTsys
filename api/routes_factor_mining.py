@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db
 from services.factor_mining_service import (
     get_active_or_latest_mining_session,
+    get_all_pinned_candidates,
     get_factor_mining_options,
     get_mining_research_report,
     get_streaming_mining_results,
@@ -166,3 +167,9 @@ async def research_report(candidate_id: int, db: AsyncSession = Depends(get_db))
         return await get_mining_research_report(db, candidate_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/pinned")
+async def get_pinned(limit: int = 200, db: AsyncSession = Depends(get_db)):
+    """Return all pinned candidates across all sessions."""
+    return await get_all_pinned_candidates(db, limit=limit)

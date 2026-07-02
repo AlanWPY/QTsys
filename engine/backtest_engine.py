@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -599,24 +600,24 @@ class BacktestEngine:
 
         daily_basic_fields = self._required_daily_basic_fields(required_fields)
         self.stock_names = self._load_stock_names(universe)
-        for ts_code in universe:
-            df = self._load_symbol_data(ts_code, warmup_start, end_date, daily_basic_fields)
-            if df.empty:
-                continue
-            self.all_data[ts_code] = df
-            date_map: dict[str, dict] = {}
-            for _, row in df.iterrows():
-                dt = row["trade_date"]
-                date_key = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)[:10].replace("-", "")
-                date_map[date_key] = row.to_dict()
-            self.date_index[ts_code] = date_map
+
+        def _load_one(ts_code: str):
+            return ts_code, self._load_symbol_data(ts_code, warmup_start, end_date, daily_basic_fields)
+
+        max_workers = min(8, max(1, len(universe)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for ts_code, df in executor.map(_load_one, universe):
+                if df.empty:
+                    continue
+                self.all_data[ts_code] = df
+                date_keys = df["trade_date"].dt.strftime("%Y%m%d")
+                records = df.to_dict("records")
+                self.date_index[ts_code] = dict(zip(date_keys, records))
 
         self.benchmark_data = self.cache.get_index_daily(benchmark, start_date, end_date)
         if self.benchmark_data is not None and not self.benchmark_data.empty:
-            for _, row in self.benchmark_data.iterrows():
-                dt = row["trade_date"]
-                date_key = dt.strftime("%Y%m%d") if hasattr(dt, "strftime") else str(dt)[:10].replace("-", "")
-                self.benchmark_date_index[date_key] = row.to_dict()
+            bm_keys = self.benchmark_data["trade_date"].dt.strftime("%Y%m%d")
+            self.benchmark_date_index = dict(zip(bm_keys, self.benchmark_data.to_dict("records")))
 
         try:
             initialize_func(self)

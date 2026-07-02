@@ -34,19 +34,19 @@ REPO_URL = read_config_value("REPO_URL", "https://github.com/AlanWPY/QTsys.git")
 PORT = int(read_config_value("PORT", "8000"))
 
 COLORS = {
-    "bg": "#07111f",
-    "panel": "#0b1628",
-    "panel_2": "#111f35",
-    "card": "#10243d",
-    "card_2": "#0d1b30",
-    "line": "#24415f",
-    "text": "#e8f2ff",
-    "muted": "#8ea4bd",
-    "primary": "#00d4ff",
-    "primary_2": "#1477ff",
-    "success": "#28d17c",
-    "warning": "#ffb020",
-    "danger": "#ff5263",
+    "bg": "#060d18",
+    "panel": "#0a1422",
+    "panel_2": "#0f1c2e",
+    "card": "#0d1f35",
+    "card_2": "#0a1828",
+    "line": "#1e3452",
+    "text": "#dceeff",
+    "muted": "#7a99b8",
+    "primary": "#4f8eff",
+    "primary_2": "#2467e8",
+    "success": "#1fd575",
+    "warning": "#f4b942",
+    "danger": "#f0425a",
 }
 
 

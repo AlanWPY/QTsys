@@ -1,5 +1,6 @@
 """因子评价引擎 - IC/IR/分组收益/多空曲线"""
 import re
+import ast
 import numpy as np
 import pandas as pd
 from typing import Optional
@@ -8,10 +9,27 @@ from logging_config import get_logger
 
 logger = get_logger("qtsys.factor.engine")
 
-FORBIDDEN_EXPR_TOKENS = [
-    "__", "import", "eval", "exec", "open(", "compile(",
-    "os.", "sys.", "subprocess", "socket", "http", "urllib", "requests",
-]
+_DANGEROUS_NAMES = frozenset([
+    "__import__", "__builtins__", "__class__", "__mro__", "__subclasses__",
+    "__globals__", "__locals__", "__code__", "__dict__", "__base__",
+    "getattr", "setattr", "delattr", "globals", "locals",
+    "vars", "dir", "eval", "exec", "compile", "open", "input", "breakpoint",
+])
+
+def _ast_safe_check(expr: str) -> bool:
+    """返回 True 表示表达式安全，False 表示有危险操作"""
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            return False
+        if isinstance(node, ast.Name) and node.id in _DANGEROUS_NAMES:
+            return False
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            return False
+    return True
 
 
 class FactorEngine:
@@ -82,12 +100,8 @@ class FactorEngine:
     def _eval_expression(self, expr, closes, highs, lows, volumes, opens=None, basic_data=None, amounts=None):
         """安全执行用户自定义因子表达式"""
         expr_text = str(expr)
-        expr_lower = expr_text.lower()
-        if any(token in expr_lower for token in FORBIDDEN_EXPR_TOKENS):
-            logger.warning("unsafe factor expression rejected")
-            return None
-        if re.search(r"__\w+__", expr_text):
-            logger.warning("dunder access rejected in factor expression")
+        if not _ast_safe_check(expr_text):
+            logger.warning("unsafe factor expression rejected by AST check")
             return None
 
         def _ts_rank_func(x):
@@ -97,17 +111,12 @@ class FactorEngine:
             return rank / n
 
         def _expanding_rank_pct(s):
-            """无未来函数的历史百分位排名：每个日期只使用当日及以前数据。"""
-            result = []
-            values = []
-            for value in pd.Series(s).values:
-                values.append(value)
-                valid = [item for item in values if pd.notna(item)]
-                if not valid or pd.isna(value):
-                    result.append(np.nan)
-                else:
-                    result.append(float(np.sum(np.array(valid) <= value) / len(valid)))
-            return pd.Series(result, index=s.index)
+            """展开窗口百分位排名（无未来函数），向量化实现。"""
+            s = pd.Series(s)
+            ranks = s.expanding().rank()
+            counts = s.expanding().count()
+            result = ranks / counts
+            return result.where(s.notna())
 
         def _expanding_zscore(s):
             mean = s.expanding(min_periods=2).mean()
@@ -165,12 +174,9 @@ class FactorEngine:
             return s.rolling(window).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
 
         def _sma(s, window, weight):
-            result = s.copy()
+            """指数移动平均，等价于聚宽 SMA(s, N, M) = M/N * s + (1-M/N) * prev"""
             alpha = weight / window
-            for i in range(1, len(s)):
-                if pd.notna(s.iloc[i]) and pd.notna(result.iloc[i-1]):
-                    result.iloc[i] = alpha * s.iloc[i] + (1 - alpha) * result.iloc[i-1]
-            return result
+            return s.ewm(alpha=alpha, adjust=False).mean()
 
         def _regbeta(x, y, window):
             def calc_beta(x_arr, y_arr):
@@ -291,6 +297,28 @@ class FactorEngine:
             path = s.diff().abs().rolling(window).sum()
             return direction / path.replace(0, np.nan)
 
+        def _signed_log(s):
+            """Signed log transform: preserves sign while compressing outliers. Used in WQ Alpha101."""
+            return pd.Series(np.sign(s.values) * np.log1p(np.abs(s.values)), index=s.index)
+
+        def _ts_percentile_rank(s, window):
+            """Rolling percentile rank within a trailing window - time-series version of cross-sectional rank."""
+            return s.rolling(int(window)).rank(pct=True)
+
+        def _ic_weighted_mean(s, window):
+            """Exponentially weighted mean with decay - approximates IC-optimal combination weights."""
+            return s.ewm(halflife=window/2, adjust=True).mean()
+
+        def _winsorize_factor(s, lower_pct=0.01, upper_pct=0.99):
+            """Winsorize: clip at percentile bounds to remove outliers before IC computation."""
+            lo = s.quantile(lower_pct)
+            hi = s.quantile(upper_pct)
+            return s.clip(lower=lo, upper=hi)
+
+        def _ts_corr_signed(s, t, window):
+            """Rolling correlation with sign - for price-volume divergence factors (Alpha101 style)."""
+            return s.rolling(int(window)).corr(t)
+
         # Compute derived data sources
         if amounts is None:
             amounts = volumes * closes
@@ -367,6 +395,12 @@ class FactorEngine:
             "downside_std": _downside_std,
             "upside_std": _upside_std,
             "efficiency_ratio": _efficiency_ratio,
+            # Frontier operators (WorldQuant/IC-stable)
+            "signed_log": _signed_log,
+            "ts_pct_rank": _ts_percentile_rank,
+            "ic_ewm": _ic_weighted_mean,
+            "winsorize": _winsorize_factor,
+            "ts_corr_signed": _ts_corr_signed,
         }
 
         # 注入财务指标
@@ -523,6 +557,9 @@ class FactorEngine:
 
             fv_arr = np.array(fvals)
             fr_arr = np.array(frets)
+
+            # 截面百分位排名标准化（行业标准做法，消除因子值分布偏态影响）
+            fv_arr = pd.Series(fv_arr).rank(pct=True).values
 
             # IC: Spearman rank correlation
             rank_f = pd.Series(fv_arr).rank().values

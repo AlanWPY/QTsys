@@ -196,6 +196,69 @@ class TushareClient:
             logger.exception(f"获取指数成分股失败: {index_code}")
             return pd.DataFrame()
 
+
+    def get_fina_indicator(self, ts_code: str, period: str = "") -> pd.DataFrame:
+        """获取财务指标(ROE/ROA/毛利率/资产负债率等)"""
+        self._rate_limit()
+        self._ensure_token()
+        try:
+            kwargs = {"ts_code": ts_code, "fields": "ts_code,ann_date,end_date,eps,roe,roa,debt_to_assets,grossprofit_margin,netprofit_margin,current_ratio,assets_turn,ocfps,ocf_to_or,bps,quick_ratio"}
+            if period:
+                kwargs["period"] = period
+            df = self.pro.fina_indicator(**kwargs)
+            if df is None or df.empty:
+                return pd.DataFrame()
+            return df.sort_values("end_date").reset_index(drop=True)
+        except Exception:
+            logger.warning(f"获取财务指标失败: {ts_code}")
+            return pd.DataFrame()
+
+    def get_income(self, ts_code: str, period: str = "") -> pd.DataFrame:
+        """获取利润表(营收/净利润)"""
+        self._rate_limit()
+        self._ensure_token()
+        try:
+            kwargs = {"ts_code": ts_code, "fields": "ts_code,ann_date,end_date,revenue,n_income,operate_profit"}
+            if period:
+                kwargs["period"] = period
+            df = self.pro.income(**kwargs)
+            if df is None or df.empty:
+                return pd.DataFrame()
+            return df.sort_values("end_date").reset_index(drop=True)
+        except Exception:
+            logger.warning(f"获取利润表失败: {ts_code}")
+            return pd.DataFrame()
+
+    def get_stock_basic_full(self) -> pd.DataFrame:
+        """获取全量A股基本信息(含行业/板块)"""
+        self._rate_limit()
+        self._ensure_token()
+        try:
+            df = self.pro.stock_basic(exchange="", list_status="L", fields="ts_code,symbol,name,area,industry,market,list_date")
+            if df is None or df.empty:
+                return pd.DataFrame()
+            return df
+        except Exception:
+            logger.warning("获取全量A股基本信息失败")
+            return pd.DataFrame()
+
+    def get_daily_basic_batch(self, trade_date: str, fields: str = "ts_code,pe,pb,total_mv,turnover_rate") -> pd.DataFrame:
+        """批量获取全市场某日基础指标，自动向前找最近有效交易日（最多回退10天）"""
+        from datetime import datetime, timedelta
+        dt = datetime.strptime(str(trade_date)[:8], "%Y%m%d")
+        for offset in range(10):
+            check_date = (dt - timedelta(days=offset)).strftime("%Y%m%d")
+            self._rate_limit()
+            self._ensure_token()
+            try:
+                df = self.pro.daily_basic(ts_code="", trade_date=check_date, fields=fields)
+                if df is not None and not df.empty:
+                    return df
+            except Exception as e:
+                logger.warning(f"get_daily_basic_batch {check_date}: {e}")
+                continue
+        return pd.DataFrame()
+
     def validate_token(self) -> bool:
         """验证token是否有效"""
         try:

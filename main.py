@@ -34,6 +34,7 @@ from api.routes_factor_backtest import router as factor_backtest_router
 from api.routes_quality import router as quality_router
 from api.routes_factor_board import router as factor_board_router
 from api.routes_factor_mining import router as factor_mining_router
+from api.routes_stock_screener import router as stock_screener_router
 
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
@@ -93,6 +94,19 @@ async def lifespan(app: FastAPI):
     global _news_refresh_task
     logger.info(f"QTsys v{VERSION} 启动中...")
     await init_db()
+    # Reset stale mining sessions left in running/pending/stopping state from previous server crash
+    try:
+        from sqlalchemy import update as _upd
+        from database.models import FactorMiningSession as _FMS
+        async with get_session_factory()() as _db:
+            await _db.execute(
+                _upd(_FMS)
+                .where(_FMS.status.in_(["running", "pending", "stopping"]))
+                .values(status="failed", phase="failed", message="服务器重启，任务中断")
+            )
+            await _db.commit()
+    except Exception:
+        pass
     logger.info("数据库初始化完成")
     logger.info("ORM 主库固定为 SQLite，MySQL 仅用于缓存与因子看板")
     logger.warning("QTsys 访问地址：http://127.0.0.1:8000  | 监听地址：http://0.0.0.0:8000")
@@ -120,6 +134,7 @@ app.include_router(factor_backtest_router)
 app.include_router(quality_router)
 app.include_router(factor_board_router)
 app.include_router(factor_mining_router)
+app.include_router(stock_screener_router)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

@@ -13,13 +13,14 @@
     <style>
 /* ===== 全局样式 ===== */
 :root {
-    --bg-900: #0f1117; --bg-800: #1a1d29; --bg-700: #1e2235;
-    --bg-600: #252a3a; --bg-500: #2d3348; --bg-400: #3b4261;
-    --text-100: #f1f5f9; --text-200: #e2e8f0; --text-300: #cbd5e1;
-    --text-400: #94a3b8; --text-500: #64748b;
-    --accent: #6366f1; --accent-light: #818cf8;
-    --profit: #22c55e; --loss: #ef4444;
-    --border: #2d3348;
+    --bg-900: #080e18; --bg-800: #0e1623; --bg-700: #141e2e;
+    --bg-600: #1a2436; --bg-500: #20293f; --bg-400: #28344f;
+    --text-100: #f0f6ff; --text-200: #dce8f8; --text-300: #b8ccdf;
+    --text-400: #7a94ad; --text-500: #4e6478;
+    --accent: #4f6ef7; --accent-light: #7b96ff;
+    --profit: #1fd575; --loss: #f0425a;
+    --border: #1e2d44;
+    --gold: #f4b942; --cyan: #22d3ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -35,9 +36,9 @@ a { color: var(--accent-light); text-decoration: none; }
 
 /* ===== 布局 ===== */
 .app { min-height: 100vh; display: flex; flex-direction: column; }
-.header { background: var(--bg-700); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.header { background: linear-gradient(135deg, var(--bg-800) 0%, var(--bg-700) 100%); border-bottom: 1px solid rgba(79,110,247,0.18); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 58px; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
 .header-brand { display: flex; align-items: center; gap: 10px; }
-.header-brand h1 { font-size: 20px; font-weight: 700; color: var(--accent-light); }
+.header-brand h1 { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, var(--accent-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.5px; }
 .header-brand span { font-size: 12px; color: var(--text-500); }
 .nav { display: flex; gap: 4px; }
 .nav-btn { padding: 8px 16px; border-radius: 8px; border: none; background: transparent; color: var(--text-400); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
@@ -46,15 +47,15 @@ a { color: var(--accent-light); text-decoration: none; }
 .main { flex: 1; padding: 24px; max-width: 1280px; margin: 0 auto; width: 100%; }
 
 /* ===== 通用组件 ===== */
-.card { background: var(--bg-700); border-radius: 12px; padding: 20px; }
+.card { background: linear-gradient(145deg, var(--bg-700) 0%, var(--bg-600) 100%); border-radius: 14px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
 .card-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: var(--text-100); }
 .input { width: 100%; background: var(--bg-700); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-200); font-size: 14px; outline: none; transition: border-color 0.2s; }
 .input:focus { border-color: var(--accent); }
 select.input { cursor: pointer; }
 .label { font-size: 12px; color: var(--text-400); margin-bottom: 4px; display: block; }
 .btn { padding: 8px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
-.btn-primary { background: var(--accent); color: white; }
-.btn-primary:hover { background: var(--accent-light); }
+.btn-primary { background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%); color: white; box-shadow: 0 2px 12px rgba(79,110,247,0.35); }
+.btn-primary:hover { background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); box-shadow: 0 4px 16px rgba(79,110,247,0.45); transform: translateY(-1px); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: var(--bg-600); color: var(--text-300); }
 .btn-secondary:hover { background: var(--bg-500); }
@@ -106,8 +107,8 @@ select.input { cursor: pointer; }
 .mt-2 { margin-top: 8px; } .mt-4 { margin-top: 16px; } .py-10 { padding: 40px 0; }
 
 /* ===== 指标卡片 ===== */
-.metric-card { background: var(--bg-700); border-radius: 12px; padding: 16px; transition: all 0.2s; }
-.metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+.metric-card { background: linear-gradient(145deg, var(--bg-700) 0%, var(--bg-600) 100%); border-radius: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.04); transition: all 0.2s; }
+.metric-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 0 1px rgba(79,110,247,0.15); }
 .metric-label { font-size: 12px; color: var(--text-400); margin-bottom: 4px; }
 .metric-value { font-size: 24px; font-weight: 700; }
 
@@ -9236,6 +9237,7 @@ function FactorMiningPage({ showToast }) {
         capacity_limit_pct: 0.10,
         min_dsr: -0.25,
     });
+    const [globalPinned, setGlobalPinned] = useState([]);
     const [starting, setStarting] = useState(false);
     const [stopping, setStopping] = useState(false);
     const [sessionId, setSessionId] = useState('');
@@ -9253,6 +9255,9 @@ function FactorMiningPage({ showToast }) {
 
     useEffect(() => {
         api.get('/api/factor_mining/options').then(setOptions).catch(() => {});
+    }, []);
+    useEffect(() => {
+        api.get('/api/factor_mining/pinned').then(res => setGlobalPinned((res && res.items) || [])).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -9309,7 +9314,7 @@ function FactorMiningPage({ showToast }) {
                 const date = String(point.date || '');
                 const value = normalizeMiningCurvePoint(point, 'return');
                 if (!date) return;
-                if (value === null) return;
+                if (value === null || !Number.isFinite(value)) return;
                 if (!map[date]) map[date] = { date };
                 map[date]['f' + idx] = value;
             });
@@ -9752,6 +9757,25 @@ function FactorMiningPage({ showToast }) {
                 </div>
             </section>
 
+            {globalPinned.length > 0 && (
+                <section className="card" style={{marginBottom:16}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                        <div>
+                            <div className="card-title" style={{marginBottom:2}}>{'🔐 已保留因子库'}</div>
+                            <div className="text-xs text-muted">{'跨会话持久保存，重新挖掘不影响显示。共 '}{globalPinned.length}{' 个'}</div>
+                        </div>
+                    </div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                        {globalPinned.map((item,idx) => (
+                            <div key={item.id||idx} style={{background:'var(--bg-600)',borderRadius:10,padding:'8px 14px',border:'1px solid rgba(79,110,247,0.25)',minWidth:160}}>
+                                <div style={{fontWeight:700,fontSize:13,color:'var(--accent-light)',marginBottom:3}}>{item.name}</div>
+                                <div style={{fontSize:11,color:'var(--text-400)'}}>{'IC '}{(item.test_metrics&&item.test_metrics.ic_mean||0).toFixed(4)}{' · 超额 '}{((item.backtest_metrics&&item.backtest_metrics.excess_return||0)).toFixed(1)}{'%'}</div>
+                                <div style={{fontSize:10,color:'var(--text-500)',marginTop:2,wordBreak:'break-all'}}>{(item.expression||'').slice(0,60)}{item.expression&&item.expression.length>60?'...':''}</div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
             <div className="factor-mining-grid">
                 <section className="card factor-mining-panel space-y">
                     <div className="factor-mining-statusbar">
@@ -9804,9 +9828,9 @@ function FactorMiningPage({ showToast }) {
                                     <YAxis tick={{fill:'#94a3b8',fontSize:10}} domain={chartYDomain} tickFormatter={v => Number(v).toFixed(1) + '%'}/>
                                      <Tooltip contentStyle={{background:'#1e2235',border:'1px solid #2d3348',borderRadius:8,color:'#e2e8f0'}} formatter={v => Number(v).toFixed(2) + '%'}/>
                                      <Legend/>
-                                    {best && <Line type="monotone" dataKey="benchmark" name={'\u57fa\u51c6'} dot={false} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
-                                    {best && <Line type="monotone" dataKey="excess" name={'\u8d85\u989d'} dot={false} stroke="#22c55e" strokeDasharray="2 2" strokeWidth={1.8} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
-                                     {chartResults.map((item, idx) => <Line key={item.id || idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>)}
+                                    {best && <Line type="monotone" connectNulls={true} dataKey="benchmark" name={'\u57fa\u51c6'} dot={false} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
+                                    {best && <Line type="monotone" connectNulls={true} dataKey="excess" name={'\u8d85\u989d'} dot={false} stroke="#22c55e" strokeDasharray="2 2" strokeWidth={1.8} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>}
+                                     {chartResults.map((item, idx) => <Line connectNulls={true} key={item.id || idx} type="monotone" dataKey={'f' + idx} name={item.name} dot={false} stroke={palette[idx % palette.length]} strokeWidth={idx === 0 ? 2.4 : 1.6} isAnimationActive={true} animationDuration={650} animationEasing="ease-out"/>)}
                                 </ComposedChart>
                             </ResponsiveContainer>
                         ) : <div className="factor-mining-empty">{isRunning ? '\u6b63\u5728\u8bc4\u4f30\u56e0\u5b50\u548c\u56de\u6d4b\u66f2\u7ebf...' : '\u5c1a\u672a\u8fd0\u884c\u6316\u6398'}</div>}
@@ -9874,7 +9898,7 @@ function FactorMiningPage({ showToast }) {
                                         <ComposedChart data={item.normalized_curve || []}>
                                             <XAxis dataKey="date" hide/>
                                             <YAxis hide domain={['dataMin', 'dataMax']}/>
-                                            <Line type="monotone" dataKey="value" dot={false} stroke={palette[idx % palette.length]} strokeWidth={1.8} isAnimationActive={true} animationDuration={500} animationEasing="ease-out"/>
+                                            <Line connectNulls={true} type="monotone" dataKey="value" dot={false} stroke={palette[idx % palette.length]} strokeWidth={1.8} isAnimationActive={true} animationDuration={500} animationEasing="ease-out"/>
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -10003,6 +10027,7 @@ function App() {
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
         { key: 'factormining', label: '\u56e0\u5b50\u6316\u6398' },
+        { key: 'screener', label: '\u9009\u80a1' },
         { key: 'workflow', label: '因子工作流' },
         { key: 'factorboard', label: '因子看板' },
         { key: 'news', label: '新闻' },
@@ -10053,6 +10078,7 @@ function App() {
         { key: 'market', label: '看盘' },
         { key: 'factor', label: '因子' },
         { key: 'factormining', label: '\u56e0\u5b50\u6316\u6398' },
+        { key: 'screener', label: '\u9009\u80a1' },
         { key: 'workflow', label: '因子工作流' },
         { key: 'factorboard', label: '因子看板' },
         { key: 'news', label: '新闻' },
@@ -10087,6 +10113,7 @@ function App() {
                 {page === 'market' && <MarketPage showToast={showToast} />}
                 {page === 'factor' && <FactorPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} openBacktestWithStrategy={() => setPage('backtest')} />}
                 {page === 'factormining' && <FactorMiningPage showToast={showToast} />}
+                {page === 'screener' && <StockScreenerPage showToast={showToast} />}
                 {page === 'workflow' && <FactorWorkflowPage showToast={showToast} />}
                 {page === 'factorboard' && <FactorBoardPage showToast={showToast} openStrategyWorkspace={() => setPage('strategy')} />}
                 {page === 'news' && <NewsPage showToast={showToast} />}
@@ -10098,7 +10125,316 @@ function App() {
     );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+
+/* ===== Stock Screener Page ===== */
+function StockScreenerPage({ showToast }) {
+    const [options, setOptions] = React.useState({ system_pools: [], industry_pools: [], factors: [] });
+    const [poolCode, setPoolCode] = React.useState('000300.SH');
+    const [fundWeight, setFundWeight] = React.useState(50);
+    const [techWeight, setTechWeight] = React.useState(50);
+    const [selectedFactors, setSelectedFactors] = React.useState([]);
+    const [topN, setTopN] = React.useState(50);
+    const [endDate, setEndDate] = React.useState('');
+    const [running, setRunning] = React.useState(false);
+    const [results, setResults] = React.useState(null);
+    const [klineModal, setKlineModal] = React.useState(null);
+    const [klineData, setKlineData] = React.useState(null);
+    const [klineLoading, setKlineLoading] = React.useState(false);
+    const [sortKey, setSortKey] = React.useState('rank');
+    const [sortDir, setSortDir] = React.useState(1);
+    const [factorSearch, setFactorSearch] = React.useState('');
+    const [showFactorPicker, setShowFactorPicker] = React.useState(false);
+    const [piDetails, setPiDetails] = React.useState(null);
+
+    React.useEffect(() => {
+        const now = new Date();
+        setEndDate(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`);
+        api.get('/api/screener/options').then(d => setOptions(d || { system_pools: [], industry_pools: [], factors: [] })).catch(() => {});
+    }, []);
+
+    const allPools = [...(options.system_pools || []), ...(options.industry_pools || [])];
+    const allFactors = (options.factors || []).filter(f => f.expression);
+    const filteredFactors = factorSearch ? allFactors.filter(f => (f.name||'').toLowerCase().includes(factorSearch.toLowerCase()) || (f.expression||'').toLowerCase().includes(factorSearch.toLowerCase())) : allFactors.slice(0, 40);
+
+    const addFactor = (f) => {
+        if (selectedFactors.find(x => x.id === f.id && x.expression === f.expression)) return;
+        setSelectedFactors(prev => [...prev, { ...f, direction: 'high' }]);
+        setShowFactorPicker(false);
+    };
+    const removeFactor = (idx) => setSelectedFactors(prev => prev.filter((_,i) => i !== idx));
+    const toggleDir = (idx) => setSelectedFactors(prev => prev.map((f,i) => i === idx ? { ...f, direction: f.direction === 'high' ? 'low' : 'high' } : f));
+
+    const handleWeightChange = (side, val) => {
+        const v = Math.max(0, Math.min(100, Number(val)));
+        if (side === 'fund') { setFundWeight(v); setTechWeight(100 - v); }
+        else { setTechWeight(v); setFundWeight(100 - v); }
+    };
+
+    const runScreener = async () => {
+        setRunning(true); setResults(null);
+        try {
+            const payload = {
+                pool_code: poolCode,
+                fund_weight: fundWeight / 100,
+                tech_weight: techWeight / 100,
+                tech_factors: selectedFactors.map(f => ({ id: f.id, name: f.name, expression: f.expression, direction: f.direction })),
+                top_n: topN,
+                end_date: endDate.replace(/-/g, ''),
+            };
+            const data = await api.post('/api/screener/run', payload, { timeoutMs: 300000 });
+            setResults(data);
+            showToast(`选股完成，共 ${(data.results||[]).length} 只`, 'success');
+        } catch(e) { showToast((e&&e.detail)||'选股失败', 'error'); }
+        setRunning(false);
+    };
+
+    const openKline = async (ts_code, name) => {
+        setKlineModal({ ts_code, name }); setKlineLoading(true); setKlineData(null);
+        try {
+            const d = await api.get(`/api/screener/kline/${ts_code}?limit=300`);
+            setKlineData(d.candles || []);
+        } catch(e) { showToast('K线加载失败', 'error'); }
+        setKlineLoading(false);
+    };
+
+    const sortedResults = React.useMemo(() => {
+        if (!results || !results.results) return [];
+        return [...results.results].sort((a, b) => {
+            const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+            return sortDir * (bv - av);
+        });
+    }, [results, sortKey, sortDir]);
+
+    const handleSort = (key) => {
+        if (sortKey === key) setSortDir(d => -d);
+        else { setSortKey(key); setSortDir(-1); }
+    };
+
+    const SortIcon = ({ col }) => sortKey === col ? (sortDir < 0 ? ' ↓' : ' ↑') : '';
+    const num = (v, d=2) => v != null && Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '-';
+    const scoreColor = (v) => v == null ? '' : v >= 70 ? 'text-profit' : v >= 40 ? '' : 'text-loss';
+
+    // K-line chart using recharts
+    const KlineChart = ({ data }) => {
+        if (!data || !data.length) return <div className="empty-state" style={{height:300}}>无K线数据</div>;
+        const chartData = data.map(d => ({
+            date: d.date ? d.date.slice(4,6)+'/'+d.date.slice(6,8) : '',
+            close: d.close, open: d.open, high: d.high, low: d.low,
+            vol: d.vol ? Math.round(d.vol/100) : 0,
+        }));
+        const closes = chartData.map(d => d.close).filter(Boolean);
+        const minC = Math.min(...closes)*0.98, maxC = Math.max(...closes)*1.02;
+        return (
+            <div style={{width:'100%'}}>
+                <ResponsiveContainer width="100%" height={280}>
+                    <ComposedChart data={chartData} margin={{top:8,right:16,bottom:0,left:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)"/>
+                        <XAxis dataKey="date" tick={{fill:'#7a94ad',fontSize:10}} tickLine={false} interval={Math.floor(chartData.length/8)}/>
+                        <YAxis domain={[minC,maxC]} tick={{fill:'#7a94ad',fontSize:10}} tickLine={false} width={60} tickFormatter={v=>v.toFixed(2)}/>
+                        <Tooltip contentStyle={{background:'#141e2e',border:'1px solid #1e2d44',borderRadius:8,color:'#dce8f8',fontSize:12}} formatter={(v,n)=>[Number(v).toFixed(3),n]}/>
+                        <Line connectNulls type="monotone" dataKey="close" stroke="#4f6ef7" strokeWidth={2} dot={false} name="收盘"/>
+                        <Line connectNulls type="monotone" dataKey="high" stroke="#1fd575" strokeWidth={1} dot={false} strokeDasharray="3 2" name="最高"/>
+                        <Line connectNulls type="monotone" dataKey="low" stroke="#f0425a" strokeWidth={1} dot={false} strokeDasharray="3 2" name="最低"/>
+                    </ComposedChart>
+                </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={80}>
+                    <BarChart data={chartData} margin={{top:4,right:16,bottom:0,left:0}}>
+                        <XAxis dataKey="date" tick={false} axisLine={false}/>
+                        <YAxis tick={false} axisLine={false} width={60}/>
+                        <Bar dataKey="vol" fill="#4f6ef7" opacity={0.5} name="成交量(百股)"/>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        );
+    };
+
+    return (
+        <div className="fade-in" style={{maxWidth:1400,margin:'0 auto',padding:'0 0 40px 0'}}>
+            {/* ── Header ────────────────────────────── */}
+            <div style={{marginBottom:20,paddingTop:4}}>
+                <h2 style={{fontSize:22,fontWeight:800,color:'var(--text-100)',marginBottom:4,background:'linear-gradient(90deg,var(--accent-light),var(--cyan))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>智能选股</h2>
+                <p style={{fontSize:13,color:'var(--text-400)'}}>基本面（改进版 Piotroski F-Score）+ 技术面（用户自选因子）双维度评分，按综合得分排序</p>
+            </div>
+
+            {/* ── Settings Row ──────────────────────── */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:16}}>
+                {/* 股票池 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)',marginBottom:12}}>📊 股票池</div>
+                    <label className="label">选择池</label>
+                    <select className="input" value={poolCode} onChange={e=>setPoolCode(e.target.value)} style={{marginBottom:8}}>
+                        <optgroup label="主流指数">
+                            {(options.system_pools||[]).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
+                        </optgroup>
+                        <optgroup label="行业板块">
+                            {(options.industry_pools||[]).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
+                        </optgroup>
+                    </select>
+                    <div style={{display:'flex',gap:8,marginTop:8}}>
+                        <div style={{flex:1}}>
+                            <label className="label">截止日期</label>
+                            <input className="input" type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}/>
+                        </div>
+                        <div style={{flex:'0 0 80px'}}>
+                            <label className="label">展示前N</label>
+                            <input className="input" type="number" min={5} max={200} value={topN} onChange={e=>setTopN(Number(e.target.value)||50)}/>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 权重设置 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)',marginBottom:12}}>⚖️ 基本面 / 技术面 权重</div>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                        <span style={{color:'var(--accent-light)',fontWeight:700,fontSize:15}}>{fundWeight}<span style={{fontSize:11,color:'var(--text-400)'}}> / 100</span></span>
+                        <span style={{fontSize:12,color:'var(--text-400)'}}>基本面 ↔ 技术面</span>
+                        <span style={{color:'var(--cyan)',fontWeight:700,fontSize:15}}>{techWeight}<span style={{fontSize:11,color:'var(--text-400)'}}> / 100</span></span>
+                    </div>
+                    <input type="range" min={0} max={100} value={fundWeight} onChange={e=>handleWeightChange('fund',e.target.value)} style={{width:'100%',accentColor:'var(--accent)',marginBottom:12}}/>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        <div style={{background:'rgba(79,110,247,0.1)',borderRadius:10,padding:'8px 12px',border:'1px solid rgba(79,110,247,0.2)',textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--text-400)'}}>基本面</div>
+                            <div style={{fontSize:20,fontWeight:800,color:'var(--accent-light)'}}>{fundWeight}%</div>
+                            <div style={{fontSize:10,color:'var(--text-500)'}}>Piotroski F-Score</div>
+                        </div>
+                        <div style={{background:'rgba(34,211,238,0.08)',borderRadius:10,padding:'8px 12px',border:'1px solid rgba(34,211,238,0.2)',textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--text-400)'}}>技术面</div>
+                            <div style={{fontSize:20,fontWeight:800,color:'var(--cyan)'}}>{techWeight}%</div>
+                            <div style={{fontSize:10,color:'var(--text-500)'}}>自选因子</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 技术因子 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                        <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)'}}>📈 技术因子 <span style={{color:'var(--text-400)',fontWeight:400,fontSize:11}}>({selectedFactors.length}个)</span></div>
+                        <button className="btn btn-primary" style={{padding:'4px 10px',fontSize:12}} onClick={()=>setShowFactorPicker(!showFactorPicker)}>+ 添加</button>
+                    </div>
+                    {showFactorPicker && (
+                        <div style={{marginBottom:8,background:'var(--bg-600)',borderRadius:10,padding:10,border:'1px solid var(--border)'}}>
+                            <input className="input" placeholder="搜索因子..." value={factorSearch} onChange={e=>setFactorSearch(e.target.value)} style={{marginBottom:8,fontSize:12}}/>
+                            <div style={{maxHeight:120,overflowY:'auto'}}>
+                                {filteredFactors.map(f=>(
+                                    <div key={f.id||f.name} onClick={()=>addFactor(f)} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:12,color:'var(--text-300)'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-500)'} onMouseLeave={e=>e.currentTarget.style.background=''}>{f.name} <span style={{color:'var(--text-500)',fontSize:10}}>{(f.expression||'').slice(0,30)}</span></div>
+                                ))}
+                                {filteredFactors.length === 0 && <div style={{color:'var(--text-500)',fontSize:12,textAlign:'center',padding:'8px 0'}}>无匹配因子</div>}
+                            </div>
+                        </div>
+                    )}
+                    <div style={{maxHeight:120,overflowY:'auto'}}>
+                        {selectedFactors.length === 0 && <div style={{color:'var(--text-500)',fontSize:12,textAlign:'center',padding:'16px 0'}}>暂未添加技术因子</div>}
+                        {selectedFactors.map((f,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                                <span style={{flex:1,fontSize:12,color:'var(--text-300)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                                <button onClick={()=>toggleDir(i)} style={{padding:'2px 8px',borderRadius:5,border:'1px solid',fontSize:10,cursor:'pointer',background:'transparent',borderColor:f.direction==='high'?'var(--profit)':'var(--loss)',color:f.direction==='high'?'var(--profit)':'var(--loss)'}}>{f.direction==='high'?'↑高好':'↓低好'}</button>
+                                <button onClick={()=>removeFactor(i)} style={{color:'var(--text-500)',background:'none',border:'none',cursor:'pointer',fontSize:14,padding:'0 2px'}}>×</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Run Button ────────────────────────── */}
+            <div style={{textAlign:'center',marginBottom:20}}>
+                <button className="btn btn-primary" style={{padding:'12px 48px',fontSize:16,borderRadius:12}} onClick={runScreener} disabled={running}>
+                    {running ? <><span className="spinner"/> 选股中...(约需1-3分钟)</> : '🔍 开始选股'}
+                </button>
+                {running && <div style={{fontSize:12,color:'var(--text-400)',marginTop:8}}>正在计算 {allPools.find(p=>p.code===poolCode)?.name||poolCode} 成分股评分，请稍候...</div>}
+            </div>
+
+            {/* ── Results ───────────────────────────── */}
+            {results && (
+                <div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                        <div>
+                            <span style={{fontWeight:700,color:'var(--text-100)',fontSize:16}}>选股结果</span>
+                            <span style={{color:'var(--text-400)',fontSize:13,marginLeft:10}}>共分析 {results.total_codes} 只，展示前 {(results.results||[]).length} 名</span>
+                            <span style={{color:'var(--text-500)',fontSize:11,marginLeft:8}}>截止 {results.end_date} · 基本面 {results.fund_weight}% · 技术面 {results.tech_weight}%</span>
+                        </div>
+                    </div>
+                    <div className="card" style={{padding:0,overflow:'hidden'}}>
+                        <div style={{overflowX:'auto'}}>
+                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                                <thead>
+                                    <tr style={{background:'rgba(0,0,0,0.2)'}}>
+                                        {[['rank','排名'],['name','股票'],['total_score','综合分'],['fund_score','基本面分'],['tech_score','技术面分'],['pe','PE'],['pb','PB'],['total_mv','市值(亿)'],['roe','ROE%'],['debt_to_assets','资负比%']].map(([k,l])=>(
+                                            <th key={k} onClick={()=>handleSort(k)} style={{padding:'10px 14px',color:'var(--text-400)',fontWeight:500,cursor:'pointer',textAlign:'right',whiteSpace:'nowrap',userSelect:'none',borderBottom:'1px solid var(--border)'}}>{l}<SortIcon col={k}/></th>
+                                        ))}
+                                        <th style={{padding:'10px 14px',color:'var(--text-400)',fontWeight:500,borderBottom:'1px solid var(--border)'}}>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedResults.map((row,i)=>(
+                                        <tr key={row.ts_code} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-600)'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-400)',fontWeight:600}}>{row.rank}</td>
+                                            <td style={{padding:'9px 14px'}}>
+                                                <div style={{fontWeight:600,color:'var(--text-100)'}}>{row.name}</div>
+                                                <div style={{fontSize:11,color:'var(--text-500)'}}>{row.ts_code} {row.industry&&<span style={{color:'var(--accent-light)'}}> · {row.industry}</span>}</div>
+                                            </td>
+                                            <td style={{padding:'9px 14px',textAlign:'right'}}>
+                                                <span style={{fontWeight:800,fontSize:16,color:row.total_score>=70?'var(--profit)':row.total_score>=40?'var(--gold)':'var(--loss)'}}>{num(row.total_score,1)}</span>
+                                            </td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--accent-light)',fontWeight:600}}>{num(row.fund_score,1)}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--cyan)',fontWeight:600}}>{num(row.tech_score,1)}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.pe!=null?num(row.pe,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.pb!=null?num(row.pb,2):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.total_mv!=null?num(row.total_mv,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:row.roe>12?'var(--profit)':row.roe>5?'var(--text-300)':'var(--loss)'}}>{row.roe!=null?num(row.roe,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:row.debt_to_assets<50?'var(--profit)':row.debt_to_assets<70?'var(--gold)':'var(--loss)'}}>{row.debt_to_assets!=null?num(row.debt_to_assets,1):'-'}</td>
+                                            <td style={{padding:'9px 14px'}}>
+                                                <div style={{display:'flex',gap:6,justifyContent:'center'}}>
+                                                    <button className="btn btn-secondary" style={{padding:'3px 10px',fontSize:11}} onClick={()=>openKline(row.ts_code, row.name)}>K线</button>
+                                                    {row.piotroski_details && Object.keys(row.piotroski_details).length>0 && (
+                                                        <button className="btn btn-secondary" style={{padding:'3px 10px',fontSize:11}} onClick={()=>setPiDetails(piDetails?.ts_code===row.ts_code?null:row)}>F分</button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Piotroski detail popup */}
+                    {piDetails && (
+                        <div className="card" style={{marginTop:12,padding:16,border:'1px solid rgba(79,110,247,0.25)'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+                                <span style={{fontWeight:700,color:'var(--text-100)'}}>{piDetails.name} — Piotroski F-Score 明细 ({piDetails.piotroski_details&&Object.values(piDetails.piotroski_details).reduce((a,b)=>a+b,0)} / 9)</span>
+                                <button onClick={()=>setPiDetails(null)} style={{background:'none',border:'none',color:'var(--text-400)',cursor:'pointer',fontSize:18}}>×</button>
+                            </div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                                {Object.entries(piDetails.piotroski_details||{}).map(([k,v])=>(
+                                    <div key={k} style={{padding:'5px 14px',borderRadius:20,fontSize:12,background:v?'rgba(31,213,117,0.15)':'rgba(240,66,90,0.12)',color:v?'var(--profit)':'var(--loss)',border:`1px solid ${v?'rgba(31,213,117,0.25)':'rgba(240,66,90,0.2)'}`}}>{v?'✓':'✗'} {k}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── K-line Modal ──────────────────────── */}
+            {klineModal && (
+                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={()=>{setKlineModal(null);setKlineData(null);}}>
+                    <div style={{background:'var(--bg-700)',borderRadius:16,padding:24,width:'min(900px,95vw)',border:'1px solid var(--border)',boxShadow:'0 24px 80px rgba(0,0,0,0.5)'}} onClick={e=>e.stopPropagation()}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                            <div>
+                                <span style={{fontWeight:800,fontSize:18,color:'var(--text-100)'}}>{klineModal.name}</span>
+                                <span style={{color:'var(--text-400)',fontSize:13,marginLeft:8}}>{klineModal.ts_code}</span>
+                            </div>
+                            <button onClick={()=>{setKlineModal(null);setKlineData(null);}} style={{background:'var(--bg-600)',border:'1px solid var(--border)',color:'var(--text-300)',borderRadius:8,padding:'4px 12px',cursor:'pointer',fontSize:14}}>关闭</button>
+                        </div>
+                        {klineLoading && <div style={{textAlign:'center',padding:60,color:'var(--text-400)'}}>加载中...</div>}
+                        {!klineLoading && klineData && <KlineChart data={klineData}/>}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>

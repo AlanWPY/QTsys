@@ -105,6 +105,11 @@ async def _init_schema(engine):
             ("factor_mining_sessions", "max_trials", "INTEGER DEFAULT 0"),
             ("factor_mining_sessions", "capacity_limit_pct", "FLOAT DEFAULT 0.10"),
             ("factor_mining_sessions", "min_dsr", "FLOAT DEFAULT -0.25"),
+            ("factor_mining_sessions", "tested_count", "INTEGER DEFAULT 0"),
+            ("factor_mining_sessions", "accepted_count", "INTEGER DEFAULT 0"),
+            ("factor_mining_sessions", "best_score", "FLOAT DEFAULT 0.0"),
+            ("factor_mining_sessions", "error", "TEXT DEFAULT ''"),
+            ("factor_mining_sessions", "stopped_at", "DATETIME DEFAULT NULL"),
             ("factor_mining_candidates", "protocol_version", "VARCHAR(40) DEFAULT 'legacy_unverified'"),
             ("factor_mining_candidates", "theme", "VARCHAR(80) DEFAULT ''"),
             ("factor_mining_candidates", "hypothesis", "TEXT DEFAULT ''"),
@@ -118,6 +123,16 @@ async def _init_schema(engine):
             ("factor_mining_candidates", "revalidation_status", "VARCHAR(40) DEFAULT ''"),
             ("factor_mining_candidates", "is_pinned", "INTEGER DEFAULT 0"),
             ("factor_mining_candidates", "is_deleted", "INTEGER DEFAULT 0"),
+            ("factor_mining_candidates", "direction", "VARCHAR(10) DEFAULT 'top'"),
+            ("factor_mining_candidates", "complexity", "INTEGER DEFAULT 0"),
+            ("factor_mining_candidates", "score", "FLOAT DEFAULT 0.0"),
+            ("factor_mining_candidates", "metrics", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "train_metrics", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "valid_metrics", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "test_metrics", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "backtest_metrics", "JSON DEFAULT '{}'"),
+            ("factor_mining_candidates", "equity_curve", "JSON DEFAULT '[]'"),
+            ("factor_mining_candidates", "normalized_curve", "JSON DEFAULT '[]'"),
         ]
         for table, col, typedef in _migrate_cols:
             try:

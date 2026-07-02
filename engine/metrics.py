@@ -45,6 +45,17 @@ def calc_metrics(
     drawdown = np.divide(cumulative - peak, peak, out=np.zeros_like(cumulative), where=peak != 0)
     max_drawdown = float(np.min(drawdown)) if drawdown.size else 0.0
 
+    # 最大回撤持续天数
+    in_drawdown = drawdown < 0
+    max_dd_dur = 0
+    cur_dur = 0
+    for flag in in_drawdown:
+        if flag:
+            cur_dur += 1
+            max_dd_dur = max(max_dd_dur, cur_dur)
+        else:
+            cur_dur = 0
+
     downside = ret[ret < daily_rf] - daily_rf
     downside_std = _safe_std(downside, ddof=1)
     sortino = (float(np.mean(excess)) / downside_std * np.sqrt(trading_days)) if downside_std > EPSILON else 0.0
@@ -61,9 +72,10 @@ def calc_metrics(
         "annual_volatility": round(annual_vol * 100, 2),
         "sharpe_ratio": round(float(sharpe), 4),
         "max_drawdown": round(max_drawdown * 100, 2),
+        "max_drawdown_duration": max_dd_dur,
         "sortino_ratio": round(float(sortino), 4),
         "calmar_ratio": round(float(calmar), 4),
-        "win_rate": round(len(wins) / n_days * 100, 2) if n_days > 0 else 0.0,
+        "win_rate": round(len(wins) / n_days * 100, 2) if n_days > 0 else 0.0,  # 日收益为正的天数占比
         "profit_loss_ratio": round(avg_win / avg_loss, 4) if avg_loss > 0 else 0.0,
     }
     metrics.update(_calc_ab(ret, benchmark_returns, risk_free_rate, trading_days))

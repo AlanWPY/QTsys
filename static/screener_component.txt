@@ -1,0 +1,308 @@
+
+/* ===== Stock Screener Page ===== */
+function StockScreenerPage({ showToast }) {
+    const [options, setOptions] = React.useState({ system_pools: [], industry_pools: [], factors: [] });
+    const [poolCode, setPoolCode] = React.useState('000300.SH');
+    const [fundWeight, setFundWeight] = React.useState(50);
+    const [techWeight, setTechWeight] = React.useState(50);
+    const [selectedFactors, setSelectedFactors] = React.useState([]);
+    const [topN, setTopN] = React.useState(50);
+    const [endDate, setEndDate] = React.useState('');
+    const [running, setRunning] = React.useState(false);
+    const [results, setResults] = React.useState(null);
+    const [klineModal, setKlineModal] = React.useState(null);
+    const [klineData, setKlineData] = React.useState(null);
+    const [klineLoading, setKlineLoading] = React.useState(false);
+    const [sortKey, setSortKey] = React.useState('rank');
+    const [sortDir, setSortDir] = React.useState(1);
+    const [factorSearch, setFactorSearch] = React.useState('');
+    const [showFactorPicker, setShowFactorPicker] = React.useState(false);
+    const [piDetails, setPiDetails] = React.useState(null);
+
+    React.useEffect(() => {
+        const now = new Date();
+        setEndDate(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`);
+        api.get('/api/screener/options').then(d => setOptions(d || { system_pools: [], industry_pools: [], factors: [] })).catch(() => {});
+    }, []);
+
+    const allPools = [...(options.system_pools || []), ...(options.industry_pools || [])];
+    const allFactors = (options.factors || []).filter(f => f.expression);
+    const filteredFactors = factorSearch ? allFactors.filter(f => (f.name||'').toLowerCase().includes(factorSearch.toLowerCase()) || (f.expression||'').toLowerCase().includes(factorSearch.toLowerCase())) : allFactors.slice(0, 40);
+
+    const addFactor = (f) => {
+        if (selectedFactors.find(x => x.id === f.id && x.expression === f.expression)) return;
+        setSelectedFactors(prev => [...prev, { ...f, direction: 'high' }]);
+        setShowFactorPicker(false);
+    };
+    const removeFactor = (idx) => setSelectedFactors(prev => prev.filter((_,i) => i !== idx));
+    const toggleDir = (idx) => setSelectedFactors(prev => prev.map((f,i) => i === idx ? { ...f, direction: f.direction === 'high' ? 'low' : 'high' } : f));
+
+    const handleWeightChange = (side, val) => {
+        const v = Math.max(0, Math.min(100, Number(val)));
+        if (side === 'fund') { setFundWeight(v); setTechWeight(100 - v); }
+        else { setTechWeight(v); setFundWeight(100 - v); }
+    };
+
+    const runScreener = async () => {
+        setRunning(true); setResults(null);
+        try {
+            const payload = {
+                pool_code: poolCode,
+                fund_weight: fundWeight / 100,
+                tech_weight: techWeight / 100,
+                tech_factors: selectedFactors.map(f => ({ id: f.id, name: f.name, expression: f.expression, direction: f.direction })),
+                top_n: topN,
+                end_date: endDate.replace(/-/g, ''),
+            };
+            const data = await api.post('/api/screener/run', payload, { timeoutMs: 300000 });
+            setResults(data);
+            showToast(`选股完成，共 ${(data.results||[]).length} 只`, 'success');
+        } catch(e) { showToast((e&&e.detail)||'选股失败', 'error'); }
+        setRunning(false);
+    };
+
+    const openKline = async (ts_code, name) => {
+        setKlineModal({ ts_code, name }); setKlineLoading(true); setKlineData(null);
+        try {
+            const d = await api.get(`/api/screener/kline/${ts_code}?limit=300`);
+            setKlineData(d.candles || []);
+        } catch(e) { showToast('K线加载失败', 'error'); }
+        setKlineLoading(false);
+    };
+
+    const sortedResults = React.useMemo(() => {
+        if (!results || !results.results) return [];
+        return [...results.results].sort((a, b) => {
+            const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+            return sortDir * (bv - av);
+        });
+    }, [results, sortKey, sortDir]);
+
+    const handleSort = (key) => {
+        if (sortKey === key) setSortDir(d => -d);
+        else { setSortKey(key); setSortDir(-1); }
+    };
+
+    const SortIcon = ({ col }) => sortKey === col ? (sortDir < 0 ? ' ↓' : ' ↑') : '';
+    const num = (v, d=2) => v != null && Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '-';
+    const scoreColor = (v) => v == null ? '' : v >= 70 ? 'text-profit' : v >= 40 ? '' : 'text-loss';
+
+    // K-line chart using recharts
+    const KlineChart = ({ data }) => {
+        if (!data || !data.length) return <div className="empty-state" style={{height:300}}>无K线数据</div>;
+        const chartData = data.map(d => ({
+            date: d.date ? d.date.slice(4,6)+'/'+d.date.slice(6,8) : '',
+            close: d.close, open: d.open, high: d.high, low: d.low,
+            vol: d.vol ? Math.round(d.vol/100) : 0,
+        }));
+        const closes = chartData.map(d => d.close).filter(Boolean);
+        const minC = Math.min(...closes)*0.98, maxC = Math.max(...closes)*1.02;
+        return (
+            <div style={{width:'100%'}}>
+                <ResponsiveContainer width="100%" height={280}>
+                    <ComposedChart data={chartData} margin={{top:8,right:16,bottom:0,left:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)"/>
+                        <XAxis dataKey="date" tick={{fill:'#7a94ad',fontSize:10}} tickLine={false} interval={Math.floor(chartData.length/8)}/>
+                        <YAxis domain={[minC,maxC]} tick={{fill:'#7a94ad',fontSize:10}} tickLine={false} width={60} tickFormatter={v=>v.toFixed(2)}/>
+                        <Tooltip contentStyle={{background:'#141e2e',border:'1px solid #1e2d44',borderRadius:8,color:'#dce8f8',fontSize:12}} formatter={(v,n)=>[Number(v).toFixed(3),n]}/>
+                        <Line connectNulls type="monotone" dataKey="close" stroke="#4f6ef7" strokeWidth={2} dot={false} name="收盘"/>
+                        <Line connectNulls type="monotone" dataKey="high" stroke="#1fd575" strokeWidth={1} dot={false} strokeDasharray="3 2" name="最高"/>
+                        <Line connectNulls type="monotone" dataKey="low" stroke="#f0425a" strokeWidth={1} dot={false} strokeDasharray="3 2" name="最低"/>
+                    </ComposedChart>
+                </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={80}>
+                    <BarChart data={chartData} margin={{top:4,right:16,bottom:0,left:0}}>
+                        <XAxis dataKey="date" tick={false} axisLine={false}/>
+                        <YAxis tick={false} axisLine={false} width={60}/>
+                        <Bar dataKey="vol" fill="#4f6ef7" opacity={0.5} name="成交量(百股)"/>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        );
+    };
+
+    return (
+        <div className="fade-in" style={{maxWidth:1400,margin:'0 auto',padding:'0 0 40px 0'}}>
+            {/* ── Header ────────────────────────────── */}
+            <div style={{marginBottom:20,paddingTop:4}}>
+                <h2 style={{fontSize:22,fontWeight:800,color:'var(--text-100)',marginBottom:4,background:'linear-gradient(90deg,var(--accent-light),var(--cyan))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>智能选股</h2>
+                <p style={{fontSize:13,color:'var(--text-400)'}}>基本面（改进版 Piotroski F-Score）+ 技术面（用户自选因子）双维度评分，按综合得分排序</p>
+            </div>
+
+            {/* ── Settings Row ──────────────────────── */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:16}}>
+                {/* 股票池 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)',marginBottom:12}}>📊 股票池</div>
+                    <label className="label">选择池</label>
+                    <select className="input" value={poolCode} onChange={e=>setPoolCode(e.target.value)} style={{marginBottom:8}}>
+                        <optgroup label="主流指数">
+                            {(options.system_pools||[]).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
+                        </optgroup>
+                        <optgroup label="行业板块">
+                            {(options.industry_pools||[]).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
+                        </optgroup>
+                    </select>
+                    <div style={{display:'flex',gap:8,marginTop:8}}>
+                        <div style={{flex:1}}>
+                            <label className="label">截止日期</label>
+                            <input className="input" type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}/>
+                        </div>
+                        <div style={{flex:'0 0 80px'}}>
+                            <label className="label">展示前N</label>
+                            <input className="input" type="number" min={5} max={200} value={topN} onChange={e=>setTopN(Number(e.target.value)||50)}/>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 权重设置 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)',marginBottom:12}}>⚖️ 基本面 / 技术面 权重</div>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                        <span style={{color:'var(--accent-light)',fontWeight:700,fontSize:15}}>{fundWeight}<span style={{fontSize:11,color:'var(--text-400)'}}> / 100</span></span>
+                        <span style={{fontSize:12,color:'var(--text-400)'}}>基本面 ↔ 技术面</span>
+                        <span style={{color:'var(--cyan)',fontWeight:700,fontSize:15}}>{techWeight}<span style={{fontSize:11,color:'var(--text-400)'}}> / 100</span></span>
+                    </div>
+                    <input type="range" min={0} max={100} value={fundWeight} onChange={e=>handleWeightChange('fund',e.target.value)} style={{width:'100%',accentColor:'var(--accent)',marginBottom:12}}/>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        <div style={{background:'rgba(79,110,247,0.1)',borderRadius:10,padding:'8px 12px',border:'1px solid rgba(79,110,247,0.2)',textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--text-400)'}}>基本面</div>
+                            <div style={{fontSize:20,fontWeight:800,color:'var(--accent-light)'}}>{fundWeight}%</div>
+                            <div style={{fontSize:10,color:'var(--text-500)'}}>Piotroski F-Score</div>
+                        </div>
+                        <div style={{background:'rgba(34,211,238,0.08)',borderRadius:10,padding:'8px 12px',border:'1px solid rgba(34,211,238,0.2)',textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--text-400)'}}>技术面</div>
+                            <div style={{fontSize:20,fontWeight:800,color:'var(--cyan)'}}>{techWeight}%</div>
+                            <div style={{fontSize:10,color:'var(--text-500)'}}>自选因子</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 技术因子 */}
+                <div className="card" style={{padding:18}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                        <div style={{fontWeight:700,fontSize:13,color:'var(--text-200)'}}>📈 技术因子 <span style={{color:'var(--text-400)',fontWeight:400,fontSize:11}}>({selectedFactors.length}个)</span></div>
+                        <button className="btn btn-primary" style={{padding:'4px 10px',fontSize:12}} onClick={()=>setShowFactorPicker(!showFactorPicker)}>+ 添加</button>
+                    </div>
+                    {showFactorPicker && (
+                        <div style={{marginBottom:8,background:'var(--bg-600)',borderRadius:10,padding:10,border:'1px solid var(--border)'}}>
+                            <input className="input" placeholder="搜索因子..." value={factorSearch} onChange={e=>setFactorSearch(e.target.value)} style={{marginBottom:8,fontSize:12}}/>
+                            <div style={{maxHeight:120,overflowY:'auto'}}>
+                                {filteredFactors.map(f=>(
+                                    <div key={f.id||f.name} onClick={()=>addFactor(f)} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:12,color:'var(--text-300)'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-500)'} onMouseLeave={e=>e.currentTarget.style.background=''}>{f.name} <span style={{color:'var(--text-500)',fontSize:10}}>{(f.expression||'').slice(0,30)}</span></div>
+                                ))}
+                                {filteredFactors.length === 0 && <div style={{color:'var(--text-500)',fontSize:12,textAlign:'center',padding:'8px 0'}}>无匹配因子</div>}
+                            </div>
+                        </div>
+                    )}
+                    <div style={{maxHeight:120,overflowY:'auto'}}>
+                        {selectedFactors.length === 0 && <div style={{color:'var(--text-500)',fontSize:12,textAlign:'center',padding:'16px 0'}}>暂未添加技术因子</div>}
+                        {selectedFactors.map((f,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                                <span style={{flex:1,fontSize:12,color:'var(--text-300)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                                <button onClick={()=>toggleDir(i)} style={{padding:'2px 8px',borderRadius:5,border:'1px solid',fontSize:10,cursor:'pointer',background:'transparent',borderColor:f.direction==='high'?'var(--profit)':'var(--loss)',color:f.direction==='high'?'var(--profit)':'var(--loss)'}}>{f.direction==='high'?'↑高好':'↓低好'}</button>
+                                <button onClick={()=>removeFactor(i)} style={{color:'var(--text-500)',background:'none',border:'none',cursor:'pointer',fontSize:14,padding:'0 2px'}}>×</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Run Button ────────────────────────── */}
+            <div style={{textAlign:'center',marginBottom:20}}>
+                <button className="btn btn-primary" style={{padding:'12px 48px',fontSize:16,borderRadius:12}} onClick={runScreener} disabled={running}>
+                    {running ? <><span className="spinner"/> 选股中...(约需1-3分钟)</> : '🔍 开始选股'}
+                </button>
+                {running && <div style={{fontSize:12,color:'var(--text-400)',marginTop:8}}>正在计算 {allPools.find(p=>p.code===poolCode)?.name||poolCode} 成分股评分，请稍候...</div>}
+            </div>
+
+            {/* ── Results ───────────────────────────── */}
+            {results && (
+                <div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                        <div>
+                            <span style={{fontWeight:700,color:'var(--text-100)',fontSize:16}}>选股结果</span>
+                            <span style={{color:'var(--text-400)',fontSize:13,marginLeft:10}}>共分析 {results.total_codes} 只，展示前 {(results.results||[]).length} 名</span>
+                            <span style={{color:'var(--text-500)',fontSize:11,marginLeft:8}}>截止 {results.end_date} · 基本面 {results.fund_weight}% · 技术面 {results.tech_weight}%</span>
+                        </div>
+                    </div>
+                    <div className="card" style={{padding:0,overflow:'hidden'}}>
+                        <div style={{overflowX:'auto'}}>
+                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                                <thead>
+                                    <tr style={{background:'rgba(0,0,0,0.2)'}}>
+                                        {[['rank','排名'],['name','股票'],['total_score','综合分'],['fund_score','基本面分'],['tech_score','技术面分'],['pe','PE'],['pb','PB'],['total_mv','市值(亿)'],['roe','ROE%'],['debt_to_assets','资负比%']].map(([k,l])=>(
+                                            <th key={k} onClick={()=>handleSort(k)} style={{padding:'10px 14px',color:'var(--text-400)',fontWeight:500,cursor:'pointer',textAlign:'right',whiteSpace:'nowrap',userSelect:'none',borderBottom:'1px solid var(--border)'}}>{l}<SortIcon col={k}/></th>
+                                        ))}
+                                        <th style={{padding:'10px 14px',color:'var(--text-400)',fontWeight:500,borderBottom:'1px solid var(--border)'}}>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedResults.map((row,i)=>(
+                                        <tr key={row.ts_code} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-600)'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-400)',fontWeight:600}}>{row.rank}</td>
+                                            <td style={{padding:'9px 14px'}}>
+                                                <div style={{fontWeight:600,color:'var(--text-100)'}}>{row.name}</div>
+                                                <div style={{fontSize:11,color:'var(--text-500)'}}>{row.ts_code} {row.industry&&<span style={{color:'var(--accent-light)'}}> · {row.industry}</span>}</div>
+                                            </td>
+                                            <td style={{padding:'9px 14px',textAlign:'right'}}>
+                                                <span style={{fontWeight:800,fontSize:16,color:row.total_score>=70?'var(--profit)':row.total_score>=40?'var(--gold)':'var(--loss)'}}>{num(row.total_score,1)}</span>
+                                            </td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--accent-light)',fontWeight:600}}>{num(row.fund_score,1)}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--cyan)',fontWeight:600}}>{num(row.tech_score,1)}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.pe!=null?num(row.pe,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.pb!=null?num(row.pb,2):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:'var(--text-300)'}}>{row.total_mv!=null?num(row.total_mv,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:row.roe>12?'var(--profit)':row.roe>5?'var(--text-300)':'var(--loss)'}}>{row.roe!=null?num(row.roe,1):'-'}</td>
+                                            <td style={{padding:'9px 14px',textAlign:'right',color:row.debt_to_assets<50?'var(--profit)':row.debt_to_assets<70?'var(--gold)':'var(--loss)'}}>{row.debt_to_assets!=null?num(row.debt_to_assets,1):'-'}</td>
+                                            <td style={{padding:'9px 14px'}}>
+                                                <div style={{display:'flex',gap:6',justifyContent:'center'}}>
+                                                    <button className="btn btn-secondary" style={{padding:'3px 10px',fontSize:11}} onClick={()=>openKline(row.ts_code, row.name)}>K线</button>
+                                                    {row.piotroski_details && Object.keys(row.piotroski_details).length>0 && (
+                                                        <button className="btn btn-secondary" style={{padding:'3px 10px',fontSize:11}} onClick={()=>setPiDetails(piDetails?.ts_code===row.ts_code?null:row)}>F分</button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Piotroski detail popup */}
+                    {piDetails && (
+                        <div className="card" style={{marginTop:12,padding:16,border:'1px solid rgba(79,110,247,0.25)'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+                                <span style={{fontWeight:700,color:'var(--text-100)'}}>{piDetails.name} — Piotroski F-Score 明细 ({piDetails.piotroski_details&&Object.values(piDetails.piotroski_details).reduce((a,b)=>a+b,0)} / 9)</span>
+                                <button onClick={()=>setPiDetails(null)} style={{background:'none',border:'none',color:'var(--text-400)',cursor:'pointer',fontSize:18}}>×</button>
+                            </div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                                {Object.entries(piDetails.piotroski_details||{}).map(([k,v])=>(
+                                    <div key={k} style={{padding:'5px 14px',borderRadius:20,fontSize:12,background:v?'rgba(31,213,117,0.15)':'rgba(240,66,90,0.12)',color:v?'var(--profit)':'var(--loss)',border:`1px solid ${v?'rgba(31,213,117,0.25)':'rgba(240,66,90,0.2)'}`}}>{v?'✓':'✗'} {k}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── K-line Modal ──────────────────────── */}
+            {klineModal && (
+                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={()=>{setKlineModal(null);setKlineData(null);}}>
+                    <div style={{background:'var(--bg-700)',borderRadius:16,padding:24,width:'min(900px,95vw)',border:'1px solid var(--border)',boxShadow:'0 24px 80px rgba(0,0,0,0.5)'}} onClick={e=>e.stopPropagation()}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                            <div>
+                                <span style={{fontWeight:800,fontSize:18,color:'var(--text-100)'}}>{klineModal.name}</span>
+                                <span style={{color:'var(--text-400)',fontSize:13,marginLeft:8}}>{klineModal.ts_code}</span>
+                            </div>
+                            <button onClick={()=>{setKlineModal(null);setKlineData(null);}} style={{background:'var(--bg-600)',border:'1px solid var(--border)',color:'var(--text-300)',borderRadius:8,padding:'4px 12px',cursor:'pointer',fontSize:14}}>关闭</button>
+                        </div>
+                        {klineLoading && <div style={{textAlign:'center',padding:60,color:'var(--text-400)'}}>加载中...</div>}
+                        {!klineLoading && klineData && <KlineChart data={klineData}/>}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

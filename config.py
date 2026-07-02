@@ -3,7 +3,7 @@ import os
 import shutil
 import sqlite3
 
-VERSION = "26.5.14"
+VERSION = "26.06.29"
 REPO_URL = "https://github.com/AlanWPY/QTsys.git"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

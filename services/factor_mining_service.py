@@ -586,6 +586,72 @@ PROFESSIONAL_FACTOR_THEMES = [
             {"name": "quality_turnover", "expression": "-rank(turnover_rate)", "description": "低换手拥挤度优选。"},
         ],
     },
+    {
+        "name": "short_term_reversal",
+        "source": "research_seed",
+        "hypothesis": "Short-term price reversals are robust in A-shares due to retail overreaction.",
+        "templates": [
+            {"name": "reversal_5d", "expression": "-(pctchange(close, 5))", "description": "5-day reversal factor."},
+            {"name": "reversal_10d_vol_adj", "expression": "-(pctchange(close, 10)) / (std(returns, 20) + 0.0001)", "description": "Vol-adjusted 10-day reversal."},
+            {"name": "momentum_drawdown_adj", "expression": "pctchange(close, 40) / (abs(drawdown_from_high(close, 40)) + 0.01)", "description": "Drawdown-adjusted 40-day momentum."},
+        ],
+    },
+    {
+        "name": "low_volatility",
+        "source": "research_seed",
+        "hypothesis": "Low-volatility anomaly: low-vol stocks earn risk-adjusted premium in A-shares.",
+        "templates": [
+            {"name": "neg_realized_vol_20", "expression": "-(std(returns, 20))", "description": "Negative realized vol (low-vol factor)."},
+            {"name": "neg_downside_vol_30", "expression": "-(downside_std(returns, 30))", "description": "Negative downside volatility."},
+            {"name": "smooth_momentum_20", "expression": "pctchange(close, 20) * efficiency_ratio(close, 20)", "description": "Return weighted by efficiency ratio."},
+        ],
+    },
+    {
+        "name": "value_quality",
+        "source": "research_seed",
+        "hypothesis": "Combined value+quality: low PE/PB with low volatility outperforms in China.",
+        "templates": [
+            {"name": "ep_ratio", "expression": "1 / (pe + 0.1)", "description": "Earnings yield (1/PE)."},
+            {"name": "bp_ratio", "expression": "1 / (pb + 0.1)", "description": "Book-to-price (1/PB)."},
+            {"name": "value_quality_combo", "expression": "(1 / (pe + 0.1)) * (1 / (std(returns, 30) + 0.001))", "description": "Value filtered by low-vol quality."},
+            {"name": "amihud_illiq_20", "expression": "mean(abs(returns) / (amount / 1e6 + 0.001), 20)", "description": "Amihud illiquidity (20-day)."},
+        ],
+    },
+    {
+        "name": "alpha101_price_volume",
+        "source": "research_seed",
+        "hypothesis": "WorldQuant Alpha101-style price-volume correlation factors. Negative correlation between volume and price change signals informed vs. uninformed trading.",
+        "templates": [
+            {"name": "alpha_neg_vol_ret_corr_6", "expression": "-corr(rank(delta(log(vol + 0.001), 2)), rank(returns), 6)", "description": "Alpha2: neg corr of volume delta rank and return rank."},
+            {"name": "alpha_neg_open_vol_corr_10", "expression": "-corr(rank(open), rank(vol), 10)", "description": "Alpha3: neg rank corr of open price and volume."},
+            {"name": "alpha_high_vol_corr_5", "expression": "-corr(rank(high), rank(vol), 5)", "description": "Alpha16 variant: neg rank corr of high and volume."},
+            {"name": "alpha_vol_momentum_8", "expression": "ts_rank(vol / (mean(vol, 20) + 0.001), 20) * ts_rank(-(delta(close, 7)), 8)", "description": "Alpha43: vol ratio rank times price reversal rank."},
+            {"name": "alpha_vwap_spread", "expression": "sqrt(abs(high * low)) - vwap", "description": "Alpha41: geometric mid-price minus vwap."},
+        ],
+    },
+    {
+        "name": "alpha101_structural",
+        "source": "research_seed",
+        "hypothesis": "Structural price patterns from WorldQuant Alpha101. Open-close spread and range patterns predict future returns through market microstructure.",
+        "templates": [
+            {"name": "alpha_open_close_rank", "expression": "rank(open / close - 1)", "description": "Alpha33: rank of open-to-close return."},
+            {"name": "alpha_ts_rank_times_oc", "expression": "-ts_rank(close, 10) * rank(close / open)", "description": "Alpha38: time-series rank times open-close ratio."},
+            {"name": "alpha_high_vol_std", "expression": "-std(high, 10) * corr(high, vol, 10)", "description": "Alpha40: negative high volatility weighted by vol correlation."},
+            {"name": "alpha_vwap_ratio", "expression": "rank(vwap - close) / (rank(vwap + close) + 0.001)", "description": "Alpha42: vwap premium ratio."},
+            {"name": "alpha_max_corr_3", "expression": "-ts_max(corr(ts_rank(vol, 5), ts_rank(high, 5), 5), 3)", "description": "Alpha26: max rolling volume-high rank correlation."},
+        ],
+    },
+    {
+        "name": "ic_stable_factors",
+        "source": "research_seed",
+        "hypothesis": "Factors designed for IC stability across market regimes. Uses cross-sectional rank normalization and multi-window smoothing to reduce IC decay.",
+        "templates": [
+            {"name": "smooth_rank_momentum_20", "expression": "mean(rank(pctchange(close, 5)), 20) - mean(rank(pctchange(close, 5)), 60)", "description": "Smoothed rank momentum: recent vs long-term rank percentile."},
+            {"name": "rank_reversal_stable", "expression": "-(rank(pctchange(close, 5)) * rank(1 / (std(returns, 20) + 0.001)))", "description": "Low-vol reversal with rank normalization for IC stability."},
+            {"name": "vol_weighted_return_10", "expression": "mean(returns * (1 / (std(returns, 20) + 0.001)), 10)", "description": "Volatility-inverse weighted return (IC-stable momentum)."},
+            {"name": "signed_log_volume_delta", "expression": "sign(delta(vol, 1)) * log(abs(delta(vol, 1)) + 1)", "description": "Signed log volume change (mitigates outlier impact)."},
+        ],
+    },
 ]
 
 
@@ -1228,25 +1294,19 @@ class MiningDataContext:
         completed = 0
         failed = 0
         total = len(self.universe)
-        max_workers = min(max((os.cpu_count() or 4) // 2, 2), 4)
+        # Use more workers; pickle cache is per-stock-filename so threads never conflict.
+        # One shared TushareClient is used via self.cache to avoid expensive per-stock init.
+        max_workers = min(max(os.cpu_count() or 4, 8), 16)
         warmup_start = _warmup_start_date(self.start_date)
         display_start = pd.to_datetime(self.start_date)
         display_end = pd.to_datetime(self.end_date)
 
         def load_one(code: str):
-            client = TushareClient(settings.tushare_token)
-            worker_cache = DataCache(client, mysql_conn=make_mysql_conn(settings))
-            try:
-                daily = worker_cache.get_daily(code, warmup_start, self.end_date, adj="qfq")
-                exec_daily = worker_cache.get_daily(code, warmup_start, self.end_date, adj=None)
-                basic = worker_cache.get_daily_basic(code, warmup_start, self.end_date)
-                return code, daily, exec_daily, basic
-            finally:
-                if worker_cache.mysql:
-                    try:
-                        worker_cache.mysql.close()
-                    except Exception:
-                        pass
+            # Reuse the shared cache (pickle files are per-stock, thread-safe for different codes)
+            daily = self.cache.get_daily(code, warmup_start, self.end_date, adj="qfq")
+            exec_daily = self.cache.get_daily(code, warmup_start, self.end_date, adj=None)
+            basic = self.cache.get_daily_basic(code, warmup_start, self.end_date)
+            return code, daily, exec_daily, basic
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1602,6 +1662,50 @@ def _forward_open_return(ctx: MiningDataContext, code: str, signal_date, forward
     return float(exit_open) / float(entry_open) - 1.0
 
 
+
+def _compute_ic_halflife(factors: dict[str, pd.Series], ctx: MiningDataContext, dates: set) -> dict:
+    """WorldQuant-style IC decay analysis: compute IC at multiple forward windows.
+    
+    Returns the IC at each period and an estimated half-life (days until IC drops to 50% of peak).
+    Used to determine optimal rebalancing frequency.
+    """
+    windows = [1, 3, 5, 10, 20]
+    ic_by_window = {}
+    for w in windows:
+        ic_vals = []
+        for dt in sorted(dates):
+            row = []
+            for code, series in factors.items():
+                if dt not in series.index:
+                    continue
+                fv = series.get(dt)
+                fr = _forward_open_return(ctx, code, dt, w)
+                if pd.notna(fv) and pd.notna(fr):
+                    row.append((float(fv), float(fr)))
+            if len(row) >= 5:
+                ic = _rank_ic([x[0] for x in row], [x[1] for x in row])
+                if pd.notna(ic):
+                    ic_vals.append(ic)
+        ic_by_window[w] = abs(float(np.nanmean(ic_vals))) if ic_vals else 0.0
+
+    peak_ic = max(ic_by_window.values()) if ic_by_window else 0.0
+    half_threshold = peak_ic * 0.5
+    optimal_window = max(ic_by_window, key=ic_by_window.get) if ic_by_window else 5
+    # Estimate half-life: first window where IC drops below 50% of peak
+    halflife = 20  # default
+    if peak_ic > 0:
+        for w in windows:
+            if ic_by_window[w] <= half_threshold:
+                halflife = w
+                break
+    return {
+        "ic_by_window": {str(w): round(v, 6) for w, v in ic_by_window.items()},
+        "optimal_window": int(optimal_window),
+        "peak_ic": round(peak_ic, 6),
+        "halflife_days": int(halflife),
+    }
+
+
 def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, dates: set, forward_days: int = 5) -> dict:
     ic_values = []
     long_short = []
@@ -1667,6 +1771,8 @@ def _segment_metrics(factors: dict[str, pd.Series], ctx: MiningDataContext, date
         "valid_points": int(valid_points),
         "monotonicity": round(1.0 if ls > 0 else -1.0 if ls < 0 else 0.0, 4),
         "monotonicity_score": round(group_monotonicity, 2),
+        "ic_stability": round(float(np.mean(ic_arr * ic_direction > 0.01)) if len(ic_arr) > 4 else 0.0, 4),
+        "ic_skew": round(float(np.skew(ic_arr)) if len(ic_arr) > 4 else 0.0, 4) if hasattr(np, 'skew') else 0.0,
     }
 
 
@@ -2108,8 +2214,11 @@ def _fast_screen_candidate(
         return False, {**metrics, "fast_reject_reason": "valid_ic_count_below_3"}
     if coverage < 45.0:
         return False, {**metrics, "fast_reject_reason": "coverage_below_45pct"}
-    if directional_ic < 0.0002 and abs(_safe_float(metrics.get("long_short_return"))) < 0.02:
+    if directional_ic < 0.0015 and abs(_safe_float(metrics.get("long_short_return"))) < 0.015:
         return False, {**metrics, "fast_reject_reason": "validation_signal_near_zero"}
+    icir = abs(_safe_float(metrics.get("ic_ir")))
+    if valid_count >= 10 and directional_ic < 0.003 and icir < 0.08:
+        return False, {**metrics, "fast_reject_reason": "ic_and_icir_both_too_low"}
     return True, metrics
 
 
@@ -2357,13 +2466,17 @@ def _institutional_final_score(
     dsr = _safe_float(significance.get("dsr"))
     p_value = min(_safe_float(significance.get("bonferroni_p"), 1.0), 1.0)
     pbo_penalty = {"low": 0.0, "medium": 0.25, "high": 0.65}.get(str(overfit_risk.get("pbo_risk")), 0.35)
+    ic_decay = _safe_float(robustness.get("ic_decay"), 1.0)
+    # Reward factors with slow IC decay (ic_decay < 0.3 = factor sustained well in test set)
+    decay_bonus = max(0.0, (0.5 - ic_decay)) * 0.4
     return round(
         base
         + dsr * 0.20
         + _safe_float(robustness.get("robustness_score")) / 120.0
         + _safe_float(capacity.get("capacity_score")) / 350.0
         - p_value * 0.30
-        - pbo_penalty,
+        - pbo_penalty
+        + decay_bonus,
         6,
     )
 
@@ -4318,6 +4431,19 @@ def _serialize_candidate(item: FactorMiningCandidate) -> dict:
     }
 
 
+async def get_all_pinned_candidates(db: AsyncSession, limit: int = 200) -> dict:
+    """Return all pinned candidates across all sessions, newest first."""
+    limit = max(1, min(int(limit or 200), 500))
+    result = await db.execute(
+        select(FactorMiningCandidate)
+        .where(FactorMiningCandidate.is_pinned == 1, FactorMiningCandidate.is_deleted == 0)
+        .order_by(FactorMiningCandidate.id.desc())
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    return {"items": [_serialize_candidate(item) for item in rows], "count": len(rows)}
+
+
 async def get_streaming_mining_results(db: AsyncSession, session_id: str, after_id: int = 0, limit: int = 50, pinned_only: bool = False) -> dict:
     limit = max(1, min(int(limit or 50), 200))
     conditions = [
@@ -4544,7 +4670,7 @@ async def stop_streaming_mining_session(db: AsyncSession, session_id: str) -> di
         await db.execute(
             update(FactorMiningSession)
             .where(FactorMiningSession.session_id == session_id)
-            .values(status="running", phase="stopping", message="已收到停止请求，正在安全停止", updated_at=datetime.utcnow())
+            .values(status="stopping", phase="stopping", message="已收到停止请求，正在安全停止", updated_at=datetime.utcnow())
         )
         await db.commit()
         return {"success": True, "message": "已发送停止请求"}

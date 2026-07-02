@@ -2,6 +2,7 @@
 import os
 import time
 import hashlib
+import threading
 import pandas as pd
 import numpy as np
 from typing import Optional
@@ -104,6 +105,7 @@ class DataCache:
         self.client = client
         self.mysql = mysql_conn
         self._mysql_disabled_tables = set()
+        self._mysql_lock = threading.Lock()
         if self.mysql:
             self._ensure_mysql_tables()
 
@@ -142,27 +144,28 @@ class DataCache:
 
     def _mysql_read(self, table: str, ts_code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
         """从 MySQL 二级缓存读取指定区间数据。"""
-        if not self.mysql or table in self._mysql_disabled_tables:
-            return None
-        try:
-            cur = self.mysql.cursor()
-            sql = f"SELECT * FROM {table} WHERE ts_code=%s AND trade_date>=%s AND trade_date<=%s ORDER BY trade_date"
-            cur.execute(sql, (ts_code, start_date, end_date))
-            rows = cur.fetchall()
-            columns = [col[0] for col in cur.description] if cur.description else []
-            cur.close()
-            if not rows or not columns:
+        with self._mysql_lock:
+            if not self.mysql or table in self._mysql_disabled_tables:
                 return None
-            df = pd.DataFrame(list(rows), columns=columns)
-            if not df.empty and "trade_date" in df.columns:
-                df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
-                df = df.dropna(subset=["trade_date"]).sort_values("trade_date").reset_index(drop=True)
-            return df if not df.empty else None
-        except Exception as e:
-            if "doesn't exist" in str(e) or "1146" in str(e):
-                self._mysql_disabled_tables.add(table)
-            logger.warning(f"MySQL 读取缓存失败 {table}: {e}")
-            return None
+            try:
+                cur = self.mysql.cursor()
+                sql = f"SELECT * FROM {table} WHERE ts_code=%s AND trade_date>=%s AND trade_date<=%s ORDER BY trade_date"
+                cur.execute(sql, (ts_code, start_date, end_date))
+                rows = cur.fetchall()
+                columns = [col[0] for col in cur.description] if cur.description else []
+                cur.close()
+                if not rows or not columns:
+                    return None
+                df = pd.DataFrame(list(rows), columns=columns)
+                if not df.empty and "trade_date" in df.columns:
+                    df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
+                    df = df.dropna(subset=["trade_date"]).sort_values("trade_date").reset_index(drop=True)
+                return df if not df.empty else None
+            except Exception as e:
+                if "doesn't exist" in str(e) or "1146" in str(e):
+                    self._mysql_disabled_tables.add(table)
+                logger.warning(f"MySQL 读取缓存失败 {table}: {e}")
+                return None
 
     def _normalize_mysql_value(self, value, column: str):
         if value is None:
@@ -189,23 +192,24 @@ class DataCache:
 
     def _mysql_write(self, table: str, df: pd.DataFrame, cols: list):
         """写入 MySQL 二级缓存，使用 `REPLACE INTO` 覆盖。"""
-        if not self.mysql or df.empty or table in self._mysql_disabled_tables:
-            return
-        try:
-            cur = self.mysql.cursor()
-            placeholders = ",".join(["%s"] * len(cols))
-            sql = f"REPLACE INTO {table} ({','.join(cols)}) VALUES ({placeholders})"
-            rows = [
-                tuple(self._normalize_mysql_value(r[c], c) if c in r.index else None for c in cols)
-                for _, r in df.iterrows()
-            ]
-            cur.executemany(sql, rows)
-            self.mysql.commit()
-            cur.close()
-        except Exception as e:
-            if "doesn't exist" in str(e) or "1146" in str(e):
-                self._mysql_disabled_tables.add(table)
-            logger.warning(f"MySQL 写入缓存失败 {table}: {e}")
+        with self._mysql_lock:
+            if not self.mysql or df.empty or table in self._mysql_disabled_tables:
+                return
+            try:
+                cur = self.mysql.cursor()
+                placeholders = ",".join(["%s"] * len(cols))
+                sql = f"REPLACE INTO {table} ({','.join(cols)}) VALUES ({placeholders})"
+                rows = [
+                    tuple(self._normalize_mysql_value(r[c], c) if c in r.index else None for c in cols)
+                    for _, r in df.iterrows()
+                ]
+                cur.executemany(sql, rows)
+                self.mysql.commit()
+                cur.close()
+            except Exception as e:
+                if "doesn't exist" in str(e) or "1146" in str(e):
+                    self._mysql_disabled_tables.add(table)
+                logger.warning(f"MySQL 写入缓存失败 {table}: {e}")
 
     def _cache_path(self, key: str) -> str:
         h = hashlib.md5(f"{CACHE_SCHEMA_VERSION}:{key}".encode()).hexdigest()
@@ -327,8 +331,46 @@ class DataCache:
         merged = pd.concat(valid, ignore_index=True)
         return self._prepare_frame(merged, date_col=date_col, unique_cols=unique_cols)
 
+    def _get_daily_core(
+        self,
+        ts_code: str,
+        start_date: str,
+        end_date: str,
+        table: str,
+        base_key: str,
+        unique_cols: list,
+        fetch_fn,
+        write_cols: list,
+        is_today: bool,
+    ) -> pd.DataFrame:
+        """通用日线数据获取核心逻辑：L1 pickle → L2 MySQL → Tushare API 增量补齐"""
+        cached_full = self._load(base_key, is_today=is_today)
+        mysql_df = self._prepare_frame(
+            self._mysql_read(table, ts_code, start_date, end_date),
+            unique_cols=unique_cols,
+        )
+        base_df = self._prepare_frame(cached_full, unique_cols=unique_cols)
+        merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
+        segments = self._missing_trade_segments(merged, start_date, end_date)
+        fetched_segments = []
+        for seg_start, seg_end in segments:
+            seg_df = fetch_fn(seg_start, seg_end)
+            seg_df = self._prepare_frame(seg_df, unique_cols=unique_cols)
+            if not seg_df.empty:
+                fetched_segments.append(seg_df)
+                logger.info(f"补齐行情 {ts_code}: {seg_start} -> {seg_end}, {len(seg_df)} 条")
+        merged = self._merge_frames(merged, *fetched_segments, unique_cols=unique_cols)
+        requested = self._slice_frame(merged, start_date, end_date)
+        if requested.empty:
+            return requested
+        requested = self._validate(requested, ts_code)
+        self._save(base_key, merged)
+        for seg_df in fetched_segments:
+            self._mysql_write(table, seg_df, write_cols)
+        return requested
+
     def get_daily(self, ts_code: str, start_date: str, end_date: str, adj: str = "qfq") -> pd.DataFrame:
-        """按时间区间计算缺失片段，用于增量补数。"""
+        """按时间区间计算缺失片段，用于增量补数。L1 pickle → L2 MySQL → Tushare API。"""
         from datetime import datetime
         today = datetime.now().strftime("%Y%m%d")
         is_today = end_date >= today
@@ -339,59 +381,22 @@ class DataCache:
             return cached
 
         if adj == "qfq":
-            table = "qtsys_daily_quotes_qfq"
-            base_key = f"daily_full_{ts_code}_{adj}"
-            unique_cols = ["ts_code", "trade_date"]
-            cached_full = self._load(base_key, is_today=is_today)
-            mysql_df = self._prepare_frame(self._mysql_read(table, ts_code, start_date, end_date), unique_cols=unique_cols)
-            base_df = self._prepare_frame(cached_full, unique_cols=unique_cols)
-            merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
-            segments = self._missing_trade_segments(merged, start_date, end_date)
-            fetched_segments = []
-            for seg_start, seg_end in segments:
-                seg_df = self.client.get_daily(ts_code, seg_start, seg_end, adj=adj)
-                seg_df = self._prepare_frame(seg_df, unique_cols=unique_cols)
-                if not seg_df.empty:
-                    fetched_segments.append(seg_df)
-                    logger.info(f"补齐前复权行情 {ts_code}: {seg_start} -> {seg_end}, {len(seg_df)} 条")
-            merged = self._merge_frames(merged, *fetched_segments, unique_cols=unique_cols)
-            requested = self._slice_frame(merged, start_date, end_date)
-            if requested.empty:
-                return requested
-            requested = self._validate(requested, ts_code)
-            self._save(key, requested)
-            self._save(base_key, merged)
-            for seg_df in fetched_segments:
-                self._mysql_write(table, seg_df,
-                    ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"])
-            return requested
+            table, base_key = "qtsys_daily_quotes_qfq", f"daily_full_{ts_code}_qfq"
+            fetch_fn = lambda s, e: self.client.get_daily(ts_code, s, e, adj="qfq")
+        else:
+            table, base_key = "qtsys_daily_quotes", f"daily_full_{ts_code}_raw"
+            fetch_fn = lambda s, e: self.client.get_daily(ts_code, s, e)
 
-        table = "qtsys_daily_quotes"
-        base_key = f"daily_full_{ts_code}_raw"
         unique_cols = ["ts_code", "trade_date"]
-        cached_full = self._load(base_key, is_today=is_today)
-        mysql_df = self._prepare_frame(self._mysql_read(table, ts_code, start_date, end_date), unique_cols=unique_cols)
-        base_df = self._prepare_frame(cached_full, unique_cols=unique_cols)
-        merged = self._merge_frames(base_df, mysql_df, unique_cols=unique_cols)
-        segments = self._missing_trade_segments(merged, start_date, end_date)
-        fetched_segments = []
-        for seg_start, seg_end in segments:
-            seg_df = self.client.get_daily(ts_code, seg_start, seg_end)
-            seg_df = self._prepare_frame(seg_df, unique_cols=unique_cols)
-            if not seg_df.empty:
-                fetched_segments.append(seg_df)
-                logger.info(f"补齐日线行情 {ts_code}: {seg_start} -> {seg_end}, {len(seg_df)} 条")
-        merged = self._merge_frames(merged, *fetched_segments, unique_cols=unique_cols)
-        requested = self._slice_frame(merged, start_date, end_date)
-        if requested.empty:
-            return requested
-        requested = self._validate(requested, ts_code)
-        self._save(key, requested)
-        self._save(base_key, merged)
-        for seg_df in fetched_segments:
-            self._mysql_write(table, seg_df,
-                ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"])
-        return requested
+        write_cols = ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount", "pct_chg"]
+
+        result = self._get_daily_core(
+            ts_code, start_date, end_date,
+            table, base_key, unique_cols, fetch_fn, write_cols, is_today,
+        )
+        if not result.empty:
+            self._save(key, result)
+        return result
 
     def _apply_adj(self, df: pd.DataFrame, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """合并复权因子,计算前复权价格"""
